@@ -1,6 +1,6 @@
 import IconFont from '../../components/IconFont';
 import { getTextWidth, groupByColumn, isMobile } from '../../utils/utils';
-import { AutoComplete, Select, Tag } from 'antd';
+import { AutoComplete, Select, Tag, Button, Upload, Image } from 'antd';
 import classNames from 'classnames';
 import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -10,6 +10,13 @@ import { AgentType, ModelType } from '../type';
 import { searchRecommend } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
+import type { GetProp, UploadFile, UploadProps } from 'antd';
+import {
+  UploadOutlined
+} from '@ant-design/icons';
+
+
+type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
 
 type Props = {
   inputMsg: string;
@@ -57,8 +64,27 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [stepOptions, setStepOptions] = useState<Record<string, any[]>>({});
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
+ 
+  const getBase64 = (file: FileType): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+
+  const handlePreview = async (file: UploadFile) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj as FileType);
+    }
+    setPreviewImage(file.url || (file.preview as string));
+    setPreviewOpen(true);
+  };
 
   const inputFocus = () => {
     inputRef.current?.focus();
@@ -321,7 +347,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, [modelOptionNodes.length, associateOptionNodes.length]);
 
   const { isComposing } = useComposing(document.getElementById('chatInput'));
-
+  
   return (
     <div className={chatFooterClass}>
       <div className={styles.tools}>
@@ -414,6 +440,58 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           >
             <IconFont type="icon-ios-send" />
           </div>
+
+          {/* 上传组件 */}
+          <div
+            className={styles.uploadContainer}
+          >
+            <Upload
+              maxCount={1}
+              listType="picture-card"
+              fileList={fileList}
+              onChange = {({ file, fileList: newFileList }) => {
+                // 这里只有删除的情况才会触发
+                setFileList(newFileList);
+                console.log(file, 'file 2')
+                console.log(newFileList, 'newFileList 2')
+              }}
+              onPreview={handlePreview}
+            >
+            </Upload>
+            {previewImage && (
+              <Image
+                wrapperStyle={{ display: 'none' }}
+                preview={{
+                  visible: previewOpen,
+                  onVisibleChange: (visible) => setPreviewOpen(visible),
+                  afterOpenChange: (visible) => !visible && setPreviewImage(''),
+                }}
+                src={previewImage}
+              />
+            )}
+          </div>
+          {/* 上传组件按钮 */}
+          <div className={styles.uploadHandler}>
+            <Upload
+              maxCount={1}
+              fileList={fileList}
+              showUploadList={false}
+              onChange = {({ file, fileList: newFileList }) => {
+                // 这里只有上传的情况才会触发
+                setFileList(newFileList);
+                console.log(file, 'file 1')
+                console.log(newFileList, 'newFileList 1')
+                // file.originFileObj
+              }}
+            >
+              <Button 
+                type="primary" 
+                className={styles.uploadHandlerBtn}
+                icon={<UploadOutlined />}>
+              </Button>
+            </Upload>
+          </div>
+
         </div>
       </div>
     </div>
