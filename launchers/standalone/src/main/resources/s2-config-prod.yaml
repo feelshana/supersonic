@@ -45,6 +45,9 @@ s2:
       threshold: 0.5
       min:
         threshold: 0.3
+    embedding:
+      use-llm-enhance: false
+      use-llm-words-segement: true
 
   manage:
     chat:
@@ -70,3 +73,19 @@ s2:
     database:
       name: "bvreport"
 
+crab:
+  api:
+    appId: kuaesoba
+    secretKey: e66a04b5e44748ebbeb119adc047f02d
+    host: https://crab.migu.cn
+    file:
+      serviceName: deepseek_whole
+      serviceType: file_parse
+      urls:
+        upload: /crab/api/resource/aimanager/task/upload
+        parse: /crab/api/aigc/task/bigmodel/deep/file/aysn/parse
+        status: /crab/api/aigc/task/bigmodel/deep/file/aysn/status
+    deepseek:
+      url: /crab/api/aigc/task/bigmodel/deepseek
+      serviceName: deepseek_32B
+      serviceType: text_to_text

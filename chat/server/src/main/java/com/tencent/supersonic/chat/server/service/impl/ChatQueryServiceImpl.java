@@ -28,6 +28,8 @@ import com.tencent.supersonic.chat.server.util.ComponentFactory;
 import com.tencent.supersonic.chat.server.util.QueryReqConverter;
 import com.tencent.supersonic.common.jsqlparser.*;
 import com.tencent.supersonic.common.pojo.ChatApp;
+import com.tencent.supersonic.common.pojo.DimensionConstants;
+import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
@@ -43,6 +45,7 @@ import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.*;
+import com.tencent.supersonic.headless.chat.corrector.S2SqlDateHelper;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import com.tencent.supersonic.headless.chat.parser.llm.SqlGenStrategyFactory;
 import com.tencent.supersonic.headless.chat.query.QueryManager;
@@ -54,7 +57,6 @@ import com.tencent.supersonic.headless.server.facade.service.SemanticLayerServic
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.service.TokenStream;
 import lombok.extern.slf4j.Slf4j;
-import net.sf.jsqlparser.expression.BinaryExpression;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.StringValue;
@@ -65,11 +67,14 @@ import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -120,7 +125,12 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
 
         ParseContext parseContext = buildParseContext(chatParseReq, new ChatParseResp(queryId));
-        chatQueryParsers.forEach(p -> p.parse(parseContext));
+        for (ChatQueryParser parser : chatQueryParsers) {
+            if (parser.accept(parseContext)) {
+                parser.parse(parseContext);
+                break;
+            }
+        }
         saveHistoryInfo(parseContext);
         // 不是简易模式的自然语言回答才走后续逻辑
         if (!parseContext.getResponse().getSelectedParses().isEmpty() && !Objects.equals(
@@ -132,7 +142,6 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 }
             }
         }
-
         if (!parseContext.needFeedback()) {
             chatManageService.batchAddParse(chatParseReq, parseContext.getResponse());
             chatManageService.updateParseCostTime(parseContext.getResponse());
@@ -157,11 +166,14 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         QueryResult queryResult = new QueryResult();
         ExecuteContext executeContext = buildExecuteContext(chatExecuteReq);
         for (ChatQueryExecutor chatQueryExecutor : chatQueryExecutors) {
-            queryResult = chatQueryExecutor.execute(executeContext);
-            if (queryResult != null) {
-                break;
+            if (chatQueryExecutor.accept(executeContext)) {
+                queryResult = chatQueryExecutor.execute(executeContext);
+                if (queryResult != null) {
+                    break;
+                }
             }
         }
+
         executeContext.setResponse(queryResult);
         if (queryResult != null) {
             savePlainText(queryResult, executeContext);
@@ -195,7 +207,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         stream.onNext(chunk -> {
             try {
                 // 发送单个数据块
-                emitter.send(SseEmitter.event().data(chunk));
+                Map<String, String> data = new HashMap<>();
+                data.put("text", chunk);
+                emitter.send(SseEmitter.event().data(data, MediaType.APPLICATION_JSON));
             } catch (IOException e) {
                 log.error("SSE send error", e);
                 emitter.completeWithError(e);
@@ -226,7 +240,22 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
         saveQueryResult(chatExecuteReq, result);
     }
-
+    public void saveFinalResult(ChatExecuteReq chatExecuteReq, String finalContent) {
+        QueryResult result = new QueryResult();
+        result.setTextResult(finalContent);
+        result.setQueryState(QueryState.SUCCESS);
+        result.setQueryMode("PLAIN_TEXT");
+        ExecuteContext executeContext =buildExecuteContext(chatExecuteReq);
+        savePlainText(result, executeContext);
+        List<FileInfo> fileInfos = new ArrayList<>();
+        // 如果有文件内容，也存储
+        if (chatExecuteReq.getFileInfoList() != null && !chatExecuteReq.getFileInfoList().isEmpty()) {
+            fileInfos.addAll(chatExecuteReq.getFileInfoList());
+            result.setHasFile(true);
+            result.setFileInfoList(fileInfos);
+        }
+        saveQueryResult(chatExecuteReq, result);
+    }
     private void savePlainText(QueryResult queryResult, ExecuteContext executeContext) {
         if (!queryResult.getQueryMode().isEmpty()
                 && executeContext.getParseInfo().getSqlInfo().getResultType().isEmpty()
@@ -828,6 +857,18 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                         partitionDimension);
                 break;
             }
+            //适配直连模式
+            if (partitionDimension.getBizName().equals(fieldExpression.getFieldName())) {
+                // first remove,then add
+                removeFieldNames.add(partitionDimension.getBizName());
+                GreaterThanEquals greaterThanEquals = new GreaterThanEquals();
+                addTimeFiltersForBizName(queryData.getDateInfo().getStartDate(), greaterThanEquals,
+                        addConditions, partitionDimension);
+                MinorThanEquals minorThanEquals = new MinorThanEquals();
+                addTimeFiltersForBizName(queryData.getDateInfo().getEndDate(), minorThanEquals, addConditions,
+                        partitionDimension);
+                break;
+            }
         }
         for (FieldExpression fieldExpression : fieldExpressionList) {
             for (QueryFilter queryFilter : queryData.getDimensionFilters()) {
@@ -857,6 +898,24 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             List<Expression> addConditions, SchemaElement partitionDimension) {
         Column column = new Column(partitionDimension.getName());
         StringValue stringValue = new StringValue(date);
+        comparisonExpression.setLeftExpression(column);
+        comparisonExpression.setRightExpression(stringValue);
+        addConditions.add(comparisonExpression);
+    }
+
+    /**
+     * 兼容直连模式
+     */
+    private <T extends ComparisonOperator> void addTimeFiltersForBizName(String date, T comparisonExpression,
+                                                                         List<Expression> addConditions, SchemaElement partitionDimension) {
+        Column column = new Column(partitionDimension.getBizName());
+        StringValue stringValue;
+        Object timeFormat = partitionDimension.getExtInfo().get(DimensionConstants.DIMENSION_TIME_FORMAT);
+        if(timeFormat != null && StringUtils.isNotBlank(timeFormat.toString())){
+            stringValue = new StringValue(DateUtils.format(date,DateUtils.DEFAULT_DATE_FORMAT,timeFormat.toString()));
+        }else {
+            stringValue = new StringValue(date);
+        }
         comparisonExpression.setLeftExpression(column);
         comparisonExpression.setRightExpression(stringValue);
         addConditions.add(comparisonExpression);

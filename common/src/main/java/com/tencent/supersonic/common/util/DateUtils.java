@@ -32,6 +32,8 @@ public class DateUtils {
             new SimpleDateFormat(DEFAULT_DATE_FORMAT);
     private static final SimpleDateFormat DEFAULT_TIME_FORMATTER =
             new SimpleDateFormat(DEFAULT_DATE_FORMAT);
+    private static final List<String> SUPPORTED_DATE_FORMATS =
+            Arrays.asList("yyyy-MM-dd", "yyyy-MM", "yyyyMMdd", "yyyyMM", "yyyy/MM/dd", "yyyy/MM");
 
     public static DateTimeFormatter getDateFormatter(String date, String[] formats) {
         for (int i = 0; i < formats.length; i++) {
@@ -92,7 +94,7 @@ public class DateUtils {
     }
 
     public static String getBeforeDate(String currentDate, int intervalDay,
-            DatePeriodEnum datePeriodEnum) {
+                                       DatePeriodEnum datePeriodEnum) {
         LocalDate specifiedDate = LocalDate.parse(currentDate, DEFAULT_DATE_FORMATTER2);
         LocalDate result = null;
         switch (datePeriodEnum) {
@@ -155,6 +157,18 @@ public class DateUtils {
         return dateFormat.format(date);
     }
 
+    public static String format(String dateStr, String inputFormat, String outputFormat) {
+        SimpleDateFormat inputFormatter = new SimpleDateFormat(inputFormat);
+        String outPutDate = dateStr;
+        try {
+            Date inputDate = inputFormatter.parse(dateStr);
+            outPutDate = format(inputDate,outputFormat);
+        }catch (Exception e) {
+            log.info("parse date failed, date:{}, inputFormat:{}, outputFormat:{}", dateStr, inputFormat, outputFormat, e);
+        }
+        return outPutDate;
+    }
+
     private static boolean containsTime(Date date) {
         DateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
         String timeString = timeFormat.format(date);
@@ -162,19 +176,13 @@ public class DateUtils {
     }
 
     public static List<String> getDateList(String startDateStr, String endDateStr,
-            DatePeriodEnum period) {
+                                           DatePeriodEnum period) {
         try {
-            LocalDate startDate;
-            LocalDate endDate;
-            if (startDateStr.length() == 6) {
-                startDate = LocalDate.parse(startDateStr + "01",
-                        DateTimeFormatter.ofPattern("yyyyMMdd"));
-                endDate =
-                        LocalDate.parse(endDateStr + "01", DateTimeFormatter.ofPattern("yyyyMMdd"));
-            } else {
-                startDate = LocalDate.parse(startDateStr);
-                endDate = LocalDate.parse(endDateStr);
-            }
+            // 解析开始日期
+            LocalDate startDate = parseDateWithMultipleFormats(startDateStr);
+            // 解析结束日期
+            LocalDate endDate = parseDateWithMultipleFormats(endDateStr);
+
             List<String> datesInRange = new ArrayList<>();
             LocalDate currentDate = startDate;
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -195,6 +203,25 @@ public class DateUtils {
             log.info("parse date failed, startDate:{}, endDate:{}", startDateStr, endDateStr, e);
         }
         return Lists.newArrayList();
+    }
+
+    private static LocalDate parseDateWithMultipleFormats(String dateStr) {
+        for (String format : SUPPORTED_DATE_FORMATS) {
+            try {
+                if (format.length() == dateStr.length()) {
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+                    if ("yyyyMM".equals(format) || "yyyy-MM".equals(format)
+                            || "yyyy/MM".equals(format)) {
+                        return LocalDate.parse(dateStr + "01",
+                                DateTimeFormatter.ofPattern(format + "dd"));
+                    }
+                    return LocalDate.parse(dateStr, formatter);
+                }
+            } catch (DateTimeParseException e) {
+                log.info("parse date failed, dateStr:{}, format:{}", dateStr, format, e);
+            }
+        }
+        return null;
     }
 
     public static boolean isAnyDateString(String value) {
