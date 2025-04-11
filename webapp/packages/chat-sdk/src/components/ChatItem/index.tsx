@@ -31,6 +31,7 @@ import { useMethodRegister } from '../../hooks';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from'rehype-raw';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css'; // 浅灰色背景主题
 
@@ -720,7 +721,7 @@ const ChatItem: React.FC<Props> = ({
               <div id={'result-response-' + msgId} className='result-container'>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                  rehypePlugins={[rehypeKatex, rehypeRaw, rehypeHighlight]}
                   components={{
                     code: ({ className, children }) => {
                       const language = className?.replace('hljs language-', '') || 'text';

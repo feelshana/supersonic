@@ -11,6 +11,7 @@ import React, { ReactNode, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from'rehype-raw';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css'; // 浅灰色背景主题
 
@@ -161,7 +162,7 @@ const ExecuteItem: React.FC<Props> = ({
             
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+              rehypePlugins={[rehypeKatex,rehypeRaw, rehypeHighlight]}
               components={{
                 code: ({ className, children }) => {
                   const language = className?.replace('hljs language-', '') || 'text';
