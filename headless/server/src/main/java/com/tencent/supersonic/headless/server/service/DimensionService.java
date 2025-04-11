@@ -11,6 +11,7 @@ import com.tencent.supersonic.headless.api.pojo.request.DimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
+import com.tencent.supersonic.headless.server.persistence.dataobject.DimensionValueDO;
 import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
 
 import java.util.List;
@@ -46,6 +47,8 @@ public interface DimensionService {
     List<DimValueMap> mockDimensionValueAlias(DimensionReq dimensionReq, User user);
 
     void sendDimensionEventBatch(List<Long> modelIds, EventType eventType);
+
+    void sendDimensionValueEventBatch(List<DimensionValueDO> dimensionValueDOS, EventType type);
 
     DataEvent getAllDataEvents();
 

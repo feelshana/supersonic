@@ -1,8 +1,8 @@
 package com.tencent.supersonic.chat.api.pojo.response;
 
+import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.common.pojo.QueryAuthorization;
 import com.tencent.supersonic.common.pojo.QueryColumn;
-import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.headless.api.pojo.AggregateInfo;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;

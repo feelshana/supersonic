@@ -62,6 +62,7 @@ public class CrabConfig {
         String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
         return EXTENSION_TYPE_MAP.getOrDefault(ext, ext);
     }
+
     public String getDsModel(String serviceName) {
         // 根据文档中的对应关系设置
         return switch (serviceName) {

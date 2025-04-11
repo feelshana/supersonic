@@ -40,6 +40,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -66,6 +67,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Lazy
     @Autowired
     private DictTaskServiceImpl dictTaskService;
 
@@ -417,6 +420,7 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         eventPublisher.publishEvent(dataEvent);
     }
 
+    @Override
     public void sendDimensionValueEventBatch(List<DimensionValueDO> dimensionValueDOS,
             EventType type) {
         DataEvent event = getDimValueDataEvent(dimensionValueDOS, type);

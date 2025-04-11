@@ -87,5 +87,5 @@ crab:
         status: /crab/api/aigc/task/bigmodel/deep/file/aysn/status
     deepseek:
       url: /crab/api/aigc/task/bigmodel/deepseek
-      serviceName: deepseek_32B
+      serviceName: deepseek_whole
       serviceType: text_to_text

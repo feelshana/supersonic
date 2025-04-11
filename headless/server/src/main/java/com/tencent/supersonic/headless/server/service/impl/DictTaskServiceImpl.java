@@ -101,9 +101,6 @@ public class DictTaskServiceImpl implements DictTaskService {
         return null;
     }
 
-    @Autowired
-    private DimensionServiceImpl dimensionServiceImpl;
-
     private void runDictTask(DictItemResp dictItemResp, User user) {
         if (Objects.isNull(dictItemResp)) {
             return;
@@ -144,7 +141,7 @@ public class DictTaskServiceImpl implements DictTaskService {
                 dimensionValueDO.setModelId(dictItemResp.getModelId());
                 dimensionValueDO.setDimId(dictItemResp.getItemId());
             });
-            dimensionServiceImpl.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
+            dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
         }
     }
 
@@ -191,7 +188,7 @@ public class DictTaskServiceImpl implements DictTaskService {
                         dimensionValueDO.setDimId(dictItemResp.getItemId());
                         dimensionValueDO.setDimBizName(dictItemResp.getBizName());
                     }).collect(Collectors.toList());
-            dimensionServiceImpl.sendDimensionValueEventBatch(dimensionValueDOS, EventType.DELETE);
+            dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.DELETE);
         }
     }
 

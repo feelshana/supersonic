@@ -240,22 +240,25 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
         saveQueryResult(chatExecuteReq, result);
     }
+
     public void saveFinalResult(ChatExecuteReq chatExecuteReq, String finalContent) {
         QueryResult result = new QueryResult();
         result.setTextResult(finalContent);
         result.setQueryState(QueryState.SUCCESS);
         result.setQueryMode("PLAIN_TEXT");
-        ExecuteContext executeContext =buildExecuteContext(chatExecuteReq);
+        ExecuteContext executeContext = buildExecuteContext(chatExecuteReq);
         savePlainText(result, executeContext);
         List<FileInfo> fileInfos = new ArrayList<>();
         // 如果有文件内容，也存储
-        if (chatExecuteReq.getFileInfoList() != null && !chatExecuteReq.getFileInfoList().isEmpty()) {
+        if (chatExecuteReq.getFileInfoList() != null
+                && !chatExecuteReq.getFileInfoList().isEmpty()) {
             fileInfos.addAll(chatExecuteReq.getFileInfoList());
             result.setHasFile(true);
             result.setFileInfoList(fileInfos);
         }
         saveQueryResult(chatExecuteReq, result);
     }
+
     private void savePlainText(QueryResult queryResult, ExecuteContext executeContext) {
         if (!queryResult.getQueryMode().isEmpty()
                 && executeContext.getParseInfo().getSqlInfo().getResultType().isEmpty()
@@ -857,7 +860,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                         partitionDimension);
                 break;
             }
-            //适配直连模式
+            // 适配直连模式
             if (partitionDimension.getBizName().equals(fieldExpression.getFieldName())) {
                 // first remove,then add
                 removeFieldNames.add(partitionDimension.getBizName());
@@ -865,8 +868,8 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 addTimeFiltersForBizName(queryData.getDateInfo().getStartDate(), greaterThanEquals,
                         addConditions, partitionDimension);
                 MinorThanEquals minorThanEquals = new MinorThanEquals();
-                addTimeFiltersForBizName(queryData.getDateInfo().getEndDate(), minorThanEquals, addConditions,
-                        partitionDimension);
+                addTimeFiltersForBizName(queryData.getDateInfo().getEndDate(), minorThanEquals,
+                        addConditions, partitionDimension);
                 break;
             }
         }
@@ -906,14 +909,17 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     /**
      * 兼容直连模式
      */
-    private <T extends ComparisonOperator> void addTimeFiltersForBizName(String date, T comparisonExpression,
-                                                                         List<Expression> addConditions, SchemaElement partitionDimension) {
+    private <T extends ComparisonOperator> void addTimeFiltersForBizName(String date,
+            T comparisonExpression, List<Expression> addConditions,
+            SchemaElement partitionDimension) {
         Column column = new Column(partitionDimension.getBizName());
         StringValue stringValue;
-        Object timeFormat = partitionDimension.getExtInfo().get(DimensionConstants.DIMENSION_TIME_FORMAT);
-        if(timeFormat != null && StringUtils.isNotBlank(timeFormat.toString())){
-            stringValue = new StringValue(DateUtils.format(date,DateUtils.DEFAULT_DATE_FORMAT,timeFormat.toString()));
-        }else {
+        Object timeFormat =
+                partitionDimension.getExtInfo().get(DimensionConstants.DIMENSION_TIME_FORMAT);
+        if (timeFormat != null && StringUtils.isNotBlank(timeFormat.toString())) {
+            stringValue = new StringValue(
+                    DateUtils.format(date, DateUtils.DEFAULT_DATE_FORMAT, timeFormat.toString()));
+        } else {
             stringValue = new StringValue(date);
         }
         comparisonExpression.setLeftExpression(column);
