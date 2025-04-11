@@ -28,6 +28,7 @@ public class Agent extends RecordInfo {
     private Integer id;
     private String name;
     private String description;
+    private String embedUrl;
     /** 0 offline, 1 online */
     private Integer status = ONLINE_STATUS;
     private List<String> examples;
