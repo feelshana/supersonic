@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS `s2_agent` (
                                           `id` int(11) NOT NULL AUTO_INCREMENT,
     `name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
     `description` TEXT COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    `embed_url` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
     `examples` TEXT COLLATE utf8mb4_unicode_ci DEFAULT NULL,
     `status` tinyint DEFAULT NULL,
     `model` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
