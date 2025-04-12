@@ -7,7 +7,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
 import { AgentType, ModelType } from '../type';
-import { searchRecommend } from '../../service';
+import { searchRecommend ,uploadAndParse, fileStatus } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
@@ -30,6 +30,7 @@ type Props = {
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
+  onFileResultChange: (result: {fileContent:string,fileId:string,fileName:string}|undefined) => void;
 };
 
 const { OptGroup, Option } = Select;
@@ -57,6 +58,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
+    onFileResultChange
   },
   ref
 ) => {
@@ -69,6 +71,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
+  const [fileResult, setFileResult] = useState<{fileContent:string,fileId:string,fileName:string}|undefined>(undefined);
  
   const getBase64 = (file: FileType): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -173,7 +176,10 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, []);
 
   const [debounceGetWords] = useState<any>(debounceGetWordsFunc);
-
+  const saveFileResult = (result: {fileContent:string,fileId:string,fileName:string}|undefined) => {
+    onFileResultChange(result);
+    setFileResult(result);
+  }
   useEffect(() => {
     if (inputMsg.length === 1 && inputMsg[0] === '/') {
       setOpen(true);
@@ -432,10 +438,17 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           </AutoComplete>
           <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: inputMsg?.length > 0,
+              [styles.sendBtnActive]: inputMsg?.length > 0 || fileResult,
             })}
             onClick={() => {
-              sendMsg(inputMsg);
+              if (inputMsg && !fileResult) {
+                sendMsg(inputMsg);
+              }else if (inputMsg && fileResult) {
+                onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n`+inputMsg)
+              }else if (!inputMsg && fileResult) {
+                onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n输出被引用的上文内容`)
+              }
+              
             }}
           >
             <IconFont type="icon-ios-send" />
@@ -452,6 +465,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               onChange = {({ file, fileList: newFileList }) => {
                 // 这里只有删除的情况才会触发
                 setFileList(newFileList);
+                saveFileResult(undefined)
                 console.log(file, 'file 2')
                 console.log(newFileList, 'newFileList 2')
               }}
@@ -476,12 +490,36 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               maxCount={1}
               fileList={fileList}
               showUploadList={false}
-              onChange = {({ file, fileList: newFileList }) => {
+              onChange = {async ({ file, fileList: newFileList }) => {
                 // 这里只有上传的情况才会触发
                 setFileList(newFileList);
                 console.log(file, 'file 1')
                 console.log(newFileList, 'newFileList 1')
-                // file.originFileObj
+                if (file.status === 'done') {
+                  const parseRes = await uploadAndParse(file.originFileObj as File)
+                  const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
+                  if (taskId) {
+                     let step = 0
+                     const pollFileStatus = async () => {
+                      const res = await fileStatus({taskId})
+                      if (res?.data?.body?.status === 'COMPLETED') {
+                        saveFileResult({
+                          fileContent: res.data.body.result?.fileContent,
+                          fileId: res.data.body.result?.fileId,
+                          fileName: file.name
+                        })
+                      } else {
+                        if (step < 5) {
+                          step++
+                          setTimeout(pollFileStatus, 500)
+                        } else {
+                          console.error('文件解析失败')
+                        }
+                      }
+                     }
+                     pollFileStatus()
+                  }
+                }
               }}
             >
               <Button 

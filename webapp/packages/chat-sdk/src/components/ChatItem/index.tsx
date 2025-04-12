@@ -10,7 +10,14 @@ import {
   SimilarQuestionType,
 } from '../../common/type';
 import { createContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { chatExecute,dataInterpret, chatParse, queryData, deleteQuery, switchEntity, queryThoughtsInSSE, chatStreamExecute } from '../../service';
+import { chatExecute,
+  dataInterpret, 
+  chatParse, 
+  queryData, 
+  deleteQuery, 
+  switchEntity, 
+  queryThoughtsInSSE, 
+  deepSeekStream } from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
 import { CheckCircleFilled } from '@ant-design/icons';
@@ -60,6 +67,11 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
+  fileResult: {
+    fileContent: string;
+    fileId: string;
+    fileName: string;
+  } | undefined
 };
 
 export const ChartItemContext = createContext({
@@ -91,6 +103,7 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
+  fileResult
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -197,16 +210,13 @@ const ChatItem: React.FC<Props> = ({
     isRefresh = false
   ) => {
     try {
-      if (parseInfos?.length === 1 && parseInfos[0]?.stream) {
+      if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
         const resultDiv = document.getElementById('result-response-'+msgId)
         if(resultDiv) {
-          let textContent = ''
+          let textContent = `文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]:\n\n`
           const messageFunc = (event) => {
-            try {
-              textContent += JSON.parse(event.data)?.text
-            } catch {
-              textContent += event.data?.text
-            }
+            textContent += JSON.parse(event.data)?.message
+            console.log(event.data, 'event.data')
             setStreamResultContent('' + textContent)
           }
           const errorFunc = (error) => {
@@ -219,12 +229,13 @@ const ChatItem: React.FC<Props> = ({
             console.log('(result)SSE 连接已关闭');
           };
           setIsStreamResult(true)
-          chatStreamExecute (
+          deepSeekStream (
             {
               queryText: msg,
               chatId: conversationId!,
               parseInfo: parseInfoValue,
-              agentId
+              agentId: agentId,
+              ...fileResult
             },
             messageFunc,errorFunc,closeFunc
           )

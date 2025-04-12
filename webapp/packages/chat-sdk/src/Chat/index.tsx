@@ -75,6 +75,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   const [isSimpleMode, setIsSimpleMode] = useState<boolean>(false);
   const [isDebugMode, setIsDebugMode] = useState<boolean>(true);
 
+  const fileResult = useRef<{fileContent:string,fileId:string,fileName:string}|undefined>();
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
 
@@ -421,122 +422,131 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
               onSelectAgent={onSelectAgent}
             />
           )}
-          <div className={styles.chatApp}>
-            {currentConversation && (
-              <div className={styles.chatBody}>
-                <div className={styles.chatContent}>
-                  {currentAgent && !isMobile && !noInput && (
-                    <div className={styles.chatHeader}>
-                      <Row style={{ width: '100%' }}>
-                        <Col flex="1 1 200px">
-                          <Space>
-                            <div className={styles.chatHeaderTitle}>{currentAgent.name}</div>
-                            <div className={styles.chatHeaderTip}>{currentAgent.description}</div>
-                            <Tooltip title="精简模式下，问答结果将以文本形式输出">
-                              <Switch
-                                key={currentAgent.id}
-                                style={{ position: 'relative', top: -1 }}
-                                size="small"
-                                value={isSimpleMode}
-                                checkedChildren="精简模式"
-                                unCheckedChildren="精简模式"
-                                onChange={checked => {
-                                  setIsSimpleMode(checked);
-                                }}
-                              />
-                            </Tooltip>
-                          </Space>
-                        </Col>
-                        <Col flex="0 1 118px"></Col>
-                      </Row>
-                    </div>
-                  )}
-                  <MessageContainer
-                    id="messageContainer"
-                    isSimpleMode={isSimpleMode}
-                    isDebugMode={isDebugMode}
-                    messageList={messageList}
-                    chatId={currentConversation?.chatId}
-                    historyVisible={historyVisible}
-                    currentAgent={currentAgent}
-                    chatVisible={chatVisible}
-                    isDeveloper={isDeveloper}
-                    integrateSystem={integrateSystem}
-                    onMsgDataLoaded={onMsgDataLoaded}
-                    onSendMsg={onSendMsg}
-                    onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
-                  />
-                  {!noInput && (
-                    <ChatFooter
-                      inputMsg={inputMsg}
+          {currentAgent?.embedUrl?.trim() ? 
+          <iframe src={currentAgent.embedUrl.trim()} title={currentAgent.name} className={styles.chatApp}></iframe> :
+          <>
+            <div className={styles.chatApp}>
+              {currentConversation && (
+                <div className={styles.chatBody}>
+                  <div className={styles.chatContent}>
+                    {currentAgent && !isMobile && !noInput && (
+                      <div className={styles.chatHeader}>
+                        <Row style={{ width: '100%' }}>
+                          <Col flex="1 1 200px">
+                            <Space>
+                              <div className={styles.chatHeaderTitle}>{currentAgent.name}</div>
+                              <div className={styles.chatHeaderTip}>{currentAgent.description}</div>
+                              <Tooltip title="精简模式下，问答结果将以文本形式输出">
+                                <Switch
+                                  key={currentAgent.id}
+                                  style={{ position: 'relative', top: -1 }}
+                                  size="small"
+                                  value={isSimpleMode}
+                                  checkedChildren="精简模式"
+                                  unCheckedChildren="精简模式"
+                                  onChange={checked => {
+                                    setIsSimpleMode(checked);
+                                  }}
+                                />
+                              </Tooltip>
+                            </Space>
+                          </Col>
+                          <Col flex="0 1 118px"></Col>
+                        </Row>
+                      </div>
+                    )}
+                    <MessageContainer
+                      id="messageContainer"
+                      isSimpleMode={isSimpleMode}
+                      isDebugMode={isDebugMode}
+                      messageList={messageList}
                       chatId={currentConversation?.chatId}
-                      agentList={agentList}
+                      historyVisible={historyVisible}
                       currentAgent={currentAgent}
-                      onToggleHistoryVisible={onToggleHistoryVisible}
-                      onInputMsgChange={onInputMsgChange}
-                      onSendMsg={sendMsg}
-                      onAddConversation={onAddConversation}
-                      onSelectAgent={onSelectAgent}
-                      onOpenAgents={() => {
-                        if (isMobile) {
-                          setMobileAgentsVisible(true);
-                        } else {
-                          setAgentListVisible(!agentListVisible);
-                        }
-                      }}
-                      onOpenShowcase={() => {
-                        setShowCaseVisible(!showCaseVisible);
-                      }}
-                      ref={chatFooterRef}
+                      chatVisible={chatVisible}
+                      isDeveloper={isDeveloper}
+                      integrateSystem={integrateSystem}
+                      onMsgDataLoaded={onMsgDataLoaded}
+                      onSendMsg={onSendMsg}
+                      onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
+                      fileResult={fileResult.current}
                     />
-                  )}
+                    {!noInput && (
+                      <ChatFooter
+                        inputMsg={inputMsg}
+                        chatId={currentConversation?.chatId}
+                        agentList={agentList}
+                        currentAgent={currentAgent}
+                        onToggleHistoryVisible={onToggleHistoryVisible}
+                        onInputMsgChange={onInputMsgChange}
+                        onSendMsg={sendMsg}
+                        onAddConversation={onAddConversation}
+                        onSelectAgent={onSelectAgent}
+                        onOpenAgents={() => {
+                          if (isMobile) {
+                            setMobileAgentsVisible(true);
+                          } else {
+                            setAgentListVisible(!agentListVisible);
+                          }
+                        }}
+                        onOpenShowcase={() => {
+                          setShowCaseVisible(!showCaseVisible);
+                        }}
+                        onFileResultChange={(result) => {
+                          fileResult.current = result
+                        }}
+                        ref={chatFooterRef}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <Conversation
-            currentAgent={currentAgent}
-            currentConversation={currentConversation}
-            historyVisible={historyVisible}
-            onSelectConversation={onSelectConversation}
-            onCloseConversation={onCloseConversation}
-            ref={conversationRef}
-          />
-          {currentAgent &&
-            (isMobile ? (
-              <Drawer
-                title="showcase"
-                placement="bottom"
-                height="95%"
-                open={showCaseVisible}
-                className={styles.showCaseDrawer}
-                destroyOnClose
-                onClose={() => {
-                  setShowCaseVisible(false);
-                }}
-              >
-                <ShowCase agentId={currentAgent.id} onSendMsg={onSendMsg} />
-              </Drawer>
-            ) : (
-              <Modal
-                title="showcase"
-                width="98%"
-                open={showCaseVisible}
-                centered
-                footer={null}
-                wrapClassName={styles.showCaseModal}
-                destroyOnClose
-                onCancel={() => {
-                  setShowCaseVisible(false);
-                }}
-              >
-                <ShowCase
-                  height="calc(100vh - 140px)"
-                  agentId={currentAgent.id}
-                  onSendMsg={onSendMsg}
-                />
-              </Modal>
-            ))}
+              )}
+            </div>
+            <Conversation
+              currentAgent={currentAgent}
+              currentConversation={currentConversation}
+              historyVisible={historyVisible}
+              onSelectConversation={onSelectConversation}
+              onCloseConversation={onCloseConversation}
+              ref={conversationRef}
+            />
+            {currentAgent &&
+              (isMobile ? (
+                <Drawer
+                  title="showcase"
+                  placement="bottom"
+                  height="95%"
+                  open={showCaseVisible}
+                  className={styles.showCaseDrawer}
+                  destroyOnClose
+                  onClose={() => {
+                    setShowCaseVisible(false);
+                  }}
+                >
+                  <ShowCase agentId={currentAgent.id} onSendMsg={onSendMsg} />
+                </Drawer>
+              ) : (
+                <Modal
+                  title="showcase"
+                  width="98%"
+                  open={showCaseVisible}
+                  centered
+                  footer={null}
+                  wrapClassName={styles.showCaseModal}
+                  destroyOnClose
+                  onCancel={() => {
+                    setShowCaseVisible(false);
+                  }}
+                >
+                  <ShowCase
+                    height="calc(100vh - 140px)"
+                    agentId={currentAgent.id}
+                    onSendMsg={onSendMsg}
+                  />
+                </Modal>
+              ))}
+            </>
+          }
         </div>
         <MobileAgents
           open={mobileAgentsVisible}
