@@ -1,6 +1,6 @@
 import IconFont from '../../components/IconFont';
 import { getTextWidth, groupByColumn, isMobile } from '../../utils/utils';
-import { AutoComplete, Select, Tag, Button, Upload, Image } from 'antd';
+import { AutoComplete, Select, Tag, Button, Upload, Image, message } from 'antd';
 import classNames from 'classnames';
 import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -11,6 +11,7 @@ import { searchRecommend ,uploadAndParse, fileStatus } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import {
   UploadOutlined
 } from '@ant-design/icons';
@@ -69,9 +70,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [previewImage, setPreviewImage] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const fileListRef = useRef<UploadFile[]>([]);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
   const [fileResult, setFileResult] = useState<{fileContent:string,fileId:string,fileName:string}|undefined>(undefined);
+  const [fileLoading, setFileLoading] = useState<boolean>(false)
+  const [messageApi, contextHolder] = message.useMessage();
  
   const getBase64 = (file: FileType): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -176,10 +180,23 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, []);
 
   const [debounceGetWords] = useState<any>(debounceGetWordsFunc);
-  const saveFileResult = (result: {fileContent:string,fileId:string,fileName:string}|undefined) => {
-    onFileResultChange(result);
-    setFileResult(result);
+  const saveFileResult = (result: {fileContent:string,fileId:string,fileName:string}|undefined,file?: UploadFile) => {
+    if (file?.uid === fileListRef.current?.[0]?.uid || !result) {
+      onFileResultChange(result);
+      setFileResult(result);
+      setFileLoading(false)
+    }
   }
+  useEffect(() => {
+    fileListRef.current = fileList;
+  }, [fileList]);
+
+  useEffect(() => {
+    setFileList([])
+    saveFileResult(undefined)
+    setFileLoading(false)
+  }, [chatId,currentAgent]);
+
   useEffect(() => {
     if (inputMsg.length === 1 && inputMsg[0] === '/') {
       setOpen(true);
@@ -356,6 +373,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   
   return (
     <div className={chatFooterClass}>
+      {contextHolder}
       <div className={styles.tools}>
         <div
           className={styles.toolItem}
@@ -438,15 +456,19 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           </AutoComplete>
           <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: inputMsg?.length > 0 || fileResult,
+              [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResult) && !fileLoading,
             })}
             onClick={() => {
               if (inputMsg && !fileResult) {
                 sendMsg(inputMsg);
               }else if (inputMsg && fileResult) {
                 onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n`+inputMsg)
+                setFileList([])
+                saveFileResult(undefined)
               }else if (!inputMsg && fileResult) {
                 onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n输出被引用的上文内容`)
+                setFileList([])
+                saveFileResult(undefined)
               }
               
             }}
@@ -458,6 +480,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           <div
             className={styles.uploadContainer}
           >
+            {fileLoading && <p><LoadingOutlined />&nbsp;&nbsp;解析中...</p>}
             <Upload
               maxCount={1}
               listType="picture-card"
@@ -485,7 +508,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             )}
           </div>
           {/* 上传组件按钮 */}
-          <div className={styles.uploadHandler}>
+          <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
             <Upload
               maxCount={1}
               fileList={fileList}
@@ -496,28 +519,51 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                 console.log(file, 'file 1')
                 console.log(newFileList, 'newFileList 1')
                 if (file.status === 'done') {
-                  const parseRes = await uploadAndParse(file.originFileObj as File)
-                  const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
-                  if (taskId) {
-                     let step = 0
-                     const pollFileStatus = async () => {
-                      const res = await fileStatus({taskId})
-                      if (res?.data?.body?.status === 'COMPLETED') {
-                        saveFileResult({
-                          fileContent: res.data.body.result?.fileContent,
-                          fileId: res.data.body.result?.fileId,
-                          fileName: file.name
-                        })
-                      } else {
-                        if (step < 5) {
-                          step++
-                          setTimeout(pollFileStatus, 500)
-                        } else {
-                          console.error('文件解析失败')
+                  setFileLoading(true)
+                  try {
+                    const parseRes = await uploadAndParse(file.originFileObj as File)
+                    const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
+                    if (taskId) {
+                       let step = 0
+                       const pollFileStatus = async () => {
+                        try {
+                          const res = await fileStatus({taskId})
+                          if (res?.data?.body?.status === 'COMPLETED') {
+                            saveFileResult({
+                              fileContent: res.data.body.result?.fileContent,
+                              fileId: res.data.body.result?.fileId,
+                              fileName: file.name
+                            }, file)
+                          } else {
+                            if (step < 20) {
+                              step++
+                              setTimeout(pollFileStatus, 500)
+                            } else {
+                              messageApi.error('文件解析失败');
+                              setFileList([])
+                              saveFileResult(undefined)
+                              setFileLoading(false)
+                            }
+                          }
+                        } catch (error) {
+                          if (step < 20) {
+                            step++
+                            setTimeout(pollFileStatus, 100)
+                          } else {
+                            messageApi.error('文件解析失败');
+                            setFileList([])
+                            saveFileResult(undefined)
+                            setFileLoading(false)
+                          }
                         }
-                      }
-                     }
-                     pollFileStatus()
+                       }
+                       pollFileStatus()
+                    }
+                  } catch (error) {
+                    messageApi.error(error as string);
+                    setFileList([])
+                    saveFileResult(undefined)
+                    setFileLoading(false)
                   }
                 }
               }}
