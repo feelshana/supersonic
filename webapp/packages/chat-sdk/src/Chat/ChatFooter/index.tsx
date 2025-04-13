@@ -184,7 +184,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     if (file?.uid === fileListRef.current?.[0]?.uid || !result) {
       onFileResultChange(result);
       setFileResult(result);
-      setFileLoading(false)
+      setFileLoading(false);
     }
   }
   useEffect(() => {
@@ -193,8 +193,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   useEffect(() => {
     setFileList([])
-    saveFileResult(undefined)
-    setFileLoading(false)
+    setFileResult(undefined);
+    setFileLoading(false);
   }, [chatId,currentAgent]);
 
   useEffect(() => {
@@ -464,11 +464,13 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               }else if (inputMsg && fileResult) {
                 onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n`+inputMsg)
                 setFileList([])
-                saveFileResult(undefined)
+                setFileResult(undefined);
+                setFileLoading(false);
               }else if (!inputMsg && fileResult) {
                 onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n输出被引用的上文内容`)
                 setFileList([])
-                saveFileResult(undefined)
+                setFileResult(undefined);
+                setFileLoading(false);
               }
               
             }}

@@ -213,7 +213,7 @@ const ChatItem: React.FC<Props> = ({
       if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
         const resultDiv = document.getElementById('result-response-'+msgId)
         if(resultDiv) {
-          let textContent = `文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]:\n\n`
+          let textContent = ''
           const messageFunc = (event) => {
             textContent += JSON.parse(event.data)?.message
             console.log(event.data, 'event.data')
