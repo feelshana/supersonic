@@ -110,7 +110,8 @@ public class NL2SQLParser implements ChatQueryParser {
                 Integer valueSize = 0;
                 if (!parseResp.getSelectedParses().isEmpty()) {
                     valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
-                            .filter(schemaElementMatch -> schemaElementMatch.getElement().getType() == SchemaElementType.VALUE)
+                            .filter(schemaElementMatch -> schemaElementMatch.getElement()
+                                    .getType() == SchemaElementType.VALUE)
                             .collect(Collectors.toList()).size();
                 }
                 if ((parseResp.getSelectedParses().isEmpty() && candidateParses.isEmpty())
@@ -276,7 +277,7 @@ public class NL2SQLParser implements ChatQueryParser {
                         && q.getQueryResult().getQueryState() == QueryState.SUCCESS
                         && StringUtils.endsWithIgnoreCase(userName, q.getUserName())
                         && DateUtils.calculateDiffMs(q.getCreateTime()) < 1000l * Integer
-                        .parseInt(parserConfig.getParameterValue(CHAT_HISTORY_SECONDS)))
+                                .parseInt(parserConfig.getParameterValue(CHAT_HISTORY_SECONDS)))
                 .collect(Collectors.toList());
 
         List<QueryResp> contextualList = contextualParseInfoList.subList(0,

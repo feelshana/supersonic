@@ -20,7 +20,8 @@ public class crabController {
     private DeepSeekService deepSeekService;
 
     @PostMapping(value = "/deepSeekStream")
-    public SseEmitter streamChat(@RequestBody ChatExecuteReq chatExecuteReq, HttpServletRequest request, HttpServletResponse response) {
+    public SseEmitter streamChat(@RequestBody ChatExecuteReq chatExecuteReq,
+            HttpServletRequest request, HttpServletResponse response) {
         chatExecuteReq.setUser(UserHolder.findUser(request, response));
         return deepSeekService.streamChat(chatExecuteReq);
     }

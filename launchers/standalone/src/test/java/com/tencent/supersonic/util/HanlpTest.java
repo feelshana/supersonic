@@ -42,7 +42,7 @@ public class HanlpTest {
     }
 
     @Test
-    public  void  test_123() throws Exception {
+    public void test_123() throws Exception {
         Path path;
         path = Paths.get("C:\\Users\\roylin\\.djl.ai\\tokenizers\\test.txt");
         Files.write(path, "test".getBytes());

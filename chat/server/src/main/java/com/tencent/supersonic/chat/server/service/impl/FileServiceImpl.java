@@ -7,8 +7,8 @@ import com.tencent.supersonic.chat.api.pojo.response.FileParseResponse;
 import com.tencent.supersonic.chat.api.pojo.response.FileStatusResponse;
 import com.tencent.supersonic.chat.api.pojo.response.FileUpLoadResponse;
 import com.tencent.supersonic.chat.server.config.CrabConfig;
-import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.chat.server.service.FileService;
+import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.common.util.HttpUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.common.util.MiguApiUrlUtils;
@@ -78,8 +78,8 @@ public class FileServiceImpl implements FileService {
         Map<String, Object> params = new HashMap<>();
         params.put("fileInfoList", List.of(fileInfo));
         return Map.of("serviceName", crabConfig.getFileServiceName(), "serviceType",
-                crabConfig.getFileServiceType(), "requestId", UUID.randomUUID().toString(), "params",
-                params);
+                crabConfig.getFileServiceType(), "requestId", UUID.randomUUID().toString(),
+                "params", params);
     }
 
     private FileInfo uploadFile(MultipartFile file, String fileType) {

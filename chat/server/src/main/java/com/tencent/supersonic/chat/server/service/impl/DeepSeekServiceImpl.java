@@ -40,33 +40,29 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     private final ChatQueryServiceImpl chatQueryService;
     private final ChatManageService chatManageService;
     private static final String FILE_ID = "fileId";
+
     @Autowired
-    public DeepSeekServiceImpl(WebClient.Builder webClientBuilder,
-                               ObjectMapper objectMapper,
-                               CrabConfig crabConfig,
-                               ChatQueryServiceImpl chatQueryService,
-                               ChatManageService chatManageService) {
+    public DeepSeekServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+            CrabConfig crabConfig, ChatQueryServiceImpl chatQueryService,
+            ChatManageService chatManageService) {
         this.objectMapper = objectMapper;
         this.crabConfig = crabConfig;
         this.chatQueryService = chatQueryService;
         this.chatManageService = chatManageService;
-        this.webClient = webClientBuilder
-                .baseUrl(crabConfig.getHost())
-                .build();
+        this.webClient = webClientBuilder.baseUrl(crabConfig.getHost()).build();
     }
 
     @Override
     public SseEmitter streamChat(ChatExecuteReq chatExecuteReq) {
         // 初始化请求
         String fileIds = "";
-        if (chatExecuteReq.getFileInfoList() != null && !chatExecuteReq.getFileInfoList().isEmpty()) {
-            if (chatExecuteReq.getQueryText() == null){
+        if (chatExecuteReq.getFileInfoList() != null
+                && !chatExecuteReq.getFileInfoList().isEmpty()) {
+            if (chatExecuteReq.getQueryText() == null) {
                 chatExecuteReq.setQueryText("请解析文本内容：");
             }
-            fileIds = chatExecuteReq.getFileInfoList().stream()
-                    .map(FileInfo::getFileId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.joining(";"));
+            fileIds = chatExecuteReq.getFileInfoList().stream().map(FileInfo::getFileId)
+                    .filter(Objects::nonNull).collect(Collectors.joining(";"));
         }
 
         String requestBody = buildRequestBody(chatExecuteReq);
@@ -97,23 +93,18 @@ public class DeepSeekServiceImpl implements DeepSeekService {
         });
 
         // 调用DeepSeek API
-        Disposable disposable = webClient.post()
-                .uri(urlPath)
+        Disposable disposable = webClient.post().uri(urlPath)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .header(FILE_ID, fileIds)
-                .bodyValue(requestBody)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, response -> Mono.error(new RuntimeException("API request failed")))
-                .bodyToFlux(JsonNode.class)
-                .doOnSubscribe(sub -> log.info("Subscription started"))
+                .header(FILE_ID, fileIds).bodyValue(requestBody).retrieve()
+                .onStatus(HttpStatusCode::isError,
+                        response -> Mono.error(new RuntimeException("API request failed")))
+                .bodyToFlux(JsonNode.class).doOnSubscribe(sub -> log.info("Subscription started"))
                 .onBackpressureBuffer(100)
                 .flatMap(response -> processStreamResponse(response, contentAccumulator))
                 .doOnCancel(() -> log.warn("Downstream cancelled"))
-                .subscribe(
-                        chunk -> sendSseChunk(emitter, chunk),
+                .subscribe(chunk -> sendSseChunk(emitter, chunk),
                         error -> handleStreamError(emitter, error),
-                        () -> completeStream(emitter, chatExecuteReq, contentAccumulator)
-                );
+                        () -> completeStream(emitter, chatExecuteReq, contentAccumulator));
         disposableRef.set(disposable);
         return emitter;
     }
@@ -128,7 +119,8 @@ public class DeepSeekServiceImpl implements DeepSeekService {
 
     private String buildSignedUrl() {
         Map<String, Object> map = new HashMap<>();
-        String urlpath = MiguApiUrlUtils.doSignature(crabConfig.getDeepseekUrl(), "post", map, crabConfig.getAppId(), crabConfig.getSecretKey());
+        String urlpath = MiguApiUrlUtils.doSignature(crabConfig.getDeepseekUrl(), "post", map,
+                crabConfig.getAppId(), crabConfig.getSecretKey());
         return urlpath;
     }
 
@@ -138,7 +130,8 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             request.put("serviceName", crabConfig.getDsServiceName());
             request.put("serviceType", crabConfig.getDsServiceType());
             request.put("requestId", UUID.randomUUID().toString());
-            request.put("sessionId", req.getSessionId() != null ? req.getSessionId() : UUID.randomUUID().toString());
+            request.put("sessionId",
+                    req.getSessionId() != null ? req.getSessionId() : UUID.randomUUID().toString());
 
             ObjectNode params = request.putObject("params");
             params.set("messages", buildMessagesArray(req));
@@ -158,29 +151,24 @@ public class DeepSeekServiceImpl implements DeepSeekService {
         getHistoryQueries(req.getChatId()).forEach(query -> {
             if (query.getQueryResult().getHasFile()) {
                 query.getQueryResult().getFileInfoList().forEach(file -> {
-                    messages.add(objectMapper.createObjectNode()
-                            .put("role", "user")
-                            .put("content", file.getFileContent()));
+                    messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
+                            file.getFileContent()));
                 });
             }
-            messages.add(objectMapper.createObjectNode()
-                    .put("role", "user")
-                    .put("content", query.getQueryText()));
-            messages.add(objectMapper.createObjectNode()
-                    .put("role", "assistant")
-                    .put("content", query.getQueryResult().getTextResult()));
+            messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
+                    query.getQueryText()));
+            messages.add(objectMapper.createObjectNode().put("role", "assistant").put("content",
+                    query.getQueryResult().getTextResult()));
         });
         if (req.getFileInfoList() != null && !req.getFileInfoList().isEmpty()) {
             for (FileInfo file : req.getFileInfoList()) {
-                messages.add(objectMapper.createObjectNode()
-                        .put("role", "user")
-                        .put("content", file.getFileContent()));
+                messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
+                        file.getFileContent()));
             }
         }
         // 添加当前问题
-        messages.add(objectMapper.createObjectNode()
-                .put("role", "user")
-                .put("content", req.getQueryText()));
+        messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
+                req.getQueryText()));
 
         return messages;
     }

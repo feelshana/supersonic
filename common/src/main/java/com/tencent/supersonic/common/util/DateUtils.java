@@ -94,7 +94,7 @@ public class DateUtils {
     }
 
     public static String getBeforeDate(String currentDate, int intervalDay,
-                                       DatePeriodEnum datePeriodEnum) {
+            DatePeriodEnum datePeriodEnum) {
         LocalDate specifiedDate = LocalDate.parse(currentDate, DEFAULT_DATE_FORMATTER2);
         LocalDate result = null;
         switch (datePeriodEnum) {
@@ -162,9 +162,10 @@ public class DateUtils {
         String outPutDate = dateStr;
         try {
             Date inputDate = inputFormatter.parse(dateStr);
-            outPutDate = format(inputDate,outputFormat);
-        }catch (Exception e) {
-            log.info("parse date failed, date:{}, inputFormat:{}, outputFormat:{}", dateStr, inputFormat, outputFormat, e);
+            outPutDate = format(inputDate, outputFormat);
+        } catch (Exception e) {
+            log.info("parse date failed, date:{}, inputFormat:{}, outputFormat:{}", dateStr,
+                    inputFormat, outputFormat, e);
         }
         return outPutDate;
     }
@@ -176,7 +177,7 @@ public class DateUtils {
     }
 
     public static List<String> getDateList(String startDateStr, String endDateStr,
-                                           DatePeriodEnum period) {
+            DatePeriodEnum period) {
         try {
             // 解析开始日期
             LocalDate startDate = parseDateWithMultipleFormats(startDateStr);

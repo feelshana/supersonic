@@ -413,7 +413,7 @@ ALTER TABLE s2_agent add column `view_org` varchar(3000) DEFAULT NULL COMMENT '�
 ALTER TABLE s2_agent add column `is_open` tinyint DEFAULT NULL COMMENT '是否公开';
 
 --20250309
-ALTER TABLE s2_model_rela alter column join_condition type text;
+ALTER TABLE s2_model_rela MODIFY COLUMN join_condition TEXT;
 
 --20250310
 ALTER TABLE s2_chat_model add column is_open tinyint DEFAULT NULL COMMENT '是否公开';
