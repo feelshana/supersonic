@@ -67,7 +67,7 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
-  fileResult: {
+  fileResult?: {
     fileContent: string;
     fileId: string;
     fileName: string;
@@ -103,7 +103,7 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
-  fileResult
+  fileResult,
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
