@@ -29,11 +29,12 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
-  fileResult: {
+  fileResults: {
     fileContent: string;
     fileId: string;
     fileName: string;
-  } | undefined
+    fileUid: string;
+  }[]
 };
 
 const MessageContainer: React.FC<Props> = ({
@@ -49,7 +50,7 @@ const MessageContainer: React.FC<Props> = ({
   isDebugMode,
   onMsgDataLoaded,
   onSendMsg, onCouldNotAnswer,
-  fileResult
+  fileResults
                                            }) => {
   const [triggerResize, setTriggerResize] = useState(false);
   const onResize = useCallback(() => {
@@ -69,6 +70,28 @@ const MessageContainer: React.FC<Props> = ({
   useEffect(() => {
     onResize();
   }, [historyVisible, chatVisible]);
+
+  const processMsg = (input) => {
+    const regex = /文件\[([^\]]+)\]\s+文件id\[[^\]]+\];/g;
+  return input.replace(regex, (match, fileName) => {
+    const ext = fileName.split('.').pop().toLowerCase();
+    let icon;
+    if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) {
+      icon = '🖼️';
+    } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+      icon = '📊';
+    } else if (['doc', 'docx'].includes(ext)) {
+      icon = '📝';
+    } else if (['ppt', 'pptx'].includes(ext)) {
+      icon = '🎥';
+    } else if (['txt', 'pdf', 'md', 'rtf'].includes(ext)) {
+      icon = '📄';
+    } else {
+      icon = '📂';
+    }
+    return `${icon} ${fileName}`;
+  });
+  }
 
   const messageContainerClass = classNames(styles.messageContainer, { [styles.mobile]: isMobile });
   return (
@@ -99,7 +122,7 @@ const MessageContainer: React.FC<Props> = ({
               )}
               {type === MessageTypeEnum.QUESTION && (
                 <>
-                  <Text position="right" data={msg} />
+                  <Text position="right" data={processMsg(msg)} />
                   {identityMsg && <Text position="left" data={identityMsg} />}
                   <ChatItem
                     msgId={msgId}
@@ -126,7 +149,7 @@ const MessageContainer: React.FC<Props> = ({
                     onSendMsg={onSendMsg}
                     isLastMessage={index === messageList.length - 1}
                     onCouldNotAnswer={onCouldNotAnswer}
-                    fileResult={fileResult}
+                    fileResults={fileResults}
                   />
                 </>
               )}

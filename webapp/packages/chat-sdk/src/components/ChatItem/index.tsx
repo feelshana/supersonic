@@ -67,11 +67,12 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
-  fileResult?: {
+  fileResults?: {
     fileContent: string;
     fileId: string;
     fileName: string;
-  } | undefined
+    fileUid: string;
+  }[]
 };
 
 export const ChartItemContext = createContext({
@@ -103,7 +104,7 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
-  fileResult,
+  fileResults,
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -132,6 +133,8 @@ const ChatItem: React.FC<Props> = ({
   const [isGoRefresh , setIsGoRefresh] = useState<boolean>(false);
   const [thinkingContent, setThinkingContent] = useState<string>('');
   const [streamResultContent, setStreamResultContent] = useState<string>('');
+  const [reasonTextContent, setReasonTextContent] = useState<string>('');
+  const [answerTextContent, setanswerTextContent] = useState<string>('');
   const isThinkingRef = useRef(isThinking);
   const isStreamResultRef = useRef(isStreamResult)
   const resetState = () => {
@@ -211,35 +214,40 @@ const ChatItem: React.FC<Props> = ({
   ) => {
     try {
       if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
-        const resultDiv = document.getElementById('result-response-'+msgId)
-        if(resultDiv) {
-          let textContent = ''
-          const messageFunc = (event) => {
-            textContent += JSON.parse(event.data)?.message
-            console.log(event.data, 'event.data')
-            setStreamResultContent('' + textContent)
+        let reasonTextContent = ''
+        let answerTextContent = ''
+        let textContent = ''
+        const messageFunc = (event) => {
+          if(JSON.parse(event.data)?.type === 'reason'){
+            reasonTextContent += JSON.parse(event.data)?.message
+          }else if(JSON.parse(event.data)?.type === 'answer') {
+            answerTextContent += JSON.parse(event.data)?.message
           }
-          const errorFunc = (error) => {
-            setIsStreamResult(false)
-            console.error('(result)SSE 错误:', error);
-            // throw error
-          };
-          const closeFunc = () => {
-            setIsStreamResult(false)
-            console.log('(result)SSE 连接已关闭');
-          };
-          setIsStreamResult(true)
-          deepSeekStream (
-            {
-              queryText: msg,
-              chatId: conversationId!,
-              parseInfo: parseInfoValue,
-              agentId: agentId,
-              ...fileResult
-            },
-            messageFunc,errorFunc,closeFunc
-          )
+          textContent += JSON.parse(event.data)?.message
+          setStreamResultContent('' + textContent)
+          setReasonTextContent('' + reasonTextContent)
+          setanswerTextContent('' + answerTextContent)
         }
+        const errorFunc = (error) => {
+          setIsStreamResult(false)
+          console.error('(result)SSE 错误:', error);
+          // throw error
+        };
+        const closeFunc = () => {
+          setIsStreamResult(false)
+          console.log('(result)SSE 连接已关闭');
+        };
+        setIsStreamResult(true)
+        deepSeekStream (
+          {
+            queryText: msg,
+            chatId: conversationId!,
+            parseInfo: parseInfoValue,
+            agentId: agentId,
+            fileResults
+          },
+          messageFunc,errorFunc,closeFunc
+        )
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {
@@ -729,7 +737,10 @@ const ChatItem: React.FC<Props> = ({
               </div> : ''
             }
             <div className={`${prefixCls}-content-container`} style={{ display: streamResultContent ? 'block' : 'none' }}>
-              <div id={'result-response-' + msgId} className='result-container'>
+              <div className='result-container  thoughts-container'>
+                { reasonTextContent }
+              </div>
+              <div className='result-container'>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeKatex, rehypeRaw, rehypeHighlight]}
@@ -747,7 +758,7 @@ const ChatItem: React.FC<Props> = ({
                     }
                   }}
                 >
-                  { streamResultContent }
+                  { answerTextContent }
                 </ReactMarkdown>
               </div>
             </div>

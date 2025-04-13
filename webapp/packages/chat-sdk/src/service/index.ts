@@ -274,17 +274,17 @@ export function deepSeekStream(
     chatId,
     parseInfo,
     agentId,
-    fileContent,
-    fileId,
-    fileName
+    fileResults
   }:{
     queryText: string;
     chatId: number;
     parseInfo: ChatContextType;
     agentId?: number;
-    fileContent?: string;
-    fileId?: string;
-    fileName?: string;
+    fileResults?: {
+      fileContent: string;
+      fileId: string;
+      fileName: string;
+    }[]
   },
 
   messageFunc: ((arg0: any) => void),
@@ -298,7 +298,7 @@ const bodyObj: {
   chatId: number;
   queryId: number | undefined;
   parseId: number;
-  fileInfoList?: {
+  fileInfoList: {
     fileContent: string;
     fileId: string;
   }[]
@@ -308,11 +308,15 @@ const bodyObj: {
   chatId: chatId || DEFAULT_CHAT_ID,
   queryId: parseInfo.queryId,
   parseId: parseInfo.id,
+  fileInfoList: []
 }
-if (fileId) {
-  const newFileContent = `文件[${fileName}]；文件id[${fileId}]:\n\n`+fileContent
-  bodyObj.fileInfoList = [{fileContent:newFileContent,fileId}]
+for (const fileResult of fileResults || []) {
+  if (fileResult.fileId) {
+    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}];\n\n`+fileResult.fileContent
+    bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})
+  }
 }
+
 return fetchEventSource(`${prefix}/chat/crab/deepSeekStream`, {
   method: 'POST',
   openWhenHidden: true, // 允许后台运行

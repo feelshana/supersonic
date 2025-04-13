@@ -31,7 +31,7 @@ type Props = {
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
-  onFileResultChange: (result: {fileContent:string,fileId:string,fileName:string}|undefined) => void;
+  onFileResultChange: (arr: {fileContent:string,fileId:string,fileName:string,fileUid:string}[]) => void;
 };
 
 const { OptGroup, Option } = Select;
@@ -73,8 +73,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const fileListRef = useRef<UploadFile[]>([]);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
-  const [fileResult, setFileResult] = useState<{fileContent:string,fileId:string,fileName:string}|undefined>(undefined);
-  const [fileLoading, setFileLoading] = useState<boolean>(false)
+  const [fileResults, setFileResults] = useState<{fileContent:string,fileId:string,fileName:string,fileUid:string}[]>([]);
+  const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([])
   const [messageApi, contextHolder] = message.useMessage();
  
   const getBase64 = (file: FileType): Promise<string> =>
@@ -180,11 +180,33 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, []);
 
   const [debounceGetWords] = useState<any>(debounceGetWordsFunc);
-  const saveFileResult = (result: {fileContent:string,fileId:string,fileName:string}|undefined,file?: UploadFile) => {
-    if (file?.uid === fileListRef.current?.[0]?.uid || !result) {
-      onFileResultChange(result);
-      setFileResult(result);
-      setFileLoading(false);
+  const saveFileResult = (
+    result: {fileContent:string,fileId:string,fileName:string,fileUid:string}|undefined,
+    file?: UploadFile
+  ) => {
+    if (file && result) {
+      setFileResults(prev => {
+        prev = prev||[]
+        let arr
+        if(file.status === 'done'){
+          const isIn = fileListRef.current.some((item)=>{return item.uid === result.fileUid})
+          if(isIn) {
+            arr = [...prev,result]
+          }
+        } else if (file.status === 'removed'){
+          arr = prev.filter(item=>item.fileUid !== result.fileUid)
+        }
+        onFileResultChange(arr)
+        return arr
+      });
+      setFileUidsInProgress(prev => {
+        return prev.filter(item=>item!== result.fileUid)
+      })
+    }
+    if (!result) {
+      onFileResultChange([]);
+      setFileResults([]);
+      setFileUidsInProgress([]);
     }
   }
   useEffect(() => {
@@ -193,8 +215,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   useEffect(() => {
     setFileList([])
-    setFileResult(undefined);
-    setFileLoading(false);
+    setFileResults([]);
+    setFileUidsInProgress([]);
   }, [chatId,currentAgent]);
 
   useEffect(() => {
@@ -456,35 +478,50 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           </AutoComplete>
           <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResult) && !fileLoading,
+              [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length,
             })}
             onClick={() => {
-              if (inputMsg && !fileResult) {
+              let str = ''
+              fileResults && fileResults.forEach((item: {fileContent:string,fileId:string,fileName:string,fileUid:string}) => {
+                str += `文件[${item.fileName}] 文件id[${item.fileId}];\n\n`
+              })
+              if (inputMsg && (!fileResults || fileResults.length === 0)) {
                 sendMsg(inputMsg);
-              }else if (inputMsg && fileResult) {
-                onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n`+inputMsg)
+              }else if (inputMsg && fileResults?.length > 0) {
+                onSendMsg(str + inputMsg)
                 setFileList([])
-                setFileResult(undefined);
-                setFileLoading(false);
-              }else if (!inputMsg && fileResult) {
-                onSendMsg(`引用上文【文件[${fileResult?.fileName}]；文件id[${fileResult?.fileId}]】:\n\n输出被引用的上文内容`)
+                setFileResults([]);
+                setFileUidsInProgress([])
+              }else if (!inputMsg && fileResults?.length > 0) {
+                onSendMsg(str + '输出以上引用的解析内容')
                 setFileList([])
-                setFileResult(undefined);
-                setFileLoading(false);
+                setFileResults([]);
+                setFileUidsInProgress([])
               }
               
             }}
           >
             <IconFont type="icon-ios-send" />
           </div>
-
+        
+        {/* loadings */}
+        <div className={styles.loadings}>
+            {
+              fileList.map((item: UploadFile) => {
+                if(fileUidsInProgress.includes(item.uid)){
+                  return <div className={styles.loadingsItem}><LoadingOutlined />&nbsp;&nbsp;解析中...</div>
+                }else{
+                  return <div className={styles.loadingsItem}>OK</div>
+                }
+              })
+            }
+          </div>
           {/* 上传组件 */}
           <div
             className={styles.uploadContainer}
           >
-            {fileLoading && <p><LoadingOutlined />&nbsp;&nbsp;解析中...</p>}
             <Upload
-              maxCount={1}
+              maxCount={10}
               listType="picture-card"
               fileList={fileList}
               onChange = {({ file, fileList: newFileList }) => {
@@ -512,7 +549,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           {/* 上传组件按钮 */}
           <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
             <Upload
-              maxCount={1}
+              maxCount={10}
               fileList={fileList}
               showUploadList={false}
               onChange = {async ({ file, fileList: newFileList }) => {
@@ -521,7 +558,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                 console.log(file, 'file 1')
                 console.log(newFileList, 'newFileList 1')
                 if (file.status === 'done') {
-                  setFileLoading(true)
+                  setFileUidsInProgress((prev)=>{
+                    return [...prev,file.uid]
+                  })
                   try {
                     const parseRes = await uploadAndParse(file.originFileObj as File)
                     const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
@@ -534,8 +573,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                             saveFileResult({
                               fileContent: res.data.body.result?.fileContent,
                               fileId: res.data.body.result?.fileId,
-                              fileName: file.name
-                            }, file)
+                              fileName: file.name,
+                              fileUid: file.uid
+                            },file)
                           } else {
                             if (step < 20) {
                               step++
@@ -544,7 +584,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                               messageApi.error('文件解析失败');
                               setFileList([])
                               saveFileResult(undefined)
-                              setFileLoading(false)
+                              setFileUidsInProgress((prev)=>{
+                                return prev.filter(item=>item!== file.uid)
+                              })
                             }
                           }
                         } catch (error) {
@@ -555,7 +597,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                             messageApi.error('文件解析失败');
                             setFileList([])
                             saveFileResult(undefined)
-                            setFileLoading(false)
+                            setFileUidsInProgress((prev)=>{
+                              return prev.filter(item=>item!== file.uid)
+                            })
                           }
                         }
                        }
@@ -565,7 +609,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                     messageApi.error(error as string);
                     setFileList([])
                     saveFileResult(undefined)
-                    setFileLoading(false)
+                    setFileUidsInProgress((prev)=>{
+                      return prev.filter(item=>item!== file.uid)
+                    })
                   }
                 }
               }}
