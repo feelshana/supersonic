@@ -34,6 +34,8 @@ type Props = {
     fileId: string;
     fileName: string;
     fileUid: string;
+    fileType: string;
+    fileSize: string;
   }[]
 };
 
@@ -111,10 +113,13 @@ const MessageContainer: React.FC<Props> = ({
       fileArr.push(fileCard)
       return ''
     })
+    const newText = text.replace(/以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\s+/g, (match) => {
+      return ''
+    })
     return (
       <>
         { fileArr }
-        <Text position="right" data={text} />
+        <Text position="right" data={newText} />
       </>
     )
   }

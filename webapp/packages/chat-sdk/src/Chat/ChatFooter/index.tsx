@@ -180,8 +180,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   const saveFileResult = (
     result: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}|undefined,
-    file: UploadFile
+    file?: UploadFile
   ) => {
+    if(!file) {
+      onFileResultChange([])
+      return
+    }
     if(file?.status === 'removed') {
       setFileResults(prev => {
         prev = prev||[]
@@ -221,7 +225,11 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   useEffect(() => {
     setFileList([])
-    setFileResults([]);
+    setFileResults((prev)=>{
+      console.log(prev,'prev')
+      return []
+    });
+    saveFileResult(undefined)
     setFileUidsInProgress([]);
   }, [chatId,currentAgent]);
 
@@ -487,10 +495,10 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length,
             })}
             onClick={() => {
-              let str = ''
+              let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
               fileResults && fileResults.forEach(
                 (item: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}) => {
-                str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n\n`
+                str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n`
               })
               if (inputMsg && (!fileResults || fileResults.length === 0)) {
                 sendMsg(inputMsg);
@@ -500,12 +508,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                 setFileResults([]);
                 setFileUidsInProgress([])
               }else if (!inputMsg && fileResults?.length > 0) {
-                onSendMsg(str + '输出以上引用的解析内容')
+                onSendMsg(str + '原封不动输出以上文件的解析内容')
                 setFileList([])
                 setFileResults([]);
                 setFileUidsInProgress([])
               }
-              
+              saveFileResult(undefined)
             }}
           >
             <IconFont type="icon-ios-send" />
@@ -634,7 +642,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                        pollFileStatus()
                     }
                   } catch (error) {
-                    messageApi.error(error as string);
+                    messageApi.error('请求失败');
                     saveFileResult(undefined, file)
                     setFileUidsInProgress((prev)=>{
                       return prev.filter(item=>item!== file.uid)

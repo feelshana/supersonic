@@ -153,7 +153,7 @@ export function queryDimensionValues(
 
 export function queryThoughtsInSSE(queryText: string, chatId: number | undefined, agentId: number | undefined, messageFunc: ((arg0: any) => void), errorFunc: ((arg0: any) => void), closeFunc: (() => void) ) {
   const ctrl = new AbortController();
-  return fetchEventSource(`${prefix}/chat/query/streamParse`, {
+  return fetchEventSource(`${prefix}/stream/chat/query/streamParse`, {
     method: 'POST',
     openWhenHidden: true, // 允许后台运行
     headers: {
@@ -314,12 +314,12 @@ const bodyObj: {
 }
 for (const fileResult of fileResults || []) {
   if (fileResult.fileId) {
-    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}];\n\n`+fileResult.fileContent
+    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}];以下内容为文件解析后的内容：\n`+fileResult.fileContent
     bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})
   }
 }
 
-return fetchEventSource(`${prefix}/chat/crab/deepSeekStream`, {
+return fetchEventSource(`${prefix}/stream/chat/crab/deepSeekStream`, {
   method: 'POST',
   openWhenHidden: true, // 允许后台运行
   headers: {

@@ -72,6 +72,8 @@ type Props = {
     fileId: string;
     fileName: string;
     fileUid: string;
+    fileType: string;
+    fileSize: string;
   }[]
 };
 
