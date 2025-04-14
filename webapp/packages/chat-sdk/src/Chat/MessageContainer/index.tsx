@@ -72,25 +72,51 @@ const MessageContainer: React.FC<Props> = ({
   }, [historyVisible, chatVisible]);
 
   const processMsg = (input) => {
-    const regex = /文件\[([^\]]+)\]\s+文件id\[[^\]]+\];/g;
-  return input.replace(regex, (match, fileName) => {
+    const regex = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\];\s+/g;
+    const fileArr: JSX.Element[] = [];
+    const text = input.replace(regex, (match, fileName, fileId, fileSize, fileType) => {
     const ext = fileName.split('.').pop().toLowerCase();
-    let icon;
-    if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) {
-      icon = '🖼️';
-    } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
-      icon = '📊';
-    } else if (['doc', 'docx'].includes(ext)) {
-      icon = '📝';
-    } else if (['ppt', 'pptx'].includes(ext)) {
-      icon = '🎥';
-    } else if (['txt', 'pdf', 'md', 'rtf'].includes(ext)) {
-      icon = '📄';
-    } else {
-      icon = '📂';
-    }
-    return `${icon} ${fileName}`;
-  });
+      let icon;
+      if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) {
+        icon = '🖼️';
+      } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+        icon = '📊';
+      } else if (['doc', 'docx'].includes(ext)) {
+        icon = '📝';
+      } else if (['ppt', 'pptx'].includes(ext)) {
+        icon = '🎥';
+      } else if (['txt', 'pdf', 'md', 'rtf'].includes(ext)) {
+        icon = '📄';
+      } else {
+        icon = '📂';
+      }
+    
+      const fileCard = (
+        <div style={{display:'flex',justifyContent:'flex-end'}}>
+          <div className={styles.fileItem}>
+            <div className={styles.fileIcon}>
+              {
+                <span style={{fontSize:'24px'}}>&nbsp;{ icon }&nbsp;&nbsp;</span>
+              }
+            </div>
+            <div className={styles.fileInfo}>
+              <div className={styles.fileName}>{fileName}</div>
+              <div className={styles.fileSize}>
+                  {fileType + ' ' + fileSize}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+      fileArr.push(fileCard)
+      return ''
+    })
+    return (
+      <>
+        { fileArr }
+        <Text position="right" data={text} />
+      </>
+    )
   }
 
   const messageContainerClass = classNames(styles.messageContainer, { [styles.mobile]: isMobile });
@@ -122,7 +148,11 @@ const MessageContainer: React.FC<Props> = ({
               )}
               {type === MessageTypeEnum.QUESTION && (
                 <>
-                  <Text position="right" data={processMsg(msg)} />
+                  {
+                    currentAgent?.chatAppConfig?.SMALL_TALK?.enable ?
+                    processMsg(msg):
+                    <Text position="right" data={msg} />
+                  }
                   {identityMsg && <Text position="left" data={identityMsg} />}
                   <ChatItem
                     msgId={msgId}

@@ -284,6 +284,8 @@ export function deepSeekStream(
       fileContent: string;
       fileId: string;
       fileName: string;
+      fileSize: string;
+      fileType: string;
     }[]
   },
 
@@ -312,7 +314,7 @@ const bodyObj: {
 }
 for (const fileResult of fileResults || []) {
   if (fileResult.fileId) {
-    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}];\n\n`+fileResult.fileContent
+    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}];\n\n`+fileResult.fileContent
     bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})
   }
 }

@@ -50,4 +50,36 @@
       padding: 20px 10px 30px;
     }
   }
+  .fileItem {
+    display: flex;
+    align-items: center;
+    background-color: var(--chat-blue);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    img {
+      width: 32px;
+      height: 32px;
+      margin-right: 10px;
+    }
+    .fileIcon {
+      cursor: pointer;
+    }
+    .fileInfo {
+      flex: 1;
+      padding-right: 10px;
+      .fileName {
+        font-size: 14px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .fileSize {
+        font-size: 12px;
+        color: var(--chat-border-color-base);
+      }
+    }
+  }
 }
