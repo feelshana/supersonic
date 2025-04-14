@@ -8,6 +8,7 @@ server:
 spring:
   profiles:
     active: ${S2_DB_TYPE:mysql-local}
+#    active: ${S2_DB_TYPE:mysql-test}
 #    active: ${S2_DB_TYPE:mysql-prod}
   application:
     name: chat

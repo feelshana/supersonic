@@ -33,6 +33,10 @@ public class CrabConfig {
     private String dsServiceName;
     @Value("${crab.api.deepseek.serviceType:text_to_text}")
     private String dsServiceType;
+    @Value("${crab.api.deepseek.onBackpressureBuffer:1000}")
+    private int onBackpressureBuffer;
+    @Value("${crab.api.deepseek.delayElements:100}")
+    private int delayElements;
     public static final String VIDEO = "VIDEO";
     public static final String IMAGE = "IMAGE";
     public static final String AUDIO = "AUDIO";

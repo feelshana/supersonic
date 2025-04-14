@@ -26,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -99,7 +100,7 @@ public class DeepSeekServiceImpl implements DeepSeekService {
                 .onStatus(HttpStatusCode::isError,
                         response -> Mono.error(new RuntimeException("API request failed")))
                 .bodyToFlux(JsonNode.class).doOnSubscribe(sub -> log.info("Subscription started"))
-                .onBackpressureBuffer(100)
+                .onBackpressureBuffer(crabConfig.getOnBackpressureBuffer()).delayElements(Duration.ofMillis(crabConfig.getDelayElements()))
                 .flatMap(response -> processStreamResponse(response, contentAccumulator))
                 .doOnCancel(() -> log.warn("Downstream cancelled"))
                 .subscribe(chunk -> sendSseChunk(emitter, chunk),
@@ -160,15 +161,14 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             messages.add(objectMapper.createObjectNode().put("role", "assistant").put("content",
                     query.getQueryResult().getTextResult()));
         });
+        // 当前上传的文件解析结果
         if (req.getFileInfoList() != null && !req.getFileInfoList().isEmpty()) {
             for (FileInfo file : req.getFileInfoList()) {
-                messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
-                        file.getFileContent()));
+                messages.add(objectMapper.createObjectNode().put("content", file.getFileContent()));
             }
         }
         // 添加当前问题
-        messages.add(objectMapper.createObjectNode().put("role", "user").put("content",
-                req.getQueryText()));
+        messages.add(objectMapper.createObjectNode().put("content", req.getQueryText()));
 
         return messages;
     }

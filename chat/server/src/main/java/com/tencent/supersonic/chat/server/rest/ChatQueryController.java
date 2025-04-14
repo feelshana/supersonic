@@ -10,7 +10,6 @@ import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.exception.InvalidArgumentException;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionValueReq;
-import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -30,9 +29,6 @@ public class ChatQueryController {
 
     @Autowired
     private ChatQueryService chatQueryService;
-
-    @Autowired
-    private static OnePassSCSqlGenStrategy onePassSCSqlGenStrategy;
 
     @PostMapping("search")
     public Object search(@RequestBody ChatParseReq chatParseReq, HttpServletRequest request,
