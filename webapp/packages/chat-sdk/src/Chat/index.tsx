@@ -75,7 +75,14 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   const [isSimpleMode, setIsSimpleMode] = useState<boolean>(false);
   const [isDebugMode, setIsDebugMode] = useState<boolean>(true);
 
-  const fileResults = useRef<{fileContent:string,fileId:string,fileName:string,fileUid:string}[]>([]);
+  const fileResults2 = useRef<{
+    fileContent:string,
+    fileId:string,
+    fileName:string,
+    fileUid:string,
+    fileSize:string,
+    fileType:string,
+  }[]>([]);
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
 
@@ -469,7 +476,10 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                       onMsgDataLoaded={onMsgDataLoaded}
                       onSendMsg={onSendMsg}
                       onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
-                      fileResults={fileResults.current}
+                      fileResults2={fileResults2.current}
+                      changeFileResult2={(result) => {
+                        fileResults2.current = result
+                      }}
                     />
                     {!noInput && (
                       <ChatFooter
@@ -492,8 +502,8 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                         onOpenShowcase={() => {
                           setShowCaseVisible(!showCaseVisible);
                         }}
-                        onFileResultChange={(result) => {
-                          fileResults.current = result
+                        changeFileResult2={(result) => {
+                          fileResults2.current = result
                         }}
                         ref={chatFooterRef}
                       />

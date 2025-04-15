@@ -29,7 +29,15 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
-  fileResults: {
+  changeFileResult2: (
+    arr: {fileContent:string,
+      fileId:string,
+      fileName:string,
+      fileUid:string,
+      fileType:string,
+      fileSize:string}[]
+  ) => void;
+  fileResults2: {
     fileContent: string;
     fileId: string;
     fileName: string;
@@ -52,7 +60,8 @@ const MessageContainer: React.FC<Props> = ({
   isDebugMode,
   onMsgDataLoaded,
   onSendMsg, onCouldNotAnswer,
-  fileResults
+  fileResults2,
+  changeFileResult2
                                            }) => {
   const [triggerResize, setTriggerResize] = useState(false);
   const onResize = useCallback(() => {
@@ -184,7 +193,8 @@ const MessageContainer: React.FC<Props> = ({
                     onSendMsg={onSendMsg}
                     isLastMessage={index === messageList.length - 1}
                     onCouldNotAnswer={onCouldNotAnswer}
-                    fileResults={fileResults}
+                    fileResults2={fileResults2}
+                    changeFileResult2={changeFileResult2}
                   />
                 </>
               )}

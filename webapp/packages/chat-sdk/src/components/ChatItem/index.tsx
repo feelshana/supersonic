@@ -67,7 +67,17 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
-  fileResults?: {
+  changeFileResult2: (
+    arr: {
+      fileContent:string,
+      fileId:string,
+      fileName:string,
+      fileUid:string,
+      fileType:string,
+      fileSize:string,
+    }[]
+  ) => void;
+  fileResults2?: {
     fileContent: string;
     fileId: string;
     fileName: string;
@@ -106,7 +116,8 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
-  fileResults,
+  changeFileResult2,
+  fileResults2,
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -246,10 +257,11 @@ const ChatItem: React.FC<Props> = ({
             chatId: conversationId!,
             parseInfo: parseInfoValue,
             agentId: agentId,
-            fileResults
+            fileResults2
           },
           messageFunc,errorFunc,closeFunc
         )
+        changeFileResult2([])
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {
@@ -399,6 +411,7 @@ const ChatItem: React.FC<Props> = ({
       }
     } catch (error) {
       onCouldNotAnswer()
+      changeFileResult2([])
       return
     }
     // 预设问题如果包含该提问，让其结果在思考后才出结果
@@ -421,7 +434,6 @@ const ChatItem: React.FC<Props> = ({
     }
     setParseLoading(false);
     const { code, data } = parseData || {};
-    console.log(data,'data')
     const { state, selectedParses, candidateParses, queryId, parseTimeCost, errorMsg } = data || {};
     const parses = selectedParses?.concat(candidateParses || []) || [];
     if (
@@ -431,8 +443,8 @@ const ChatItem: React.FC<Props> = ({
       (!parses[0]?.properties?.type && !parses[0]?.queryMode)
     ) {
       setParseTip(state === ParseStateEnum.FAILED && errorMsg ? errorMsg : PARSE_ERROR_TIP);
-
       setParseInfo({ queryId } as any);
+      changeFileResult2([])
       return;
     }
     onUpdateMessageScroll?.();
@@ -456,6 +468,8 @@ const ChatItem: React.FC<Props> = ({
     setDateInfo(parseInfoValue?.dateInfo);
     if (parseInfos.length === 1) {
       onExecute(parseInfoValue, parseInfos);
+    }else{
+      changeFileResult2([])
     }
   };
 

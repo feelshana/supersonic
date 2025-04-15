@@ -28,7 +28,13 @@ type Props = {
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
-  onFileResultChange: (arr: {fileContent:string,fileId:string,fileName:string,fileUid:string}[]) => void;
+  changeFileResult2: (arr: {fileContent:string,
+    fileId:string,
+    fileName:string,
+    fileUid:string,
+    fileSize:string,
+    fileType:string,
+  }[]) => void;
 };
 
 const { OptGroup, Option } = Select;
@@ -56,7 +62,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
-    onFileResultChange
+    changeFileResult2 // 需要改变【文件解析结果列表2】触发的函数
   },
   ref
 ) => {
@@ -66,21 +72,34 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [focused, setFocused] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
-  const fileListRef = useRef<UploadFile[]>([]);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
-  const [fileResults, setFileResults] = useState<{fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}[]>([]);
-  const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([])
+  /* 文件上传相关状态 ---start */
+
+  // 上传的文件列表，即文件上传组件里的fileList
+  const [fileList, setFileList] = useState<UploadFile[]>([]); 
+  const fileListRef = useRef<UploadFile[]>([]);
+
+  // 【文件解析结果列表1】该列表是已经解析完毕的解析结果
+  /*  注：
+      【文件解析结果列表1】存的是即将发出去的解析结果；
+      【文件解析结果列表2】存的是准备调用deepSeekStream的解析结果（需要解析结果作为参数传给deepSeekStream)；
+      【文件解析结果列表2】与【文件解析结果列表1】不总是相同
+       因为在调用deepSeekStream前还要调用parse接口，而【文件解析结果列表1】在消息发出去后就清空了 */
+  const [fileResults, setFileResults] = useState<{
+    fileContent:string,
+    fileId:string,
+    fileName:string,
+    fileUid:string,
+    fileSize:string,
+    fileType:string
+  }[]>([]);
+
+  // 正在解析的文件uid列表, 解析完的文件uid会从该列表移除
+  const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([]) 
   const [messageApi, contextHolder] = message.useMessage();
- 
-  const getBase64 = (file: FileType): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
+
+  /* 文件上传相关状态 ---end */
 
   const handlePreview = async (file: UploadFile) => {
     if (!file.url && !file.preview) {
@@ -177,61 +196,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, []);
 
   const [debounceGetWords] = useState<any>(debounceGetWordsFunc);
-
-  const saveFileResult = (
-    result: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}|undefined,
-    file?: UploadFile
-  ) => {
-    if(!file) {
-      onFileResultChange([])
-      return
-    }
-    if(file?.status === 'removed') {
-      setFileResults(prev => {
-        prev = prev||[]
-        const arr = prev.filter(item=>item.fileUid !== file?.uid)
-        onFileResultChange(arr)
-        return arr
-      })
-      return
-    }
-    if (file && result) {
-      setFileResults(prev => {
-        prev = prev||[]
-        let arr
-        if(file.status === 'done'){
-          const isIn = fileListRef.current.some((item)=>{return item.uid === result.fileUid})
-          if(isIn) {
-            arr = [...prev,result]
-          }
-        }
-        onFileResultChange(arr)
-        return arr
-      });
-      setFileUidsInProgress(prev => {
-        return prev.filter(item=>item!== result.fileUid)
-      })
-    }
-  }
-
-  const formatSize = (size) => {
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-  };
-  useEffect(() => {
-    fileListRef.current = fileList;
-  }, [fileList]);
-
-  useEffect(() => {
-    setFileList([])
-    setFileResults((prev)=>{
-      console.log(prev,'prev')
-      return []
-    });
-    saveFileResult(undefined)
-    setFileUidsInProgress([]);
-  }, [chatId,currentAgent]);
 
   useEffect(() => {
     if (inputMsg.length === 1 && inputMsg[0] === '/') {
@@ -406,7 +370,118 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, [modelOptionNodes.length, associateOptionNodes.length]);
 
   const { isComposing } = useComposing(document.getElementById('chatInput'));
+
+  /* 文件上传相关功能 ---start */
+  const getBase64 = (file: FileType): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  }
+
+  const formatSize = (size) => {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+  }
   
+  /**
+   * 动态改变文件解析结果列表（【文件解析结果列表1】、【文件解析结果列表2】）
+   * @param result 
+   * 需要被操作的解析结果对象
+   * 如果 !result, 则表示该操作并没有解析结果比如：文件被删除
+   * @param file 
+   * 需要被操作的文件对象
+   * 如果 !file, 则表示这是一个清空文件上传状态的操作，通常是切换助手和新对话时使用
+   * 问题点：
+   * 1. !file时是否要执行 changeFileResult2([]) 这是个值得思考的的问题：
+   *    ① 如果不置空，则在切换助手和新对话后，上一个助手或者对话的FileResult2会短暂存在，影响下个对话或者助手
+   *    ② 如果置空，切换后，如果上一个助手或对话的问题正在调用parse接口的阶段，那么上一个助手或对话调用deepseekStream就没带上文件解析结果
+   *    从 严重性来说 ①更严重；②的话可以理解为用户在提问后没有等待回答，而是直接切换助手或对话，那么这个问题没带解析结果影响不大
+   *    也许有其他方法解决这两个矛盾点，比如在回答中时不让切换助手或对话（H5端就是这么做的）。但似乎没必要。
+   *    综上，还是选择置空，执行 changeFileResult2([])
+   * @returns 
+   */
+  const saveFileResult = (
+    result: {
+      fileContent:string,
+      fileId:string,
+      fileName:string,
+      fileUid:string,
+      fileSize:string,
+      fileType:string
+    }|undefined,
+    file?: UploadFile
+  ) => {
+    if(!file) {
+      setFileList([])
+      setFileResults((prev)=>{
+        return []
+      });
+      changeFileResult2([])
+      setFileUidsInProgress([])
+      return
+    }
+    if(file?.status === 'removed') {
+      setFileResults(prev => {
+        prev = prev||[]
+        const arr = prev.filter(item=>item.fileUid !== file?.uid)
+        changeFileResult2(arr)
+        return arr
+      })
+      return
+    }
+    if (file && result) {
+      setFileResults(prev => {
+        prev = prev||[]
+        let arr
+        if(file.status === 'done'){
+          const isIn = fileListRef.current.some((item)=>{return item.uid === result.fileUid})
+          if(isIn) {
+            arr = [...prev,result]
+          }
+        }
+        changeFileResult2(arr)
+        return arr
+      });
+      setFileUidsInProgress(prev => {
+        return prev.filter(item=>item!== result.fileUid)
+      })
+    }
+  } 
+  
+  const sendMsgWithFile = () => {
+    let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
+    fileResults && fileResults.forEach(
+      (item: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}) => {
+        str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n`
+      })
+      if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
+        sendMsg(inputMsg);
+      }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+        onSendMsg(str + inputMsg)
+        setFileList([])
+        setFileResults([]);
+        setFileUidsInProgress([])
+      }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+        onSendMsg(str + '原封不动输出以上文件的解析内容')
+        setFileList([])
+        setFileResults([]);
+        setFileUidsInProgress([])
+    }
+  }
+  
+  useEffect(() => {
+    fileListRef.current = fileList;
+  }, [fileList])
+
+  useEffect(() => {
+    saveFileResult(undefined)
+  }, [chatId,currentAgent])
+  /* 文件上传相关功能 ---end */
+
   return (
     <div className={chatFooterClass}>
       {contextHolder}
@@ -469,9 +544,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                   onInputMsgChange('');
                   return;
                 }
-                if (!isSelect && !isComposing) {
-                  sendMsg(chatInputEl.value);
-                  setOpen(false);
+                if ((inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length) {
+                  if (!isSelect && !isComposing) {
+                    sendMsgWithFile()
+                    setOpen(false);
+                  }
+                  
                 }
               }
             }}
@@ -486,8 +564,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             allowClear
             open={open}
             defaultActiveFirstOption={false}
-            getPopupContainer={triggerNode => triggerNode.parentNode}
-          >
+            getPopupContainer={triggerNode => triggerNode.parentNode}>
             {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
           </AutoComplete>
           <div
@@ -495,36 +572,16 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length,
             })}
             onClick={() => {
-              let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
-              fileResults && fileResults.forEach(
-                (item: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}) => {
-                str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n`
-              })
-              if (inputMsg && (!fileResults || fileResults.length === 0)) {
-                sendMsg(inputMsg);
-              }else if (inputMsg && fileResults?.length > 0) {
-                onSendMsg(str + inputMsg)
-                setFileList([])
-                setFileResults([]);
-                setFileUidsInProgress([])
-              }else if (!inputMsg && fileResults?.length > 0) {
-                onSendMsg(str + '原封不动输出以上文件的解析内容')
-                setFileList([])
-                setFileResults([]);
-                setFileUidsInProgress([])
-              }
-              saveFileResult(undefined)
-            }}
-          >
+              sendMsgWithFile()
+            }}>
             <IconFont type="icon-ios-send" />
           </div>
-        
           {/* 上传组件 */}
-          <div
-            className={styles.uploadContainer}
-          >
+          <div className={styles.uploadContainer}>
             {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}
             <Upload
+              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+              method='get'
               maxCount={10}
               // listType="picture"
               fileList={fileList}
@@ -582,6 +639,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           {/* 上传组件按钮 */}
           <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
             <Upload
+              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+              method='get'
               maxCount={10}
               fileList={fileList}
               showUploadList={false}
