@@ -41,7 +41,16 @@ public class FileServiceImpl implements FileService {
             // 2. 构建异步任务参数
             Map<String, Object> taskParams = buildTaskParams(uploadedFile);
             // 3. 文档解析异步下发任务
-            return getFileParseResponse(taskParams);
+            FileBaseResponse<FileParseResponse> response = getFileParseResponse(taskParams);
+
+            // 添加文件信息到响应中
+            if (response.getBody() != null) {
+                FileParseResponse body = response.getBody();
+                body.setFileName(file.getOriginalFilename());
+                body.setFileType(fileType);
+                body.setFileSize(String.valueOf(file.getSize()));
+            }
+            return response;
         } catch (Exception e) {
             throw new RuntimeException("操作失败: " + e.getMessage());
         }

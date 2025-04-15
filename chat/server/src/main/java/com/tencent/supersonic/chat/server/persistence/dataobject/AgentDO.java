@@ -17,7 +17,7 @@ public class AgentDO {
     private String name;
 
     private String description;
-    
+
     private String embedUrl;
 
     /** 0 offline, 1 online */

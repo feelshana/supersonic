@@ -25,4 +25,10 @@ public class crabController {
         chatExecuteReq.setUser(UserHolder.findUser(request, response));
         return deepSeekService.streamChat(chatExecuteReq);
     }
+
+    @PostMapping(value = "/stopStream")
+    public Boolean stopStream(@RequestBody ChatExecuteReq chatExecuteReq) {
+        deepSeekService.stopStream(chatExecuteReq.getQueryId());
+        return true;
+    }
 }

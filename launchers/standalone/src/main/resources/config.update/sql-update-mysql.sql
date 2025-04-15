@@ -421,3 +421,6 @@ ALTER TABLE s2_database add column is_open tinyint DEFAULT NULL COMMENT '是否�
 
 --20250321
 ALTER TABLE s2_user add column last_login datetime DEFAULT NULL;
+
+--20250414
+ALTER TABLE s2_agent add column `embed_url` varchar(1000) DEFAULT NULL COMMENT '嵌入模型url';

@@ -91,4 +91,4 @@ crab:
       serviceName: deepseek_32B
       serviceType: text_to_text
       onBackpressureBuffer: 1000
-      delayElements: 100
+      delayElements: 60

@@ -25,4 +25,9 @@ public class FileParseResponse {
      * 提示词
      */
     private List<String> prompt;
+
+    private String filePath;
+    private String fileName;
+    private String fileSize;
+    private String fileType;
 }

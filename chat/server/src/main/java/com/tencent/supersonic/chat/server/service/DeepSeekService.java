@@ -6,4 +6,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public interface DeepSeekService {
 
     SseEmitter streamChat(ChatExecuteReq chatExecuteReq);
+
+    void stopStream(Long queryId);
 }

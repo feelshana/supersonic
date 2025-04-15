@@ -90,4 +90,4 @@ crab:
       serviceName: deepseek_whole
       serviceType: text_to_text
       onBackpressureBuffer: 1000
-      delayElements: 100
+      delayElements: 60

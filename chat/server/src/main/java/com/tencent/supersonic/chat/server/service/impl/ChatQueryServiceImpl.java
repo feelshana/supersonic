@@ -1078,4 +1078,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
         chatManageService.saveQueryResult(chatExecuteReq, queryResult);
     }
+
+    public void deleteChatQuery(Long queryId) {
+        chatManageService.deleteQuery(queryId);
+    }
+
 }

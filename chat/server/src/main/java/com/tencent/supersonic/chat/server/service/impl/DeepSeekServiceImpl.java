@@ -28,7 +28,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +41,9 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     private final ChatQueryServiceImpl chatQueryService;
     private final ChatManageService chatManageService;
     private static final String FILE_ID = "fileId";
+    private final ConcurrentHashMap<Long, SseEmitter> activeEmitters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Disposable> activeSubscriptions =
+            new ConcurrentHashMap<>();
 
     @Autowired
     public DeepSeekServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
@@ -69,27 +72,27 @@ public class DeepSeekServiceImpl implements DeepSeekService {
         String requestBody = buildRequestBody(chatExecuteReq);
         String urlPath = buildSignedUrl();
 
-        // 创建SSE发射器（120秒超时）
-        SseEmitter emitter = new SseEmitter(120_000L);
-        StringBuilder contentAccumulator = new StringBuilder();
-        AtomicReference<Disposable> disposableRef = new AtomicReference<>();
+        // 创建SSE发射器（180秒超时）
+        SseEmitter emitter = new SseEmitter(180_000L);
 
+        StringBuilder contentAccumulator = new StringBuilder();
+        activeEmitters.put(chatExecuteReq.getQueryId(), emitter);
+        Long queryId = chatExecuteReq.getQueryId();
         // 设置超时和错误处理
         emitter.onCompletion(() -> {
-            disposeSafely(disposableRef.get());
+            cleanupResources(queryId);
             log.info("SSE completed normally");
         });
 
         emitter.onTimeout(() -> {
             savePartialResult(chatExecuteReq, contentAccumulator.toString());
-            disposeSafely(disposableRef.get());
-            emitter.complete();
+            cleanupResources(queryId);
             log.warn("SSE terminated by timeout");
         });
 
         emitter.onError(e -> {
             savePartialResult(chatExecuteReq, contentAccumulator.toString());
-            disposeSafely(disposableRef.get());
+            cleanupResources(queryId);
             log.error("SSE error occurred", e);
         });
 
@@ -100,14 +103,38 @@ public class DeepSeekServiceImpl implements DeepSeekService {
                 .onStatus(HttpStatusCode::isError,
                         response -> Mono.error(new RuntimeException("API request failed")))
                 .bodyToFlux(JsonNode.class).doOnSubscribe(sub -> log.info("Subscription started"))
-                .onBackpressureBuffer(crabConfig.getOnBackpressureBuffer()).delayElements(Duration.ofMillis(crabConfig.getDelayElements()))
+                .onBackpressureBuffer(crabConfig.getOnBackpressureBuffer())
+                .delayElements(Duration.ofMillis(crabConfig.getDelayElements()))
                 .flatMap(response -> processStreamResponse(response, contentAccumulator))
                 .doOnCancel(() -> log.warn("Downstream cancelled"))
                 .subscribe(chunk -> sendSseChunk(emitter, chunk),
                         error -> handleStreamError(emitter, error),
                         () -> completeStream(emitter, chatExecuteReq, contentAccumulator));
-        disposableRef.set(disposable);
+        activeSubscriptions.put(chatExecuteReq.getQueryId(), disposable);
         return emitter;
+    }
+
+    @Override
+    public void stopStream(Long queryId) {
+        cleanupResources(queryId);
+        chatQueryService.deleteChatQuery(queryId);
+        log.info("Stream stopped for queryId: {}", queryId);
+    }
+
+    private void cleanupResources(Long queryId) {
+        // 清理emitter
+        SseEmitter emitter = activeEmitters.remove(queryId);
+        if (emitter != null) {
+            try {
+                emitter.complete();
+            } catch (Exception e) {
+                log.error("Emitter complete error", e);
+            }
+        }
+
+        // 清理subscription
+        Disposable disposable = activeSubscriptions.remove(queryId);
+        disposeSafely(disposable);
     }
 
     // 释放资源避免内存泄露
