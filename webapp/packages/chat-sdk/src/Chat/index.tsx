@@ -11,7 +11,7 @@ import MessageContainer from './MessageContainer';
 import styles from './style.module.less';
 import { ConversationDetailType, MessageItem, MessageTypeEnum, AgentType, FileResultsType } from './type';
 import { queryAgentList } from './service';
-import { useThrottleFn } from 'ahooks';
+import { useSetState, useThrottleFn } from 'ahooks';
 import Conversation from './Conversation';
 import ChatFooter from './ChatFooter';
 import classNames from 'classnames';
@@ -76,6 +76,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   const [isDebugMode, setIsDebugMode] = useState<boolean>(true);
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
+  const [currentInStreamQueryId,setCurrentInstreamQueryId]= useState<number|undefined>(undefined);
 
   useImperativeHandle(ref, () => ({
     sendCopilotMsg,
@@ -469,6 +470,9 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                       onMsgDataLoaded={onMsgDataLoaded}
                       onSendMsg={onSendMsg}
                       onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
+                      changeInStreamQueryId={(queryId:number|undefined) => {
+                        setCurrentInstreamQueryId(queryId);
+                      }}
                     />
                     {!noInput && (
                       <ChatFooter
@@ -492,6 +496,10 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                           setShowCaseVisible(!showCaseVisible);
                         }}
                         ref={chatFooterRef}
+                        currentInStreamQueryId={currentInStreamQueryId}
+                        changeInStreamQueryId={(queryId:number|undefined) => {
+                          setCurrentInstreamQueryId(queryId);
+                        }}
                       />
                     )}
                   </div>

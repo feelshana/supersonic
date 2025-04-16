@@ -29,6 +29,7 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
+  changeInStreamQueryId?: (queryId: number|undefined) => void;
 };
 
 const MessageContainer: React.FC<Props> = ({
@@ -44,6 +45,7 @@ const MessageContainer: React.FC<Props> = ({
   isDebugMode,
   onMsgDataLoaded,
   onSendMsg, onCouldNotAnswer,
+  changeInStreamQueryId
 }) => {
   const [triggerResize, setTriggerResize] = useState(false);
   const onResize = useCallback(() => {
@@ -177,6 +179,7 @@ const MessageContainer: React.FC<Props> = ({
                     onSendMsg={onSendMsg}
                     isLastMessage={index === messageList.length - 1}
                     onCouldNotAnswer={onCouldNotAnswer}
+                    changeInStreamQueryId={changeInStreamQueryId}
                   />
                 </>
               )}

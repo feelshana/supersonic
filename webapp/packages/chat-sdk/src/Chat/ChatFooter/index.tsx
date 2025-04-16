@@ -7,7 +7,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
 import { AgentType, ModelType, FileResultsType } from '../type';
-import { searchRecommend ,uploadAndParse, fileStatus } from '../../service';
+import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
@@ -28,6 +28,8 @@ type Props = {
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
+  currentInStreamQueryId: number | undefined;
+  changeInStreamQueryId: (queryId: number|undefined) => void;
 };
 
 const { OptGroup, Option } = Select;
@@ -55,6 +57,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
+    currentInStreamQueryId,
+    changeInStreamQueryId
   },
   ref
 ) => {
@@ -78,7 +82,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   // 正在解析的文件uid列表, 解析完的文件uid会从该列表移除
   const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([]) 
   const [messageApi, contextHolder] = message.useMessage();
-
+  const [showPauseButton, setShowPauseButton] = useState<boolean>(false)
   /* 文件上传相关状态 ---end */
 
   const handlePreview = async (file: UploadFile) => {
@@ -423,24 +427,32 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   } 
   
   const sendMsgWithFile = () => {
+    if(currentInStreamQueryId !== undefined) {
+      // 如果正在流式输出结果，发送消息行为被阻止
+      return
+    }
     let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
     fileResults && fileResults.forEach(
       (item: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}) => {
         str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n`
-      })
-      if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
-        sendMsg(inputMsg);
-      }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
-        onSendMsg(str + inputMsg,undefined,JSON.parse(JSON.stringify(fileResults)))
-        setFileList([])
-        setFileResults([]);
-        setFileUidsInProgress([])
-      }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
-        onSendMsg(str + '原封不动输出以上文件的解析内容',undefined,JSON.parse(JSON.stringify(fileResults)))
-        setFileList([])
-        setFileResults([]);
-        setFileUidsInProgress([])
+      }
+    )
+    if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
+      sendMsg(inputMsg);
+    }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+      onSendMsg(str + inputMsg,undefined,JSON.parse(JSON.stringify(fileResults)))
+      setFileList([])
+      setFileResults([]);
+      setFileUidsInProgress([])
+    }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+      onSendMsg(str + '原封不动输出以上文件的解析内容',undefined,JSON.parse(JSON.stringify(fileResults)))
+      setFileList([])
+      setFileResults([]);
+      setFileUidsInProgress([])
+    } else {
+      return
     }
+    setShowPauseButton(true)
   }
   
   useEffect(() => {
@@ -449,7 +461,14 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   useEffect(() => {
     saveFileResult(undefined)
+    changeInStreamQueryId(undefined)
   }, [chatId,currentAgent])
+
+  useEffect(()=>{
+    if(currentInStreamQueryId === undefined) {
+      setShowPauseButton(false)
+    }
+  },[currentInStreamQueryId])
   /* 文件上传相关功能 ---end */
 
   return (
@@ -514,12 +533,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                   onInputMsgChange('');
                   return;
                 }
-                if ((inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length) {
-                  if (!isSelect && !isComposing) {
-                    sendMsgWithFile()
-                    setOpen(false);
-                  }
-                  
+                if (!isSelect && !isComposing) {
+                  sendMsgWithFile()
+                  setOpen(false);
                 }
               }
             }}
@@ -537,15 +553,36 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             getPopupContainer={triggerNode => triggerNode.parentNode}>
             {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
           </AutoComplete>
+          {/* 发送按钮 */}
           <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: (inputMsg?.length > 0 || fileResults?.length > 0) && !fileUidsInProgress?.length,
+              [styles.sendBtnActive]: 
+              (inputMsg?.length > 0 || fileResults?.length > 0) && 
+              !fileUidsInProgress?.length &&
+              currentInStreamQueryId === undefined,
             })}
             onClick={() => {
               sendMsgWithFile()
             }}>
             <IconFont type="icon-ios-send" />
           </div>
+          {/* 暂停按钮 */}
+          {showPauseButton && <div
+            className={classNames(styles.sendBtn, {
+              [styles.sendBtnActive]: currentInStreamQueryId
+            })}
+            onClick={() => {
+              if(currentInStreamQueryId !== undefined) {
+                stopStream({queryId:currentInStreamQueryId}).then(()=>{
+                }).catch((err)=>{
+                  messageApi.error('暂停失败');
+                }).finally(()=>{
+                  changeInStreamQueryId(undefined)
+                })
+              }
+            }}>
+            <IconFont type="icon-copilot-fill" />
+          </div>}
           {/* 上传组件 */}
           <div className={styles.uploadContainer}>
             {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}

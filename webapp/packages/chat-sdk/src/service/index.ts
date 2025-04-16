@@ -344,3 +344,11 @@ return fetchEventSource(`${prefix}/stream/chat/crab/deepSeekStream`, {
   }
 })
 }
+
+export function stopStream(
+  params:{
+    queryId: number;
+  }
+) {
+  return axios.post<any>(`${prefix}/chat/crab/stopStream`,params);
+}

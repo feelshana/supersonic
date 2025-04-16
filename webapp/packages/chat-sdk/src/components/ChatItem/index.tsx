@@ -68,6 +68,7 @@ type Props = {
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
   fileResultsForReqStream?: FileResultsType;
+  changeInStreamQueryId?: (queryId: number|undefined) => void;
 };
 
 export const ChartItemContext = createContext({
@@ -99,7 +100,8 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
-  fileResultsForReqStream
+  fileResultsForReqStream,
+  changeInStreamQueryId = () => {},
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -227,11 +229,13 @@ const ChatItem: React.FC<Props> = ({
         const errorFunc = (error) => {
           setIsStreamResult(false)
           console.error('(result)SSE 错误:', error);
+          changeInStreamQueryId(undefined)
           // throw error
         };
         const closeFunc = () => {
           setIsStreamResult(false)
           console.log('(result)SSE 连接已关闭');
+          changeInStreamQueryId(undefined)
         };
         setIsStreamResult(true)
         deepSeekStream (
@@ -244,6 +248,7 @@ const ChatItem: React.FC<Props> = ({
           },
           messageFunc,errorFunc,closeFunc
         )
+        changeInStreamQueryId(parseInfoValue.queryId)
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {
@@ -474,7 +479,6 @@ const ChatItem: React.FC<Props> = ({
     if (data !== undefined || executeTip !== '' || parseLoading) {
       return;
     }
-    console.log(msg, msgData, '????')
     initChatItem(msg, msgData);
   }, [msg, msgData]);
 
