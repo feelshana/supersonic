@@ -30,6 +30,7 @@ export type MessageItem = {
   score?: number;
   feedback?: string;
   filters?: any;
+  fileResultsForReqStream?: FileResultsType;
 };
 
 export type ConversationDetailType = {
@@ -107,3 +108,12 @@ export type AgentType = {
   chatAppConfig: any;
   embedUrl: string;
 };
+export type FileResultType = {fileContent:string,
+  fileId:string,
+  fileName:string,
+  fileUid:string,
+  fileSize:string,
+  fileType:string,
+}
+
+export type FileResultsType = FileResultType[]

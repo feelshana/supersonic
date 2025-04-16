@@ -7,6 +7,7 @@ import {
   ParseDataType,
   SearchRecommendItem,
 } from '../common/type';
+import type { FileResultsType } from '../Chat/type'
 import { isMobile } from '../utils/utils';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { getToken } from '../utils/utils';
@@ -274,21 +275,14 @@ export function deepSeekStream(
     chatId,
     parseInfo,
     agentId,
-    fileResults2
+    fileResultsForReqStream
   }:{
     queryText: string;
     chatId: number;
     parseInfo: ChatContextType;
     agentId?: number;
-    fileResults2?: {
-      fileContent: string;
-      fileId: string;
-      fileName: string;
-      fileSize: string;
-      fileType: string;
-    }[]
+    fileResultsForReqStream?: FileResultsType
   },
-
   messageFunc: ((arg0: any) => void),
   errorFunc: ((arg0: any) => void),
   closeFunc: (() => void)
@@ -312,7 +306,8 @@ const bodyObj: {
   parseId: parseInfo.id,
   fileInfoList: []
 }
-for (const fileResult of fileResults2 || []) {
+for (const fileResult of fileResultsForReqStream || []) {
+  console.log(fileResult,'3333')
   if (fileResult.fileId) {
     const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}];以下内容为文件解析后的内容：\n`+fileResult.fileContent
     bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})

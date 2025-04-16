@@ -30,7 +30,7 @@ import classNames from 'classnames';
 import Tools from '../Tools';
 import SqlItem from './SqlItem';
 import SimilarQuestionItem from './SimilarQuestionItem';
-import { AgentType } from '../../Chat/type';
+import { AgentType, FileResultsType } from '../../Chat/type';
 import dayjs, { Dayjs } from 'dayjs';
 import { exportCsvFile } from '../../utils/utils';
 import Loading from './Loading';
@@ -67,24 +67,7 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
-  changeFileResult2: (
-    arr: {
-      fileContent:string,
-      fileId:string,
-      fileName:string,
-      fileUid:string,
-      fileType:string,
-      fileSize:string,
-    }[]
-  ) => void;
-  fileResults2?: {
-    fileContent: string;
-    fileId: string;
-    fileName: string;
-    fileUid: string;
-    fileType: string;
-    fileSize: string;
-  }[]
+  fileResultsForReqStream?: FileResultsType;
 };
 
 export const ChartItemContext = createContext({
@@ -116,8 +99,7 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
-  changeFileResult2,
-  fileResults2,
+  fileResultsForReqStream
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -223,7 +205,8 @@ const ChatItem: React.FC<Props> = ({
     parseInfoValue: ChatContextType,
     parseInfos?: ChatContextType[],
     isSwitchParseInfo?: boolean,
-    isRefresh = false
+    isRefresh = false,
+    fileResultsForReqStream?: FileResultsType
   ) => {
     try {
       if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
@@ -257,11 +240,10 @@ const ChatItem: React.FC<Props> = ({
             chatId: conversationId!,
             parseInfo: parseInfoValue,
             agentId: agentId,
-            fileResults2
+            fileResultsForReqStream
           },
           messageFunc,errorFunc,closeFunc
         )
-        changeFileResult2([])
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {
@@ -411,7 +393,6 @@ const ChatItem: React.FC<Props> = ({
       }
     } catch (error) {
       onCouldNotAnswer()
-      changeFileResult2([])
       return
     }
     // 预设问题如果包含该提问，让其结果在思考后才出结果
@@ -444,7 +425,6 @@ const ChatItem: React.FC<Props> = ({
     ) {
       setParseTip(state === ParseStateEnum.FAILED && errorMsg ? errorMsg : PARSE_ERROR_TIP);
       setParseInfo({ queryId } as any);
-      changeFileResult2([])
       return;
     }
     onUpdateMessageScroll?.();
@@ -467,9 +447,7 @@ const ChatItem: React.FC<Props> = ({
     updateDimensionFitlers(parseInfoValue?.dimensionFilters || []);
     setDateInfo(parseInfoValue?.dateInfo);
     if (parseInfos.length === 1) {
-      onExecute(parseInfoValue, parseInfos);
-    }else{
-      changeFileResult2([])
+      onExecute(parseInfoValue, parseInfos, undefined, undefined, fileResultsForReqStream);
     }
   };
 
@@ -496,6 +474,7 @@ const ChatItem: React.FC<Props> = ({
     if (data !== undefined || executeTip !== '' || parseLoading) {
       return;
     }
+    console.log(msg, msgData, '????')
     initChatItem(msg, msgData);
   }, [msg, msgData]);
 

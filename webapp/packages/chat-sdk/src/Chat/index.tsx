@@ -9,7 +9,7 @@ import {
 } from 'react';
 import MessageContainer from './MessageContainer';
 import styles from './style.module.less';
-import { ConversationDetailType, MessageItem, MessageTypeEnum, AgentType } from './type';
+import { ConversationDetailType, MessageItem, MessageTypeEnum, AgentType, FileResultsType } from './type';
 import { queryAgentList } from './service';
 import { useThrottleFn } from 'ahooks';
 import Conversation from './Conversation';
@@ -74,15 +74,6 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
 
   const [isSimpleMode, setIsSimpleMode] = useState<boolean>(false);
   const [isDebugMode, setIsDebugMode] = useState<boolean>(true);
-
-  const fileResults2 = useRef<{
-    fileContent:string,
-    fileId:string,
-    fileName:string,
-    fileUid:string,
-    fileSize:string,
-    fileType:string,
-  }[]>([]);
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
 
@@ -293,7 +284,8 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
     msg?: string,
     list?: MessageItem[],
     modelId?: number,
-    sendMsgParams?: SendMsgParamsType
+    sendMsgParams?: SendMsgParamsType,
+    fileResultsForReqStream?: FileResultsType
   ) => {
     const currentMsg = msg || inputMsg;
     if (currentMsg.trim() === '') {
@@ -321,6 +313,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
         agentId: agent?.id || agentIdValue || currentAgent?.id,
         type: MessageTypeEnum.QUESTION,
         filters: sendMsgParams?.filters,
+        fileResultsForReqStream
       },
     ];
     setMessageList(msgs);
@@ -402,8 +395,8 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
     updateMessageContainerScroll();
   };
 
-  const sendMsg = (msg: string, modelId?: number) => {
-    onSendMsg(msg, messageList, modelId);
+  const sendMsg = (msg: string, modelId?: number, fileResultsForReqStream?:FileResultsType) => {
+    onSendMsg(msg, messageList, modelId, undefined, fileResultsForReqStream);
     if (isMobile) {
       inputBlur();
     }
@@ -476,10 +469,6 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                       onMsgDataLoaded={onMsgDataLoaded}
                       onSendMsg={onSendMsg}
                       onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
-                      fileResults2={fileResults2.current}
-                      changeFileResult2={(result) => {
-                        fileResults2.current = result
-                      }}
                     />
                     {!noInput && (
                       <ChatFooter
@@ -501,9 +490,6 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                         }}
                         onOpenShowcase={() => {
                           setShowCaseVisible(!showCaseVisible);
-                        }}
-                        changeFileResult2={(result) => {
-                          fileResults2.current = result
                         }}
                         ref={chatFooterRef}
                       />

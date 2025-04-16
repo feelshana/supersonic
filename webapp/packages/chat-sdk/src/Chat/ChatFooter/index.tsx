@@ -6,7 +6,7 @@ import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
-import { AgentType, ModelType } from '../type';
+import { AgentType, ModelType, FileResultsType } from '../type';
 import { searchRecommend ,uploadAndParse, fileStatus } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
@@ -24,17 +24,10 @@ type Props = {
   onToggleHistoryVisible: () => void;
   onOpenAgents: () => void;
   onInputMsgChange: (value: string) => void;
-  onSendMsg: (msg: string, dataSetId?: number) => void;
+  onSendMsg: (msg: string, dataSetId?: number, fileResultsForReqStream?: FileResultsType) => void;
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
-  changeFileResult2: (arr: {fileContent:string,
-    fileId:string,
-    fileName:string,
-    fileUid:string,
-    fileSize:string,
-    fileType:string,
-  }[]) => void;
 };
 
 const { OptGroup, Option } = Select;
@@ -62,7 +55,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
-    changeFileResult2 // 需要改变【文件解析结果列表2】触发的函数
   },
   ref
 ) => {
@@ -80,20 +72,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [fileList, setFileList] = useState<UploadFile[]>([]); 
   const fileListRef = useRef<UploadFile[]>([]);
 
-  // 【文件解析结果列表1】该列表是已经解析完毕的解析结果
-  /*  注：
-      【文件解析结果列表1】存的是即将发出去的解析结果；
-      【文件解析结果列表2】存的是准备调用deepSeekStream的解析结果（需要解析结果作为参数传给deepSeekStream)；
-      【文件解析结果列表2】与【文件解析结果列表1】不总是相同
-       因为在调用deepSeekStream前还要调用parse接口，而【文件解析结果列表1】在消息发出去后就清空了 */
-  const [fileResults, setFileResults] = useState<{
-    fileContent:string,
-    fileId:string,
-    fileName:string,
-    fileUid:string,
-    fileSize:string,
-    fileType:string
-  }[]>([]);
+  // 【文件解析结果列表】该列表是已经解析完毕的解析结果
+  const [fileResults, setFileResults] = useState<FileResultsType>([]);
 
   // 正在解析的文件uid列表, 解析完的文件uid会从该列表移除
   const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([]) 
@@ -388,20 +368,13 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }
   
   /**
-   * 动态改变文件解析结果列表（【文件解析结果列表1】、【文件解析结果列表2】）
+   * 动态改变【文件解析结果列表】
    * @param result 
    * 需要被操作的解析结果对象
    * 如果 !result, 则表示该操作并没有解析结果比如：文件被删除
    * @param file 
    * 需要被操作的文件对象
    * 如果 !file, 则表示这是一个清空文件上传状态的操作，通常是切换助手和新对话时使用
-   * 问题点：
-   * 1. !file时是否要执行 changeFileResult2([]) 这是个值得思考的的问题：
-   *    ① 如果不置空，则在切换助手和新对话后，上一个助手或者对话的FileResult2会短暂存在，影响下个对话或者助手
-   *    ② 如果置空，切换后，如果上一个助手或对话的问题正在调用parse接口的阶段，那么上一个助手或对话调用deepseekStream就没带上文件解析结果
-   *    从 严重性来说 ①更严重；②的话可以理解为用户在提问后没有等待回答，而是直接切换助手或对话，那么这个问题没带解析结果影响不大
-   *    也许有其他方法解决这两个矛盾点，比如在回答中时不让切换助手或对话（H5端就是这么做的）。但似乎没必要。
-   *    综上，还是选择置空，执行 changeFileResult2([])
    * @returns 
    */
   const saveFileResult = (
@@ -420,7 +393,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       setFileResults((prev)=>{
         return []
       });
-      changeFileResult2([])
       setFileUidsInProgress([])
       return
     }
@@ -428,7 +400,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       setFileResults(prev => {
         prev = prev||[]
         const arr = prev.filter(item=>item.fileUid !== file?.uid)
-        changeFileResult2(arr)
         return arr
       })
       return
@@ -443,7 +414,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             arr = [...prev,result]
           }
         }
-        changeFileResult2(arr)
         return arr
       });
       setFileUidsInProgress(prev => {
@@ -461,12 +431,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
         sendMsg(inputMsg);
       }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
-        onSendMsg(str + inputMsg)
+        onSendMsg(str + inputMsg,undefined,JSON.parse(JSON.stringify(fileResults)))
         setFileList([])
         setFileResults([]);
         setFileUidsInProgress([])
       }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
-        onSendMsg(str + '原封不动输出以上文件的解析内容')
+        onSendMsg(str + '原封不动输出以上文件的解析内容',undefined,JSON.parse(JSON.stringify(fileResults)))
         setFileList([])
         setFileResults([]);
         setFileUidsInProgress([])
