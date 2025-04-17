@@ -401,6 +401,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       return
     }
     if(file?.status === 'removed') {
+      // 有的情况是用代码改file.status为removed，所以需要执行下setFileList
+      setFileList(prev => {
+        prev = prev||[]
+        const arr = prev.filter(item=>item.uid !== file?.uid)
+        return arr
+      })
       setFileResults(prev => {
         prev = prev||[]
         const arr = prev.filter(item=>item.fileUid !== file?.uid)
@@ -685,7 +691,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                               step++
                               setTimeout(pollFileStatus, 2000)
                             } else {
-                              messageApi.error('文件解析失败');
+                              messageApi.error(`文件 ${file.name} 解析失败`);
+                              file.status = 'removed'
                               saveFileResult(undefined, file)
                               setFileUidsInProgress((prev)=>{
                                 return prev.filter(item=>item!== file.uid)
@@ -697,7 +704,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                             step++
                             setTimeout(pollFileStatus, 100)
                           } else {
-                            messageApi.error('文件解析失败');
+                            messageApi.error(`文件文件 ${file.name} 解析失败`);
+                            file.status = 'removed'
                             saveFileResult(undefined, file)
                             setFileUidsInProgress((prev)=>{
                               return prev.filter(item=>item!== file.uid)
