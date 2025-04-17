@@ -70,7 +70,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [previewOpen, setPreviewOpen] = useState(false);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
-  /* 文件上传相关状态 ---start */
+  // #region 文件上传相关功能
 
   // 上传的文件列表，即文件上传组件里的fileList
   const [fileList, setFileList] = useState<UploadFile[]>([]); 
@@ -82,8 +82,11 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   // 正在解析的文件uid列表, 解析完的文件uid会从该列表移除
   const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([]) 
   const [messageApi, contextHolder] = message.useMessage();
+
+  // 是否显示停止流式输出的按钮
   const [showPauseButton, setShowPauseButton] = useState<boolean>(false)
-  /* 文件上传相关状态 ---end */
+
+  // #endregion 文件上传相关功能
 
   const handlePreview = async (file: UploadFile) => {
     if (!file.url && !file.preview) {
@@ -355,7 +358,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   const { isComposing } = useComposing(document.getElementById('chatInput'));
 
-  /* 文件上传相关功能 ---start */
+  // #region 文件上传相关功能
 
   // 预览图片要用到的函数
   const getBase64 = (file: FileType): Promise<string> => {
@@ -604,7 +607,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     }
   },[currentInStreamQueryId])
 
-  /* 文件上传相关功能 ---end */
+  // #endregion 文件上传相关功能
 
   return (
     <div className={chatFooterClass}>
@@ -688,6 +691,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             getPopupContainer={triggerNode => triggerNode.parentNode}>
             {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
           </AutoComplete>
+          {
+            // #region 文件上传相关功能
+          }
           {/* 发送按钮 */}
           <div
             className={classNames(styles.sendBtn, {
@@ -752,6 +758,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               </Button>
             </Upload>
           </div>
+          {
+            // #endregion 文件上传相关功能
+          }
         </div>
       </div>
     </div>
