@@ -11,7 +11,7 @@ import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../s
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
-import { LoadingOutlined, CloseCircleOutlined,UploadOutlined } from '@ant-design/icons';
+import { LoadingOutlined, CloseCircleOutlined,UploadOutlined,PauseCircleFilled } from '@ant-design/icons';
 
 
 type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
@@ -581,7 +581,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                 })
               }
             }}>
-            <IconFont type="icon-copilot-fill" />
+            <PauseCircleFilled />
           </div>}
           {/* 上传组件 */}
           <div className={styles.uploadContainer}>
