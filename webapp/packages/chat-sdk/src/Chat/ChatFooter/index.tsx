@@ -356,6 +356,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const { isComposing } = useComposing(document.getElementById('chatInput'));
 
   /* 文件上传相关功能 ---start */
+
+  // 预览图片要用到的函数
   const getBase64 = (file: FileType): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -365,6 +367,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     });
   }
 
+  // 格式化文件大小
   const formatSize = (size) => {
     if (size < 1024) return `${size} B`;
     if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
@@ -432,6 +435,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     }
   } 
   
+  // 开启闲聊对话时发送消息的函数（此时有文件上传功能）
   const sendMsgWithFile = () => {
     if(currentInStreamQueryId !== undefined) {
       // 如果正在流式输出结果，发送消息行为被阻止
@@ -460,7 +464,131 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     }
     setShowPauseButton(true)
   }
+
+  // 轮询文件解析状态接口
+  const pollFileStatus = async (file,taskId,step) => {
+    const onFailed = () => {
+      messageApi.error(`文件 ${file.name} 解析失败`);
+      file.status = 'removed'
+      saveFileResult(undefined, file)
+      setFileUidsInProgress((prev)=>{
+        return prev.filter(item=>item!== file.uid)
+      })
+    }
+    if (
+      fileList.some((item)=>{return item.uid === file.uid}) && file.status === 'done'
+    ) {
+      try {
+        const res = await fileStatus({taskId})
+        if (res?.data?.body?.status === 'COMPLETED') {
+          saveFileResult({
+            fileContent: res.data.body.result?.fileContent,
+            fileId: res.data.body.result?.fileId,
+            fileName: file.name,
+            fileUid: file.uid,
+            fileSize: formatSize(file.size),
+            fileType: file.type?.split('/')[0].toUpperCase() || ''
+          },file)
+        } else if (res?.data?.body?.status === 'ERROR') {
+          onFailed()
+        } else {
+          if (step < 20) {
+            step++
+            setTimeout(()=>{pollFileStatus(file,taskId,step)}, 2000)
+          } else {
+            onFailed()
+          }
+        }
+      } catch (error) {
+        if (step < 20) {
+          step++
+          setTimeout(()=>{pollFileStatus(file,taskId,step)}, 2000)
+        } else {
+          onFailed()
+        }
+      }
+    }
+  }
   
+  // 上传文件的回调
+  const onAddFile = async ({ file, fileList: newFileList }) => {
+    setFileList(newFileList);
+    console.log(file, 'file 1')
+    console.log(newFileList, 'newFileList 1')
+    if (file.status === 'done') {
+      if(file.type?.startsWith('image/')){
+        file.thumbUrl = URL.createObjectURL(file.originFileObj as File)
+      }
+      setFileUidsInProgress((prev)=>{
+        return [...prev,file.uid]
+      })
+      try {
+        const parseRes = await uploadAndParse(file.originFileObj as File)
+        const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
+        if (taskId) {
+          pollFileStatus(file,taskId,0)
+        }
+      } catch (error) {
+        messageApi.error('请求失败');
+        saveFileResult(undefined, file)
+        setFileUidsInProgress((prev)=>{
+          return prev.filter(item=>item!== file.uid)
+        })
+      }
+    }
+  }
+  
+  // 删除文件的回调
+  const onRemoveFile = ({ file, fileList: newFileList }) => {
+    setFileList(newFileList);
+    saveFileResult(undefined, file)
+    console.log(file, 'file 2')
+    console.log(newFileList, 'newFileList 2')
+    if (file.thumbUrl) URL.revokeObjectURL(file.thumbUrl);
+  }
+
+  // 停止流式输出的回调
+  const onStopStream = () => {
+    if(currentInStreamQueryId !== undefined) {
+      stopStream({queryId:currentInStreamQueryId}).then(()=>{
+      }).catch((err)=>{
+        messageApi.error('暂停失败');
+      }).finally(()=>{
+        changeInStreamQueryId(undefined)
+      })
+    }
+  }
+  
+  // 自定义文件列表的渲染函数
+  const itemRender = (originNode, file, fileList, actions) => (
+    <div className={styles.fileItem}>
+      <div className={styles.fileIcon}>
+        {
+          file.type?.startsWith('image/') ? 
+          <img src={file.thumbUrl} alt="" onClick={()=>{actions.preview()}}/> : 
+          <span style={{fontSize:'24px'}}>&nbsp;📄&nbsp;&nbsp;</span>
+        }
+      </div>
+      <div className={styles.fileInfo}>
+        <div className={styles.fileName}>{file.name}</div>
+        <div className={styles.fileSize}>
+          {fileUidsInProgress.includes(file.uid) ? 
+            <div className={styles.loadingsItem}><LoadingOutlined />&nbsp;&nbsp;解析中...</div> : 
+            file?.type?.split('/')[0].toUpperCase() + ' ' + formatSize(file.size)
+          }
+        </div>
+      </div>
+      <div className={styles.closeButton}>
+        <CloseCircleOutlined 
+          className={styles.closeIcon}
+          onClick={() => {
+            actions.remove()
+          }}
+        />
+      </div>
+    </div>
+  )
+
   useEffect(() => {
     fileListRef.current = fileList;
   }, [fileList])
@@ -475,6 +603,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       setShowPauseButton(false)
     }
   },[currentInStreamQueryId])
+
   /* 文件上传相关功能 ---end */
 
   return (
@@ -577,16 +706,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             className={classNames(styles.sendBtn, {
               [styles.sendBtnActive]: currentInStreamQueryId
             })}
-            onClick={() => {
-              if(currentInStreamQueryId !== undefined) {
-                stopStream({queryId:currentInStreamQueryId}).then(()=>{
-                }).catch((err)=>{
-                  messageApi.error('暂停失败');
-                }).finally(()=>{
-                  changeInStreamQueryId(undefined)
-                })
-              }
-            }}>
+            onClick={onStopStream}>
             <PauseCircleFilled />
           </div>}
           {/* 上传组件 */}
@@ -598,42 +718,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               maxCount={10}
               // listType="picture"
               fileList={fileList}
-              itemRender={(originNode, file, fileList, actions) => (
-                <div className={styles.fileItem}>
-                  <div className={styles.fileIcon}>
-                    {
-                      file.type?.startsWith('image/') ? 
-                      <img src={file.thumbUrl} alt="" onClick={()=>{actions.preview()}}/> : 
-                      <span style={{fontSize:'24px'}}>&nbsp;📄&nbsp;&nbsp;</span>
-                    }
-                  </div>
-                  <div className={styles.fileInfo}>
-                    <div className={styles.fileName}>{file.name}</div>
-                    <div className={styles.fileSize}>
-                      {fileUidsInProgress.includes(file.uid) ? 
-                        <div className={styles.loadingsItem}><LoadingOutlined />&nbsp;&nbsp;解析中...</div> : 
-                        file?.type?.split('/')[0].toUpperCase() + ' ' + formatSize(file.size)
-                      }
-                    </div>
-                  </div>
-                  <div className={styles.closeButton}>
-                    <CloseCircleOutlined 
-                      className={styles.closeIcon}
-                      onClick={() => {
-                        actions.remove()
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-              onChange = {({ file, fileList: newFileList }) => {
-                // 这里只有删除的情况才会触发
-                setFileList(newFileList);
-                saveFileResult(undefined, file)
-                console.log(file, 'file 2')
-                console.log(newFileList, 'newFileList 2')
-                if (file.thumbUrl) URL.revokeObjectURL(file.thumbUrl);
-              }}
+              itemRender={itemRender}
+              onChange = {onRemoveFile}
               onPreview={handlePreview}
             >
             </Upload>
@@ -657,73 +743,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               maxCount={10}
               fileList={fileList}
               showUploadList={false}
-              onChange = {async ({ file, fileList: newFileList }) => {
-                // 这里只有上传的情况才会触发
-                setFileList(newFileList);
-                console.log(file, 'file 1')
-                console.log(newFileList, 'newFileList 1')
-                if (file.status === 'done') {
-                  if(file.type?.startsWith('image/')){
-                    file.thumbUrl = URL.createObjectURL(file.originFileObj as File)
-                  }
-                  setFileUidsInProgress((prev)=>{
-                    return [...prev,file.uid]
-                  })
-                  try {
-                    const parseRes = await uploadAndParse(file.originFileObj as File)
-                    const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
-                    if (taskId) {
-                       let step = 0
-                       const pollFileStatus = async () => {
-                        try {
-                          const res = await fileStatus({taskId})
-                          if (res?.data?.body?.status === 'COMPLETED') {
-                            saveFileResult({
-                              fileContent: res.data.body.result?.fileContent,
-                              fileId: res.data.body.result?.fileId,
-                              fileName: file.name,
-                              fileUid: file.uid,
-                              fileSize: formatSize(file.size),
-                              fileType: file.type?.split('/')[0].toUpperCase() || ''
-                            },file)
-                          } else {
-                            if (step < 20) {
-                              step++
-                              setTimeout(pollFileStatus, 2000)
-                            } else {
-                              messageApi.error(`文件 ${file.name} 解析失败`);
-                              file.status = 'removed'
-                              saveFileResult(undefined, file)
-                              setFileUidsInProgress((prev)=>{
-                                return prev.filter(item=>item!== file.uid)
-                              })
-                            }
-                          }
-                        } catch (error) {
-                          if (step < 20) {
-                            step++
-                            setTimeout(pollFileStatus, 100)
-                          } else {
-                            messageApi.error(`文件文件 ${file.name} 解析失败`);
-                            file.status = 'removed'
-                            saveFileResult(undefined, file)
-                            setFileUidsInProgress((prev)=>{
-                              return prev.filter(item=>item!== file.uid)
-                            })
-                          }
-                        }
-                       }
-                       pollFileStatus()
-                    }
-                  } catch (error) {
-                    messageApi.error('请求失败');
-                    saveFileResult(undefined, file)
-                    setFileUidsInProgress((prev)=>{
-                      return prev.filter(item=>item!== file.uid)
-                    })
-                  }
-                }
-              }}
+              onChange = {onAddFile}
             >
               <Button 
                 type="primary" 
@@ -732,7 +752,6 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               </Button>
             </Upload>
           </div>
-
         </div>
       </div>
     </div>
