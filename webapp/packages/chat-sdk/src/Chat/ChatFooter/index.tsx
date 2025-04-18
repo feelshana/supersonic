@@ -572,9 +572,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     if(currentInStreamQueryId !== undefined) {
       stopStream({queryId:currentInStreamQueryId}).then(()=>{
       }).catch((err)=>{
-        messageApi.error('暂停失败');
-      }).finally(()=>{
-        changeInStreamQueryId(undefined)
+        messageApi.error('停止失败');
       })
     }
   }
@@ -728,7 +726,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             }}>
             <IconFont type="icon-ios-send" />
           </div>
-          {/* 暂停按钮 */}
+          {/* 停止输出按钮 */}
           {showPauseButton && <div
             className={classNames(styles.sendBtn, {
               [styles.sendBtnActive]: currentInStreamQueryId
