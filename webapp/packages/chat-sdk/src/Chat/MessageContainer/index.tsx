@@ -29,7 +29,8 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
-  changeInStreamQueryId?: (queryId: number|undefined) => void;
+  changeInStreamQueryId: (queryId: number|undefined) => void;
+  onSendMsgWithRecommend: (example: string) => void;
 };
 
 const MessageContainer: React.FC<Props> = ({
@@ -45,7 +46,8 @@ const MessageContainer: React.FC<Props> = ({
   isDebugMode,
   onMsgDataLoaded,
   onSendMsg, onCouldNotAnswer,
-  changeInStreamQueryId
+  changeInStreamQueryId,
+  onSendMsgWithRecommend
 }) => {
   const [triggerResize, setTriggerResize] = useState(false);
   const onResize = useCallback(() => {
@@ -143,7 +145,7 @@ const MessageContainer: React.FC<Props> = ({
             <div key={msgId} id={`${msgId}`} className={styles.messageItem}>
               {type === MessageTypeEnum.TEXT && <Text position="left" data={msg} />}
               {type === MessageTypeEnum.AGENT_LIST && (
-                  <AgentTip currentAgent={currentAgent} onSendMsg={onSendMsg} id={msgId}/>
+                  <AgentTip currentAgent={currentAgent} onSendMsg={onSendMsg} id={msgId} onSendMsgWithRecommend={onSendMsgWithRecommend}/>
               )}
               {type === MessageTypeEnum.QUESTION && (
                 <>

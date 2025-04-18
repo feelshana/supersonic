@@ -117,3 +117,7 @@ export type FileResultType = {fileContent:string,
 }
 
 export type FileResultsType = FileResultType[]
+
+export type SendMsgWithRecommendTriggerType = {
+  example: string;
+}

@@ -188,61 +188,7 @@ export function queryThoughtsInSSE(queryText: string, chatId: number | undefined
     }
   });
 }
-
-export function chatStreamExecute(
-    {
-      queryText,
-      chatId,
-      parseInfo,
-      agentId
-    }:{
-      queryText: string;
-      chatId: number;
-      parseInfo: ChatContextType;
-      agentId?: number;
-    },
-    messageFunc: ((arg0: any) => void),
-    errorFunc: ((arg0: any) => void),
-    closeFunc: (() => void)
-) {
-  const ctrl = new AbortController();
-  return fetchEventSource(`${prefix}/stream/chat/query/streamExecute`, {
-    method: 'POST',
-    openWhenHidden: true, // 允许后台运行
-    headers: {
-      'Cache-Control': 'no-cache',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + getToken()
-    },
-    body: JSON.stringify({
-      queryText,
-      agentId,
-      chatId: chatId || DEFAULT_CHAT_ID,
-      queryId: parseInfo.queryId,
-      parseId: parseInfo.id,
-    }),
-    signal: ctrl.signal,
-    onopen: async (res) => {
-      if (res.ok) {
-        return;
-      } else {
-        errorFunc(new Error('连接不成功'))
-        ctrl.abort();
-        throw new Error('连接不成功')
-      }
-    },
-    onmessage: messageFunc,
-    onerror: (error) => {
-      errorFunc(error)
-      ctrl.abort();
-      throw error
-    },
-    onclose: () => {
-      closeFunc()
-    }
-  })
-}
-
+// 智能洞察
 export function dataInterpret(
   textResult: string,
   queryText: string,
@@ -259,16 +205,19 @@ export function dataInterpret(
     parseId: parseInfo.id,
   });
 }
+// 上传并解析文件
 export function uploadAndParse(file: File) {
   const formData = new FormData();
   formData.append('file', file);
   return axios.post<any>(`${prefix}/chat/file/uploadAndParse`, formData );
 }
 
+// 文件解析状态查询,查询完成后会得到解析内容
 export function fileStatus(params) {
   return axios.post<any>(`${prefix}/chat/file/status`, params);
 }
 
+// 【开启闲聊后】流式回答
 export function deepSeekStream(
   {
     queryText,
@@ -345,6 +294,7 @@ return fetchEventSource(`${prefix}/stream/chat/crab/deepSeekStream`, {
 })
 }
 
+// 【开启闲聊后】停止流式回答
 export function stopStream(
   params:{
     queryId: number;

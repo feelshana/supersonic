@@ -6,7 +6,7 @@ import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
-import { AgentType, ModelType, FileResultsType } from '../type';
+import { AgentType, ModelType, FileResultsType, SendMsgWithRecommendTriggerType } from '../type';
 import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
@@ -30,6 +30,7 @@ type Props = {
   onOpenShowcase: () => void;
   currentInStreamQueryId: number | undefined;
   changeInStreamQueryId: (queryId: number|undefined) => void;
+  sendMsgWithRecommendTrigger: SendMsgWithRecommendTriggerType;
 };
 
 const { OptGroup, Option } = Select;
@@ -58,7 +59,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onSelectAgent,
     onOpenShowcase,
     currentInStreamQueryId,
-    changeInStreamQueryId
+    changeInStreamQueryId,
+    sendMsgWithRecommendTrigger
   },
   ref
 ) => {
@@ -437,10 +439,25 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       })
     }
   } 
+
+  // 【开启闲聊后】点推荐问题的函数
+  const sendMsgWithRecommend = (example: string) => {
+    if (!example) {
+      return
+    }
+    if(currentInStreamQueryId !== undefined) {
+      messageApi.error('当前有问题正在回答中...')
+      // 如果正在流式输出结果，发送消息行为被阻止
+      return
+    }
+    onSendMsg(example)
+    setShowPauseButton(true)
+  }
   
-  // 开启闲聊对话时发送消息的函数（此时有文件上传功能）
+  // 【开启闲聊后】发送消息的函数（此时有文件上传功能）
   const sendMsgWithFile = () => {
     if(currentInStreamQueryId !== undefined) {
+      messageApi.error('当前有问题正在回答中...')
       // 如果正在流式输出结果，发送消息行为被阻止
       return
     }
@@ -451,16 +468,16 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       }
     )
     if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
-      sendMsg(inputMsg);
+      sendMsg(inputMsg)
     }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
       onSendMsg(str + inputMsg,undefined,JSON.parse(JSON.stringify(fileResults)))
       setFileList([])
-      setFileResults([]);
+      setFileResults([])
       setFileUidsInProgress([])
     }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
       onSendMsg(str + '原封不动输出以上文件的解析内容',undefined,JSON.parse(JSON.stringify(fileResults)))
       setFileList([])
-      setFileResults([]);
+      setFileResults([])
       setFileUidsInProgress([])
     } else {
       return
@@ -606,6 +623,10 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       setShowPauseButton(false)
     }
   },[currentInStreamQueryId])
+
+  useEffect(()=>{
+    sendMsgWithRecommend(sendMsgWithRecommendTrigger.example)
+  },[sendMsgWithRecommendTrigger])
 
   // #endregion 文件上传相关功能
 

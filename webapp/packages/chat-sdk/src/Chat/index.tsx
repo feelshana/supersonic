@@ -77,6 +77,8 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
   const [currentInStreamQueryId,setCurrentInstreamQueryId]= useState<number|undefined>(undefined);
+  //【开启闲聊后】点推荐问题的触发器，example是点击的推荐问题
+  const [sendMsgWithRecommendTrigger, setSndMsgWithRecommendTrigger] = useState({example:''});
 
   useImperativeHandle(ref, () => ({
     sendCopilotMsg,
@@ -473,6 +475,9 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                       changeInStreamQueryId={(queryId:number|undefined) => {
                         setCurrentInstreamQueryId(queryId);
                       }}
+                      onSendMsgWithRecommend={(example:string) => {
+                        setSndMsgWithRecommendTrigger({example})
+                      }}
                     />
                     {!noInput && (
                       <ChatFooter
@@ -500,6 +505,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                         changeInStreamQueryId={(queryId:number|undefined) => {
                           setCurrentInstreamQueryId(queryId);
                         }}
+                        sendMsgWithRecommendTrigger={sendMsgWithRecommendTrigger}
                       />
                     )}
                   </div>
