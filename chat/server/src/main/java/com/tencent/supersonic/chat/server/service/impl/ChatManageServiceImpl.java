@@ -248,4 +248,13 @@ public class ChatManageServiceImpl implements ChatManageService {
         ChatParseDO chatParseDO = chatQueryRepository.getParseInfo(questionId, parseId);
         return JSONObject.parseObject(chatParseDO.getParseInfo(), SemanticParseInfo.class);
     }
+
+    @Override
+    public List<QueryResp> getChatQueriesByUserName(Integer chatId, String userName) {
+        List<QueryResp> queries = chatQueryRepository.getChatQueriesByUserName(chatId, userName);
+        if (!CollectionUtils.isEmpty(queries)) {
+            fillParseInfo(queries);
+        }
+        return queries;
+    }
 }
