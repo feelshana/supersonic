@@ -215,11 +215,15 @@ const ChatItem: React.FC<Props> = ({
         let reasonTextContent = ''
         let answerTextContent = ''
         let textContent = ''
+        let endFlag = false
         const messageFunc = (event) => {
           if(JSON.parse(event.data)?.type === 'reason'){
             reasonTextContent += JSON.parse(event.data)?.message
           }else if(JSON.parse(event.data)?.type === 'answer') {
             answerTextContent += JSON.parse(event.data)?.message
+          }else if(JSON.parse(event.data)?.type === 'endFlag') {
+            endFlag = true
+            changeInStreamQueryId(undefined)
           }
           textContent += JSON.parse(event.data)?.message
           setStreamResultContent('' + textContent)
@@ -229,13 +233,17 @@ const ChatItem: React.FC<Props> = ({
         const errorFunc = (error) => {
           setIsStreamResult(false)
           console.error('(result)SSE 错误:', error);
-          changeInStreamQueryId(undefined)
+          if (!endFlag) {
+            changeInStreamQueryId(undefined)
+          }
           // throw error
         };
         const closeFunc = () => {
           setIsStreamResult(false)
           console.log('(result)SSE 连接已关闭');
-          changeInStreamQueryId(undefined)
+          if (!endFlag) {
+            changeInStreamQueryId(undefined)
+          }
         };
         setIsStreamResult(true)
         deepSeekStream (
