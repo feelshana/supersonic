@@ -22,18 +22,17 @@ import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.common.util.PageUtils;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.response.ParseTimeCostResp;
+import com.tencent.supersonic.headless.api.pojo.response.QueryState;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Repository
@@ -205,5 +204,23 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
     @Override
     public List<ChatParseDO> getParseInfoList(List<Long> questionIds) {
         return chatParseMapper.getParseInfoList(questionIds);
+    }
+
+    @Override
+    public List<QueryResp> getChatQueriesByUserName(Integer chatId, String userName) {
+        List<Map<String, Object>> data = chatQueryDOMapper.selectByUserName(chatId, userName);
+        List<QueryResp> list = new ArrayList<>();
+        data.forEach(data1 -> {
+            QueryResp queryResp = new QueryResp();
+            queryResp.setQuestionId(Long.parseLong(data1.get("questionId").toString()));
+            queryResp.setUserName(data1.get("userName").toString());
+            queryResp.setQueryText(data1.get("queryText").toString());
+            QueryResult queryResult =
+                    JsonUtil.toObject(data1.get("queryResult").toString(), QueryResult.class);
+            queryResp.setQueryResult(queryResult);
+            list.add(queryResp);
+
+        });
+        return list;
     }
 }

@@ -37,4 +37,6 @@ public interface ChatQueryRepository {
     ChatParseDO getParseInfo(Long questionId, int parseId);
 
     List<ChatParseDO> getParseInfoList(List<Long> questionIds);
+
+    List<QueryResp> getChatQueriesByUserName(Integer chatId, String userName);
 }
