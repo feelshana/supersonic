@@ -210,7 +210,13 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             }
 
             JsonNode body = response.path("body");
-
+            // 处理结束标志
+            if (body.has("endFlag") && "1".equals(body.path("endFlag").asText())) {
+                ObjectNode result = objectMapper.createObjectNode();
+                result.put("type", "endFlag");
+                result.put("message", "1");
+                return Flux.just(objectMapper.writeValueAsString(result));
+            }
             // 累积content
             if (body.has("content")) {
                 String content = body.path("content").asText();
