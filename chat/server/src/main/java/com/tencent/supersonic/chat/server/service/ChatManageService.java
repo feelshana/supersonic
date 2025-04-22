@@ -50,4 +50,6 @@ public interface ChatManageService {
     List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ChatParseResp chatParseResp);
 
     SemanticParseInfo getParseInfo(Long questionId, int parseId);
+
+    List<QueryResp> getChatQueriesByUserName(Integer chatId, String userName);
 }
