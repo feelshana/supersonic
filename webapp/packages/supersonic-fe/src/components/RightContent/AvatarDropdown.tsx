@@ -40,45 +40,46 @@ const AvatarDropdown: React.FC<GlobalHeaderRightProps> = () => {
     changePasswordModalRef.current?.open();
   };
 
-  const items = [
-    {
-      label: (
-        <>
-          <KeyOutlined />
-          访问令牌
-        </>
-      ),
-      key: 'accessToken',
-      onClick: handleAccessToken,
-    },
-    {
-      label: (
-        <>
-          <UnlockOutlined />
-          修改密码
-        </>
-      ),
-      key: 'changePassword',
-      onClick: handleChangePassword,
-    },
-    {
-      label: (
-        <>
-          <LogoutOutlined />
-          退出登录
-        </>
-      ),
-      onClick: (event: any) => {
-        const { key } = event;
-        if (key === 'logout' && initialState) {
-          loginOut().then(() => {
-            setInitialState({ ...initialState, currentUser: undefined });
-          });
-          return;
-        }
-      },
-      key: 'logout',
-    },
+  // 右上角头像暂不让点，把这些菜单注释
+  const items:any = [
+    // {
+    //   label: (
+    //     <>
+    //       <KeyOutlined />
+    //       访问令牌
+    //     </>
+    //   ),
+    //   key: 'accessToken',
+    //   onClick: handleAccessToken,
+    // },
+    // {
+    //   label: (
+    //     <>
+    //       <UnlockOutlined />
+    //       修改密码
+    //     </>
+    //   ),
+    //   key: 'changePassword',
+    //   onClick: handleChangePassword,
+    // },
+    // {
+    //   label: (
+    //     <>
+    //       <LogoutOutlined />
+    //       退出登录
+    //     </>
+    //   ),
+    //   onClick: (event: any) => {
+    //     const { key } = event;
+    //     if (key === 'logout' && initialState) {
+    //       loginOut().then(() => {
+    //         setInitialState({ ...initialState, currentUser: undefined });
+    //       });
+    //       return;
+    //     }
+    //   },
+    //   key: 'logout',
+    // },
   ];
   return (
     <>
