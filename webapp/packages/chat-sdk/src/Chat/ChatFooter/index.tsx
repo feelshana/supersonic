@@ -6,7 +6,7 @@ import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
-import { AgentType, ModelType, FileResultsType, SendMsgWithRecommendTriggerType } from '../type';
+import { AgentType, ModelType, FileResultType,FileResultsType, SendMsgWithRecommendTriggerType } from '../type';
 import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
@@ -396,7 +396,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       fileName:string,
       fileUid:string,
       fileSize:string,
-      fileType:string
+      fileType:string,
+      fileSizePercent:string,
     }|undefined,
     file?: UploadFile
   ) => {
@@ -463,8 +464,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     }
     let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
     fileResults && fileResults.forEach(
-      (item: {fileContent:string,fileId:string,fileName:string,fileUid:string,fileSize:string,fileType:string}) => {
-        str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}];\n`
+      (item: FileResultType) => {
+        str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}] 文件读取进度[${item.fileSizePercent}];\n`
       }
     )
     if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
@@ -507,7 +508,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             fileName: file.name,
             fileUid: file.uid,
             fileSize: formatSize(file.size),
-            fileType: file.type?.split('/')[0].toUpperCase() || ''
+            fileType: file.type?.split('/')[0].toUpperCase() || '',
+            fileSizePercent: res.data.body.result?.fileSizePercent || '100%'
           },file)
         } else if (res?.data?.body?.status === 'ERROR') {
           onFailed()
@@ -579,6 +581,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   
   // 自定义文件列表的渲染函数
   const itemRender = (originNode, file, fileList, actions) => (
+    <>
     <div className={styles.fileItem}>
       <div className={styles.fileIcon}>
         {
@@ -605,6 +608,12 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
         />
       </div>
     </div>
+    {!fileUidsInProgress.includes(file.uid) && fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent !== '100%'? 
+      <div className={styles.fileSizePercent}>
+        ⚠️ 超出字数限制， DeepSeek 只阅读了前 {fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent} 
+      </div>
+    :''}
+    </>
   )
 
   useEffect(() => {

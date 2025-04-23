@@ -114,6 +114,7 @@ export type FileResultType = {fileContent:string,
   fileUid:string,
   fileSize:string,
   fileType:string,
+  fileSizePercent: string,
 }
 
 export type FileResultsType = FileResultType[]

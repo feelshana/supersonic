@@ -257,7 +257,7 @@ const bodyObj: {
 }
 for (const fileResult of fileResultsForReqStream || []) {
   if (fileResult.fileId) {
-    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}];以下内容为文件解析后的内容：\n`+fileResult.fileContent
+    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}] 文件读取完成度[${fileResult.fileSizePercent}];以下内容为文件解析后的内容：\n`+fileResult.fileContent
     bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})
   }
 }

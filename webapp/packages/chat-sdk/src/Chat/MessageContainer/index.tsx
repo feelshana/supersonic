@@ -69,9 +69,17 @@ const MessageContainer: React.FC<Props> = ({
   }, [historyVisible, chatVisible]);
 
   const processMsg = (input) => {
-    const regex = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\];\s+/g;
+    // regex1是兼容问题里没有 [文件解析进度] 的文件
+    let regex1 = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\];\s+/g
+    let regex2 = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\]\s+文件读取进度\[([^\]]+)\];\s+/g
+    let regex: RegExp;
+    if (regex1.test(input)) {
+      regex = regex1
+    } else {
+      regex = regex2
+    }
     const fileArr: JSX.Element[] = [];
-    const text = input.replace(regex, (match, fileName, fileId, fileSize, fileType) => {
+    const text = input.replace(regex, (match, fileName, fileId, fileSize, fileType, fileSizePercent) => {
     const ext = fileName.split('.').pop().toLowerCase();
       let icon;
       if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) {
@@ -89,7 +97,7 @@ const MessageContainer: React.FC<Props> = ({
       }
     
       const fileCard = (
-        <div style={{display:'flex',justifyContent:'flex-end'}}>
+        <div className={styles.fileItemContainer}>
           <div className={styles.fileItem}>
             <div className={styles.fileIcon}>
               {
@@ -103,6 +111,8 @@ const MessageContainer: React.FC<Props> = ({
               </div>
             </div>
           </div>
+          {fileSizePercent !== '100%' ? 
+          <div className={styles.fileSizePercent}>⚠️ 超出字数限制， DeepSeek 只阅读了前 {fileSizePercent} </div> : ''}
         </div>
       )
       fileArr.push(fileCard)
