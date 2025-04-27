@@ -20,7 +20,7 @@ import { chatExecute,
   deepSeekStream } from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
-import { CheckCircleFilled } from '@ant-design/icons';
+import { CheckCircleFilled, CaretDownOutlined ,CaretUpOutlined } from '@ant-design/icons';
 import IconFont from '../IconFont';
 import ExpandParseTip from './ExpandParseTip';
 import ParseTip from './ParseTip';
@@ -36,6 +36,7 @@ import { exportCsvFile } from '../../utils/utils';
 import Loading from './Loading';
 import { useMethodRegister } from '../../hooks';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from'rehype-raw';
@@ -133,7 +134,10 @@ const ChatItem: React.FC<Props> = ({
   const [reasonTextContent, setReasonTextContent] = useState<string>('');
   const [answerTextContent, setanswerTextContent] = useState<string>('');
   const isThinkingRef = useRef(isThinking);
-  const isStreamResultRef = useRef(isStreamResult)
+  const isStreamResultRef = useRef(isStreamResult);
+  const [thinkingTimeInSeconds, setThinkingTimeInSeconds] = useState<number>(0);
+  const [toggleOfThouths, setToggleOfThouths] = useState<boolean>(false);
+  const [isThinkingOfdeepSeekStream, setIsThinkingOfdeepSeekStream] = useState<boolean>(false);
   const resetState = () => {
     setParseLoading(false);
     setParseTimeCost(undefined);
@@ -216,10 +220,18 @@ const ChatItem: React.FC<Props> = ({
         let answerTextContent = ''
         let textContent = ''
         let endFlag = false
+        setIsThinkingOfdeepSeekStream(true)
+        let timer = setInterval(() => {
+          setThinkingTimeInSeconds((prev)=>{
+            return prev + 1
+          })
+        }, 1000)
         const messageFunc = (event) => {
           if(JSON.parse(event.data)?.type === 'reason'){
             reasonTextContent += JSON.parse(event.data)?.message
           }else if(JSON.parse(event.data)?.type === 'answer') {
+            setIsThinkingOfdeepSeekStream(false)
+            clearInterval(timer)
             answerTextContent += JSON.parse(event.data)?.message
           }else if(JSON.parse(event.data)?.type === 'endFlag') {
             endFlag = true
@@ -231,6 +243,8 @@ const ChatItem: React.FC<Props> = ({
           setanswerTextContent('' + answerTextContent)
         }
         const errorFunc = (error) => {
+          setIsThinkingOfdeepSeekStream(false)
+          clearInterval(timer)
           setIsStreamResult(false)
           console.error('(result)SSE 错误:', error);
           if (!endFlag) {
@@ -239,6 +253,8 @@ const ChatItem: React.FC<Props> = ({
           // throw error
         };
         const closeFunc = () => {
+          setIsThinkingOfdeepSeekStream(false)
+          clearInterval(timer)
           setIsStreamResult(false)
           console.log('(result)SSE 连接已关闭');
           if (!endFlag) {
@@ -744,12 +760,20 @@ const ChatItem: React.FC<Props> = ({
               </div> : ''
             }
             <div className={`${prefixCls}-content-container`} style={{ display: streamResultContent ? 'block' : 'none' }}>
-              <div className='result-container  thoughts-container'>
-                { reasonTextContent }
+              <div className='toggle-content' onClick={()=>{
+                setToggleOfThouths((prev) => { return !prev})
+              }}>
+                {isThinkingOfdeepSeekStream ? `思考中...` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}  
+                <div className='toggle-content-icon'>
+                 { toggleOfThouths ? <CaretUpOutlined /> : <CaretDownOutlined />} 
+                </div>
               </div>
+              {!toggleOfThouths ? <div className='result-container  thoughts-container'>
+                { reasonTextContent }
+              </div>: ''}
               <div className='result-container'>
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={[remarkGfm,remarkBreaks]}
                   rehypePlugins={[rehypeKatex, rehypeRaw, rehypeHighlight]}
                   components={{
                     code: ({ className, children }) => {

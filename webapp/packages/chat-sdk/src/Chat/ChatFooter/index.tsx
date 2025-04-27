@@ -609,9 +609,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       </div>
     </div>
     {!fileUidsInProgress.includes(file.uid) && fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent !== '100%'? 
-      <div className={styles.fileSizePercent}>
+       (file.status === 'done' && <div className={styles.fileSizePercent}>
         ⚠️ 超出字数限制， DeepSeek 只阅读了前 {fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent} 
-      </div>
+      </div>) 
     :''}
     </>
   )
@@ -748,7 +748,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}
             <Upload
               // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
-              method='get'
+              method={'get' as any }
               maxCount={10}
               // listType="picture"
               fileList={fileList}
@@ -773,7 +773,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
           <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
             <Upload
               // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
-              method='get'
+              method={'get' as any }
               maxCount={10}
               fileList={fileList}
               showUploadList={false}
