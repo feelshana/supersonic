@@ -159,7 +159,9 @@ export const layout: RunTimeLayoutConfig = (params) => {
             {/* <AppPage dom={dom} /> */}
             {dom}
             {history.location.pathname !== '/chat' && !isMobile && (
-              <Copilot token={getToken() || ''} isDeveloper />
+              // 暂时隐藏copilot
+              // <Copilot token={getToken() || ''} isDeveloper />
+              ''
             )}
           </div>
         </ConfigProvider>
