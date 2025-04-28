@@ -122,3 +122,11 @@ export type FileResultsType = FileResultType[]
 export type SendMsgWithRecommendTriggerType = {
   example: string;
 }
+
+export type DeepSeekStreamParams = {
+    queryText: string;
+    chatId: number;
+    parseInfo: ChatContextType;
+    agentId?: number;
+    fileResultsForReqStream?: FileResultsType
+}

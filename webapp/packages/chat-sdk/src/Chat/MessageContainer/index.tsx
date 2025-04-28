@@ -1,12 +1,12 @@
 import Text from '../components/Text';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { isEqual } from 'lodash';
-import { AgentType, MessageItem, MessageTypeEnum } from '../type';
+import { AgentType, DeepSeekStreamParams, MessageItem, MessageTypeEnum } from '../type';
 import { isMobile, updateMessageContainerScroll } from '../../utils/utils';
 import styles from './style.module.less';
 import AgentTip from '../components/AgentTip';
 import classNames from 'classnames';
-import { MsgDataType } from '../../common/type';
+import { MsgDataType, ChatContextType } from '../../common/type';
 import ChatItem from '../../components/ChatItem';
 
 type Props = {
@@ -29,7 +29,7 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
-  changeInStreamQueryId: (queryId: number|undefined) => void;
+  changeInStreamQuery: (params: DeepSeekStreamParams|undefined) => void;
   onSendMsgWithRecommend: (example: string) => void;
 };
 
@@ -46,7 +46,7 @@ const MessageContainer: React.FC<Props> = ({
   isDebugMode,
   onMsgDataLoaded,
   onSendMsg, onCouldNotAnswer,
-  changeInStreamQueryId,
+  changeInStreamQuery,
   onSendMsgWithRecommend
 }) => {
   const [triggerResize, setTriggerResize] = useState(false);
@@ -191,7 +191,7 @@ const MessageContainer: React.FC<Props> = ({
                     onSendMsg={onSendMsg}
                     isLastMessage={index === messageList.length - 1}
                     onCouldNotAnswer={onCouldNotAnswer}
-                    changeInStreamQueryId={changeInStreamQueryId}
+                    changeInStreamQuery={changeInStreamQuery}
                   />
                 </>
               )}

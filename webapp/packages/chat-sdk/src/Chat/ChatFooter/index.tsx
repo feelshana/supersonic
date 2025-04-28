@@ -6,7 +6,8 @@ import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
-import { AgentType, ModelType, FileResultType,FileResultsType, SendMsgWithRecommendTriggerType } from '../type';
+import { AgentType, ModelType, FileResultType,FileResultsType, SendMsgWithRecommendTriggerType, DeepSeekStreamParams } from '../type';
+import { ChatContextType } from '../../common/type';
 import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
@@ -28,8 +29,8 @@ type Props = {
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
-  currentInStreamQueryId: number | undefined;
-  changeInStreamQueryId: (queryId: number|undefined) => void;
+  currentInStreamQuery: DeepSeekStreamParams | undefined;
+  changeInStreamQuery: (params: DeepSeekStreamParams|undefined) => void;
   sendMsgWithRecommendTrigger: SendMsgWithRecommendTriggerType;
 };
 
@@ -58,8 +59,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
-    currentInStreamQueryId,
-    changeInStreamQueryId,
+    currentInStreamQuery,
+    changeInStreamQuery,
     sendMsgWithRecommendTrigger
   },
   ref
@@ -446,7 +447,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     if (!example) {
       return
     }
-    if(currentInStreamQueryId !== undefined) {
+    if(currentInStreamQuery !== undefined) {
       messageApi.error('当前有问题正在回答中...')
       // 如果正在流式输出结果，发送消息行为被阻止
       return
@@ -457,7 +458,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   
   // 【开启闲聊后】发送消息的函数（此时有文件上传功能）
   const sendMsgWithFile = () => {
-    if(currentInStreamQueryId !== undefined) {
+    if(currentInStreamQuery !== undefined) {
       messageApi.error('当前有问题正在回答中...')
       // 如果正在流式输出结果，发送消息行为被阻止
       return
@@ -571,8 +572,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   // 停止流式输出的回调
   const onStopStream = () => {
-    if(currentInStreamQueryId !== undefined) {
-      stopStream({queryId:currentInStreamQueryId}).then(()=>{
+    if(currentInStreamQuery !== undefined) {
+      stopStream({queryId:currentInStreamQuery?.parseInfo?.queryId!}).then(()=>{
       }).catch((err)=>{
         messageApi.error('停止失败');
       })
@@ -621,15 +622,23 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   }, [fileList])
 
   useEffect(() => {
+    onStopStream()
     saveFileResult(undefined)
-    changeInStreamQueryId(undefined)
+    changeInStreamQuery(undefined)
+    setShowPauseButton(false)
   }, [chatId,currentAgent])
 
   useEffect(()=>{
-    if(currentInStreamQueryId === undefined) {
+    if(currentInStreamQuery === undefined) {
       setShowPauseButton(false)
+    } else if (
+      currentInStreamQuery?.agentId !== currentAgent?.id || 
+      currentInStreamQuery?.chatId !== chatId
+    ) {
+      changeInStreamQuery(undefined)
+      onStopStream()
     }
-  },[currentInStreamQueryId])
+  },[currentInStreamQuery])
 
   useEffect(()=>{
     sendMsgWithRecommend(sendMsgWithRecommendTrigger.example)
@@ -728,7 +737,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
               [styles.sendBtnActive]: 
               (inputMsg?.length > 0 || fileResults?.length > 0) && 
               !fileUidsInProgress?.length &&
-              currentInStreamQueryId === undefined,
+              currentInStreamQuery === undefined,
             })}
             onClick={() => {
               sendMsgWithFile()
@@ -736,9 +745,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             <IconFont type="icon-ios-send" />
           </div>
           {/* 停止输出按钮 */}
-          {showPauseButton && <div
+          {currentAgent?.chatAppConfig?.SMALL_TALK?.enable && showPauseButton && <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: currentInStreamQueryId
+              [styles.sendBtnActive]: !!currentInStreamQuery
             })}
             onClick={onStopStream}>
             <PauseCircleFilled />

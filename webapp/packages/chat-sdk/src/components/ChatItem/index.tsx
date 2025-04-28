@@ -30,7 +30,7 @@ import classNames from 'classnames';
 import Tools from '../Tools';
 import SqlItem from './SqlItem';
 import SimilarQuestionItem from './SimilarQuestionItem';
-import { AgentType, FileResultsType } from '../../Chat/type';
+import { AgentType, DeepSeekStreamParams, FileResultsType } from '../../Chat/type';
 import dayjs, { Dayjs } from 'dayjs';
 import { exportCsvFile } from '../../utils/utils';
 import Loading from './Loading';
@@ -69,7 +69,7 @@ type Props = {
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
   fileResultsForReqStream?: FileResultsType;
-  changeInStreamQueryId?: (queryId: number|undefined) => void;
+  changeInStreamQuery?: (params: DeepSeekStreamParams|undefined) => void;
 };
 
 export const ChartItemContext = createContext({
@@ -102,7 +102,7 @@ const ChatItem: React.FC<Props> = ({
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
   fileResultsForReqStream,
-  changeInStreamQueryId = () => {},
+  changeInStreamQuery = () => {},
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -235,7 +235,7 @@ const ChatItem: React.FC<Props> = ({
             answerTextContent += JSON.parse(event.data)?.message
           }else if(JSON.parse(event.data)?.type === 'endFlag') {
             endFlag = true
-            changeInStreamQueryId(undefined)
+            changeInStreamQuery(undefined)
           }
           textContent += JSON.parse(event.data)?.message
           setStreamResultContent('' + textContent)
@@ -248,7 +248,7 @@ const ChatItem: React.FC<Props> = ({
           setIsStreamResult(false)
           console.error('(result)SSE 错误:', error);
           if (!endFlag) {
-            changeInStreamQueryId(undefined)
+            changeInStreamQuery(undefined)
           }
           // throw error
         };
@@ -258,7 +258,7 @@ const ChatItem: React.FC<Props> = ({
           setIsStreamResult(false)
           console.log('(result)SSE 连接已关闭');
           if (!endFlag) {
-            changeInStreamQueryId(undefined)
+            changeInStreamQuery(undefined)
           }
         };
         setIsStreamResult(true)
@@ -272,7 +272,13 @@ const ChatItem: React.FC<Props> = ({
           },
           messageFunc,errorFunc,closeFunc
         )
-        changeInStreamQueryId(parseInfoValue.queryId)
+        changeInStreamQuery({
+          queryText: msg,
+          chatId: conversationId!,
+          parseInfo: parseInfoValue,
+          agentId: agentId,
+          fileResultsForReqStream
+        })
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {

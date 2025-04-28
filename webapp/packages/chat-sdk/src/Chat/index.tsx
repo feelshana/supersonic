@@ -9,7 +9,7 @@ import {
 } from 'react';
 import MessageContainer from './MessageContainer';
 import styles from './style.module.less';
-import { ConversationDetailType, MessageItem, MessageTypeEnum, AgentType, FileResultsType } from './type';
+import { ConversationDetailType, MessageItem, MessageTypeEnum, AgentType, FileResultsType,DeepSeekStreamParams } from './type';
 import { queryAgentList } from './service';
 import { useSetState, useThrottleFn } from 'ahooks';
 import Conversation from './Conversation';
@@ -76,7 +76,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   const [isDebugMode, setIsDebugMode] = useState<boolean>(true);
   const conversationRef = useRef<any>();
   const chatFooterRef = useRef<any>();
-  const [currentInStreamQueryId,setCurrentInstreamQueryId]= useState<number|undefined>(undefined);
+  const [currentInStreamQuery,setCurrentInstreamQuery]= useState<DeepSeekStreamParams|undefined>(undefined);
   //【开启闲聊后】点推荐问题的触发器，example是点击的推荐问题
   const [sendMsgWithRecommendTrigger, setSndMsgWithRecommendTrigger] = useState({example:''});
 
@@ -472,8 +472,8 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                       onMsgDataLoaded={onMsgDataLoaded}
                       onSendMsg={onSendMsg}
                       onCouldNotAnswer={()=>{updateMessageContainerScroll();pushHelloRep()}}
-                      changeInStreamQueryId={(queryId:number|undefined) => {
-                        setCurrentInstreamQueryId(queryId);
+                      changeInStreamQuery={(params:DeepSeekStreamParams|undefined) => {
+                        setCurrentInstreamQuery(params);
                       }}
                       onSendMsgWithRecommend={(example:string) => {
                         setSndMsgWithRecommendTrigger({example})
@@ -501,9 +501,9 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
                           setShowCaseVisible(!showCaseVisible);
                         }}
                         ref={chatFooterRef}
-                        currentInStreamQueryId={currentInStreamQueryId}
-                        changeInStreamQueryId={(queryId:number|undefined) => {
-                          setCurrentInstreamQueryId(queryId);
+                        currentInStreamQuery={currentInStreamQuery}
+                        changeInStreamQuery={(params:DeepSeekStreamParams|undefined) => {
+                          setCurrentInstreamQuery(params);
                         }}
                         sendMsgWithRecommendTrigger={sendMsgWithRecommendTrigger}
                       />

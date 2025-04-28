@@ -7,7 +7,7 @@ import {
   ParseDataType,
   SearchRecommendItem,
 } from '../common/type';
-import type { FileResultsType } from '../Chat/type'
+import type { DeepSeekStreamParams } from '../Chat/type'
 import { isMobile } from '../utils/utils';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { getToken } from '../utils/utils';
@@ -225,13 +225,7 @@ export function deepSeekStream(
     parseInfo,
     agentId,
     fileResultsForReqStream
-  }:{
-    queryText: string;
-    chatId: number;
-    parseInfo: ChatContextType;
-    agentId?: number;
-    fileResultsForReqStream?: FileResultsType
-  },
+  }:DeepSeekStreamParams,
   messageFunc: ((arg0: any) => void),
   errorFunc: ((arg0: any) => void),
   closeFunc: (() => void)
