@@ -20,7 +20,7 @@ import { chatExecute,
   deepSeekStream } from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
-import { CheckCircleFilled, CaretDownOutlined ,CaretUpOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
 import IconFont from '../IconFont';
 import ExpandParseTip from './ExpandParseTip';
 import ParseTip from './ParseTip';
@@ -223,9 +223,9 @@ const ChatItem: React.FC<Props> = ({
         setIsThinkingOfdeepSeekStream(true)
         let timer = setInterval(() => {
           setThinkingTimeInSeconds((prev)=>{
-            return prev + 1
+            return +(prev + 0.1).toFixed(1)
           })
-        }, 1000)
+        }, 100)
         const messageFunc = (event) => {
           if(JSON.parse(event.data)?.type === 'reason'){
             reasonTextContent += JSON.parse(event.data)?.message
@@ -763,9 +763,9 @@ const ChatItem: React.FC<Props> = ({
               <div className='toggle-content' onClick={()=>{
                 setToggleOfThouths((prev) => { return !prev})
               }}>
-                {isThinkingOfdeepSeekStream ? `思考中...` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}  
+                {isThinkingOfdeepSeekStream ? `深度思考中...(${thinkingTimeInSeconds}秒)` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}  
                 <div className='toggle-content-icon'>
-                 { toggleOfThouths ? <CaretUpOutlined /> : <CaretDownOutlined />} 
+                 { toggleOfThouths ? <CaretRightOutlined /> : <CaretDownOutlined />} 
                 </div>
               </div>
               {!toggleOfThouths ? <div className='result-container  thoughts-container'>
