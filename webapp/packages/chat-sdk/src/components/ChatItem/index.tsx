@@ -135,7 +135,7 @@ const ChatItem: React.FC<Props> = ({
   const [answerTextContent, setanswerTextContent] = useState<string>('');
   const isThinkingRef = useRef(isThinking);
   const isStreamResultRef = useRef(isStreamResult);
-  const [thinkingTimeInSeconds, setThinkingTimeInSeconds] = useState<number>(0);
+  const [thinkingTimeInSeconds, setThinkingTimeInSeconds] = useState<string>('0');
   const [toggleOfThouths, setToggleOfThouths] = useState<boolean>(false);
   const [isThinkingOfdeepSeekStream, setIsThinkingOfdeepSeekStream] = useState<boolean>(false);
   const resetState = () => {
@@ -223,7 +223,7 @@ const ChatItem: React.FC<Props> = ({
         setIsThinkingOfdeepSeekStream(true)
         let timer = setInterval(() => {
           setThinkingTimeInSeconds((prev)=>{
-            return +(prev + 0.1).toFixed(1)
+            return (+prev + 0.1).toFixed(1)
           })
         }, 100)
         const messageFunc = (event) => {
