@@ -397,7 +397,7 @@ const ChatItem: React.FC<Props> = ({
           setThinkingContent('' + responseDiv.textContent)
           responseDiv.scrollTop = responseDiv.scrollHeight;
         },time)
-        time += 200
+        time += 50
       }
       const errorFunc = (error) => {
         setIsThinking(false)
