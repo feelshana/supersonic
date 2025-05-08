@@ -43,6 +43,9 @@ axiosInstance.interceptors.response.use(
         contextpath?.substring(0, contextpath?.indexOf('&')) +
         `&redirect_uri=${encodeURIComponent(`http://${win.location.host}`)}`;
     }
+    if (response.data.code === 403) {
+      window.location.href = '/webapp/login';
+    }
     return response.data;
   },
   (error) => {
