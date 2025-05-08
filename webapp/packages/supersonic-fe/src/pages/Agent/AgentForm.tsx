@@ -261,6 +261,9 @@ const AgentForm: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnCli
           <FormItem name="description" label="描述">
             <TextArea placeholder="请输入助理描述" />
           </FormItem>
+          <FormItem name="embedUrl" label="小助手链接">
+            <TextArea placeholder="配置链接后，将以该链接作为小助手" />
+          </FormItem>
         </div>
       ),
     },

@@ -1,15 +1,21 @@
 import IconFont from '../../components/IconFont';
 import { getTextWidth, groupByColumn, isMobile } from '../../utils/utils';
-import { AutoComplete, Select, Tag } from 'antd';
+import { AutoComplete, Select, Tag, Button, Upload, Image, message } from 'antd';
 import classNames from 'classnames';
 import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
-import { AgentType, ModelType } from '../type';
-import { searchRecommend } from '../../service';
+import { AgentType, ModelType, FileResultType,FileResultsType, SendMsgWithRecommendTriggerType, DeepSeekStreamParams } from '../type';
+import { ChatContextType } from '../../common/type';
+import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
+import type { GetProp, UploadFile, UploadProps } from 'antd';
+import { LoadingOutlined, CloseCircleOutlined,UploadOutlined,PauseCircleFilled } from '@ant-design/icons';
+
+
+type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
 
 type Props = {
   inputMsg: string;
@@ -19,10 +25,13 @@ type Props = {
   onToggleHistoryVisible: () => void;
   onOpenAgents: () => void;
   onInputMsgChange: (value: string) => void;
-  onSendMsg: (msg: string, dataSetId?: number) => void;
+  onSendMsg: (msg: string, dataSetId?: number, fileResultsForReqStream?: FileResultsType) => void;
   onAddConversation: (agent?: AgentType) => void;
   onSelectAgent: (agent: AgentType) => void;
   onOpenShowcase: () => void;
+  currentInStreamQuery: DeepSeekStreamParams | undefined;
+  changeInStreamQuery: (params: DeepSeekStreamParams|undefined) => void;
+  sendMsgWithRecommendTrigger: SendMsgWithRecommendTriggerType;
 };
 
 const { OptGroup, Option } = Select;
@@ -50,6 +59,9 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     onAddConversation,
     onSelectAgent,
     onOpenShowcase,
+    currentInStreamQuery,
+    changeInStreamQuery,
+    sendMsgWithRecommendTrigger
   },
   ref
 ) => {
@@ -57,8 +69,35 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [stepOptions, setStepOptions] = useState<Record<string, any[]>>({});
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
+  // #region 文件上传相关功能
+
+  // 上传的文件列表，即文件上传组件里的fileList
+  const [fileList, setFileList] = useState<UploadFile[]>([]); 
+  const fileListRef = useRef<UploadFile[]>([]);
+
+  // 【文件解析结果列表】该列表是已经解析完毕的解析结果
+  const [fileResults, setFileResults] = useState<FileResultsType>([]);
+
+  // 正在解析的文件uid列表, 解析完的文件uid会从该列表移除
+  const [fileUidsInProgress, setFileUidsInProgress] = useState<string[]>([]) 
+  const [messageApi, contextHolder] = message.useMessage();
+
+  // 是否显示停止流式输出的按钮
+  const [showPauseButton, setShowPauseButton] = useState<boolean>(false)
+
+  // #endregion 文件上传相关功能
+
+  const handlePreview = async (file: UploadFile) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj as FileType);
+    }
+    setPreviewImage(file.url || (file.preview as string));
+    setPreviewOpen(true);
+  };
 
   const inputFocus = () => {
     inputRef.current?.focus();
@@ -322,8 +361,294 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
 
   const { isComposing } = useComposing(document.getElementById('chatInput'));
 
+  // #region 文件上传相关功能
+
+  // 预览图片要用到的函数
+  const getBase64 = (file: FileType): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  }
+
+  // 格式化文件大小
+  const formatSize = (size) => {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  
+  /**
+   * 动态改变【文件解析结果列表】
+   * @param result 
+   * 需要被操作的解析结果对象
+   * 如果 !result, 则表示该操作并没有解析结果比如：文件被删除
+   * @param file 
+   * 需要被操作的文件对象
+   * 如果 !file, 则表示这是一个清空文件上传状态的操作，通常是切换助手和新对话时使用
+   * @returns 
+   */
+  const saveFileResult = (
+    result: {
+      fileContent:string,
+      fileId:string,
+      fileName:string,
+      fileUid:string,
+      fileSize:string,
+      fileType:string,
+      fileSizePercent:string,
+    }|undefined,
+    file?: UploadFile
+  ) => {
+    if(!file) {
+      setFileList([])
+      setFileResults((prev)=>{
+        return []
+      });
+      setFileUidsInProgress([])
+      return
+    }
+    if(file?.status === 'removed') {
+      // 有的情况是用代码改file.status为removed，所以需要执行下setFileList
+      setFileList(prev => {
+        prev = prev||[]
+        const arr = prev.filter(item=>item.uid !== file?.uid)
+        return arr
+      })
+      setFileResults(prev => {
+        prev = prev||[]
+        const arr = prev.filter(item=>item.fileUid !== file?.uid)
+        return arr
+      })
+      return
+    }
+    if (file && result) {
+      setFileResults(prev => {
+        prev = prev||[]
+        let arr
+        if(file.status === 'done'){
+          const isIn = fileListRef.current.some((item)=>{return item.uid === result.fileUid})
+          if(isIn) {
+            arr = [...prev,result]
+          }
+        }
+        return arr
+      });
+      setFileUidsInProgress(prev => {
+        return prev.filter(item=>item!== result.fileUid)
+      })
+    }
+  } 
+
+  // 【开启闲聊后】点推荐问题的函数
+  const sendMsgWithRecommend = (example: string) => {
+    if (!example) {
+      return
+    }
+    if(currentInStreamQuery !== undefined) {
+      messageApi.error('当前有问题正在回答中...')
+      // 如果正在流式输出结果，发送消息行为被阻止
+      return
+    }
+    onSendMsg(example)
+    setShowPauseButton(true)
+  }
+  
+  // 【开启闲聊后】发送消息的函数（此时有文件上传功能）
+  const sendMsgWithFile = () => {
+    if(currentInStreamQuery !== undefined) {
+      messageApi.error('当前有问题正在回答中...')
+      // 如果正在流式输出结果，发送消息行为被阻止
+      return
+    }
+    let str = '以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\n'
+    fileResults && fileResults.forEach(
+      (item: FileResultType) => {
+        str += `文件[${item.fileName}] 文件id[${item.fileId}] 文件大小[${item.fileSize}] 文件类型[${item.fileType}] 文件读取进度[${item.fileSizePercent}];\n`
+      }
+    )
+    if (inputMsg && !fileResults?.length && !fileUidsInProgress?.length) {
+      sendMsg(inputMsg)
+    }else if (inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+      onSendMsg(str + inputMsg,undefined,JSON.parse(JSON.stringify(fileResults)))
+      setFileList([])
+      setFileResults([])
+      setFileUidsInProgress([])
+    }else if (!inputMsg && fileResults?.length > 0 && !fileUidsInProgress?.length) {
+      onSendMsg(str + '原封不动输出以上文件的解析内容',undefined,JSON.parse(JSON.stringify(fileResults)))
+      setFileList([])
+      setFileResults([])
+      setFileUidsInProgress([])
+    } else {
+      return
+    }
+    setShowPauseButton(true)
+  }
+
+  // 轮询文件解析状态接口
+  const pollFileStatus = async (file,taskId,step) => {
+    const onFailed = () => {
+      messageApi.error(`文件 ${file.name} 解析失败`);
+      file.status = 'removed'
+      saveFileResult(undefined, file)
+      setFileUidsInProgress((prev)=>{
+        return prev.filter(item=>item!== file.uid)
+      })
+    }
+    if (
+      fileList.some((item)=>{return item.uid === file.uid}) && file.status === 'done'
+    ) {
+      try {
+        const res = await fileStatus({taskId})
+        if (res?.data?.body?.status === 'COMPLETED') {
+          saveFileResult({
+            fileContent: res.data.body.result?.fileContent,
+            fileId: res.data.body.result?.fileId,
+            fileName: file.name,
+            fileUid: file.uid,
+            fileSize: formatSize(file.size),
+            fileType: file.type?.split('/')[0].toUpperCase() || '',
+            fileSizePercent: res.data.body.result?.fileSizePercent || '100%'
+          },file)
+        } else if (res?.data?.body?.status === 'ERROR') {
+          onFailed()
+        } else {
+          if (step < 20) {
+            step++
+            setTimeout(()=>{pollFileStatus(file,taskId,step)}, 2000)
+          } else {
+            onFailed()
+          }
+        }
+      } catch (error) {
+        if (step < 20) {
+          step++
+          setTimeout(()=>{pollFileStatus(file,taskId,step)}, 2000)
+        } else {
+          onFailed()
+        }
+      }
+    }
+  }
+  
+  // 上传文件的回调
+  const onAddFile = async ({ file, fileList: newFileList }) => {
+    setFileList(newFileList);
+    console.log(file, 'file 1')
+    console.log(newFileList, 'newFileList 1')
+    if (file.status === 'done') {
+      if(file.type?.startsWith('image/')){
+        file.thumbUrl = URL.createObjectURL(file.originFileObj as File)
+      }
+      setFileUidsInProgress((prev)=>{
+        return [...prev,file.uid]
+      })
+      try {
+        const parseRes = await uploadAndParse(file.originFileObj as File)
+        const taskId = parseRes?.data?.body?.resultList?.[0]?.taskId
+        if (taskId) {
+          pollFileStatus(file,taskId,0)
+        }
+      } catch (error) {
+        messageApi.error('请求失败');
+        saveFileResult(undefined, file)
+        setFileUidsInProgress((prev)=>{
+          return prev.filter(item=>item!== file.uid)
+        })
+      }
+    }
+  }
+  
+  // 删除文件的回调
+  const onRemoveFile = ({ file, fileList: newFileList }) => {
+    setFileList(newFileList);
+    saveFileResult(undefined, file)
+    console.log(file, 'file 2')
+    console.log(newFileList, 'newFileList 2')
+    if (file.thumbUrl) URL.revokeObjectURL(file.thumbUrl);
+  }
+
+  // 停止流式输出的回调
+  const onStopStream = () => {
+    if(currentInStreamQuery !== undefined) {
+      stopStream({queryId:currentInStreamQuery?.parseInfo?.queryId!}).then(()=>{
+      }).catch((err)=>{
+        messageApi.error('停止失败');
+      })
+    }
+  }
+  
+  // 自定义文件列表的渲染函数
+  const itemRender = (originNode, file, fileList, actions) => (
+    <>
+    <div className={styles.fileItem}>
+      <div className={styles.fileIcon}>
+        {
+          file.type?.startsWith('image/') ? 
+          <img src={file.thumbUrl} alt="" onClick={()=>{actions.preview()}}/> : 
+          <span style={{fontSize:'24px'}}>&nbsp;📄&nbsp;&nbsp;</span>
+        }
+      </div>
+      <div className={styles.fileInfo}>
+        <div className={styles.fileName}>{file.name}</div>
+        <div className={styles.fileSize}>
+          {fileUidsInProgress.includes(file.uid) ? 
+            <div className={styles.loadingsItem}><LoadingOutlined />&nbsp;&nbsp;解析中...</div> : 
+            file?.type?.split('/')[0].toUpperCase() + ' ' + formatSize(file.size)
+          }
+        </div>
+      </div>
+      <div className={styles.closeButton}>
+        <CloseCircleOutlined 
+          className={styles.closeIcon}
+          onClick={() => {
+            actions.remove()
+          }}
+        />
+      </div>
+    </div>
+    {!fileUidsInProgress.includes(file.uid) && fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent !== '100%'? 
+       (file.status === 'done' && <div className={styles.fileSizePercent}>
+        ⚠️ 超出字数限制， DeepSeek 只阅读了前 {fileResults.find(item=>item.fileUid === file.uid)?.fileSizePercent} 
+      </div>) 
+    :''}
+    </>
+  )
+
+  useEffect(() => {
+    fileListRef.current = fileList;
+  }, [fileList])
+
+  useEffect(() => {
+    onStopStream()
+    saveFileResult(undefined)
+    changeInStreamQuery(undefined)
+    setShowPauseButton(false)
+  }, [chatId,currentAgent])
+
+  useEffect(()=>{
+    if(currentInStreamQuery === undefined) {
+      setShowPauseButton(false)
+    } else if (
+      currentInStreamQuery?.agentId !== currentAgent?.id || 
+      currentInStreamQuery?.chatId !== chatId
+    ) {
+      changeInStreamQuery(undefined)
+      onStopStream()
+    }
+  },[currentInStreamQuery])
+
+  useEffect(()=>{
+    sendMsgWithRecommend(sendMsgWithRecommendTrigger.example)
+  },[sendMsgWithRecommendTrigger])
+
+  // #endregion 文件上传相关功能
+
   return (
     <div className={chatFooterClass}>
+      {contextHolder}
       <div className={styles.tools}>
         <div
           className={styles.toolItem}
@@ -384,7 +709,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                   return;
                 }
                 if (!isSelect && !isComposing) {
-                  sendMsg(chatInputEl.value);
+                  sendMsgWithFile()
                   setOpen(false);
                 }
               }
@@ -400,20 +725,79 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             allowClear
             open={open}
             defaultActiveFirstOption={false}
-            getPopupContainer={triggerNode => triggerNode.parentNode}
-          >
+            getPopupContainer={triggerNode => triggerNode.parentNode}>
             {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
           </AutoComplete>
+          {
+            // #region 文件上传相关功能
+          }
+          {/* 发送按钮 */}
           <div
             className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: inputMsg?.length > 0,
+              [styles.sendBtnActive]: 
+              (inputMsg?.length > 0 || fileResults?.length > 0) && 
+              !fileUidsInProgress?.length &&
+              currentInStreamQuery === undefined,
             })}
             onClick={() => {
-              sendMsg(inputMsg);
-            }}
-          >
+              sendMsgWithFile()
+            }}>
             <IconFont type="icon-ios-send" />
           </div>
+          {/* 停止输出按钮 */}
+          {currentAgent?.chatAppConfig?.SMALL_TALK?.enable && showPauseButton && <div
+            className={classNames(styles.sendBtn, {
+              [styles.sendBtnActive]: !!currentInStreamQuery
+            })}
+            onClick={onStopStream}>
+            <PauseCircleFilled />
+          </div>}
+          {/* 上传组件 */}
+          <div className={styles.uploadContainer}>
+            {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}
+            <Upload
+              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+              method={'get' as any }
+              maxCount={10}
+              // listType="picture"
+              fileList={fileList}
+              itemRender={itemRender}
+              onChange = {onRemoveFile}
+              onPreview={handlePreview}
+            >
+            </Upload>
+            {previewImage && (
+              <Image
+                wrapperStyle={{ display: 'none' }}
+                preview={{
+                  visible: previewOpen,
+                  onVisibleChange: (visible) => setPreviewOpen(visible),
+                  afterOpenChange: (visible) => !visible && setPreviewImage(''),
+                }}
+                src={previewImage}
+              />
+            )}
+          </div>
+          {/* 上传组件按钮 */}
+          <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
+            <Upload
+              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+              method={'get' as any }
+              maxCount={10}
+              fileList={fileList}
+              showUploadList={false}
+              onChange = {onAddFile}
+            >
+              <Button 
+                type="primary" 
+                className={styles.uploadHandlerBtn}
+                icon={<UploadOutlined />}>
+              </Button>
+            </Upload>
+          </div>
+          {
+            // #endregion 文件上传相关功能
+          }
         </div>
       </div>
     </div>

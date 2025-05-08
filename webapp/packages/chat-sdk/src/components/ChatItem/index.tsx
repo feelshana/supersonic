@@ -10,10 +10,17 @@ import {
   SimilarQuestionType,
 } from '../../common/type';
 import { createContext, useEffect, useRef, useState, ReactNode } from 'react';
-import { chatExecute,dataInterpret, chatParse, queryData, deleteQuery, switchEntity, queryThoughtsInSSE, chatStreamExecute } from '../../service';
+import { chatExecute,
+  dataInterpret, 
+  chatParse, 
+  queryData, 
+  deleteQuery, 
+  switchEntity, 
+  queryThoughtsInSSE, 
+  deepSeekStream } from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
-import { CheckCircleFilled } from '@ant-design/icons';
+import { CheckCircleFilled, CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons';
 import IconFont from '../IconFont';
 import ExpandParseTip from './ExpandParseTip';
 import ParseTip from './ParseTip';
@@ -23,14 +30,16 @@ import classNames from 'classnames';
 import Tools from '../Tools';
 import SqlItem from './SqlItem';
 import SimilarQuestionItem from './SimilarQuestionItem';
-import { AgentType } from '../../Chat/type';
+import { AgentType, DeepSeekStreamParams, FileResultsType } from '../../Chat/type';
 import dayjs, { Dayjs } from 'dayjs';
 import { exportCsvFile } from '../../utils/utils';
 import Loading from './Loading';
 import { useMethodRegister } from '../../hooks';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from'rehype-raw';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css'; // 浅灰色背景主题
 
@@ -59,6 +68,8 @@ type Props = {
   onUpdateMessageScroll?: () => void;
   onSendMsg?: (msg: string) => void;
   onCouldNotAnswer?: () => void;
+  fileResultsForReqStream?: FileResultsType;
+  changeInStreamQuery?: (params: DeepSeekStreamParams|undefined) => void;
 };
 
 export const ChartItemContext = createContext({
@@ -90,6 +101,8 @@ const ChatItem: React.FC<Props> = ({
   onMsgDataLoaded,
   onUpdateMessageScroll,
   onCouldNotAnswer = () => {},
+  fileResultsForReqStream,
+  changeInStreamQuery = () => {},
 }) => {
   const [parseLoading, setParseLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -118,8 +131,13 @@ const ChatItem: React.FC<Props> = ({
   const [isGoRefresh , setIsGoRefresh] = useState<boolean>(false);
   const [thinkingContent, setThinkingContent] = useState<string>('');
   const [streamResultContent, setStreamResultContent] = useState<string>('');
+  const [reasonTextContent, setReasonTextContent] = useState<string>('');
+  const [answerTextContent, setanswerTextContent] = useState<string>('');
   const isThinkingRef = useRef(isThinking);
-  const isStreamResultRef = useRef(isStreamResult)
+  const isStreamResultRef = useRef(isStreamResult);
+  const [thinkingTimeInSeconds, setThinkingTimeInSeconds] = useState<string>('0');
+  const [toggleOfThouths, setToggleOfThouths] = useState<boolean>(false);
+  const [isThinkingOfdeepSeekStream, setIsThinkingOfdeepSeekStream] = useState<boolean>(false);
   const resetState = () => {
     setParseLoading(false);
     setParseTimeCost(undefined);
@@ -193,41 +211,74 @@ const ChatItem: React.FC<Props> = ({
     parseInfoValue: ChatContextType,
     parseInfos?: ChatContextType[],
     isSwitchParseInfo?: boolean,
-    isRefresh = false
+    isRefresh = false,
+    fileResultsForReqStream?: FileResultsType
   ) => {
     try {
-      if (parseInfos?.length === 1 && parseInfos[0]?.stream) {
-        const resultDiv = document.getElementById('result-response-'+msgId)
-        if(resultDiv) {
-          let textContent = ''
-          const messageFunc = (event) => {
-            try {
-              textContent += JSON.parse(event.data)?.text
-            } catch {
-              textContent += event.data?.text
-            }
-            setStreamResultContent('' + textContent)
+      if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
+        let reasonTextContent = ''
+        let answerTextContent = ''
+        let textContent = ''
+        let endFlag = false
+        setIsThinkingOfdeepSeekStream(true)
+        let timer = setInterval(() => {
+          setThinkingTimeInSeconds((prev)=>{
+            return (+prev + 0.1).toFixed(1)
+          })
+        }, 100)
+        const messageFunc = (event) => {
+          if(JSON.parse(event.data)?.type === 'reason'){
+            reasonTextContent += JSON.parse(event.data)?.message
+          }else if(JSON.parse(event.data)?.type === 'answer') {
+            setIsThinkingOfdeepSeekStream(false)
+            clearInterval(timer)
+            answerTextContent += JSON.parse(event.data)?.message
+          }else if(JSON.parse(event.data)?.type === 'endFlag') {
+            endFlag = true
+            changeInStreamQuery(undefined)
           }
-          const errorFunc = (error) => {
-            setIsStreamResult(false)
-            console.error('(result)SSE 错误:', error);
-            // throw error
-          };
-          const closeFunc = () => {
-            setIsStreamResult(false)
-            console.log('(result)SSE 连接已关闭');
-          };
-          setIsStreamResult(true)
-          chatStreamExecute (
-            {
-              queryText: msg,
-              chatId: conversationId!,
-              parseInfo: parseInfoValue,
-              agentId
-            },
-            messageFunc,errorFunc,closeFunc
-          )
+          textContent += JSON.parse(event.data)?.message
+          setStreamResultContent('' + textContent)
+          setReasonTextContent('' + reasonTextContent)
+          setanswerTextContent('' + answerTextContent)
         }
+        const errorFunc = (error) => {
+          setIsThinkingOfdeepSeekStream(false)
+          clearInterval(timer)
+          setIsStreamResult(false)
+          console.error('(result)SSE 错误:', error);
+          if (!endFlag) {
+            changeInStreamQuery(undefined)
+          }
+          // throw error
+        };
+        const closeFunc = () => {
+          setIsThinkingOfdeepSeekStream(false)
+          clearInterval(timer)
+          setIsStreamResult(false)
+          console.log('(result)SSE 连接已关闭');
+          if (!endFlag) {
+            changeInStreamQuery(undefined)
+          }
+        };
+        setIsStreamResult(true)
+        deepSeekStream (
+          {
+            queryText: msg,
+            chatId: conversationId!,
+            parseInfo: parseInfoValue,
+            agentId: agentId,
+            fileResultsForReqStream
+          },
+          messageFunc,errorFunc,closeFunc
+        )
+        changeInStreamQuery({
+          queryText: msg,
+          chatId: conversationId!,
+          parseInfo: parseInfoValue,
+          agentId: agentId,
+          fileResultsForReqStream
+        })
       } else {
         setExecuteMode(true);
         if (isSwitchParseInfo) {
@@ -346,7 +397,7 @@ const ChatItem: React.FC<Props> = ({
           setThinkingContent('' + responseDiv.textContent)
           responseDiv.scrollTop = responseDiv.scrollHeight;
         },time)
-        time += 200
+        time += 50
       }
       const errorFunc = (error) => {
         setIsThinking(false)
@@ -399,7 +450,6 @@ const ChatItem: React.FC<Props> = ({
     }
     setParseLoading(false);
     const { code, data } = parseData || {};
-    console.log(data,'data')
     const { state, selectedParses, candidateParses, queryId, parseTimeCost, errorMsg } = data || {};
     const parses = selectedParses?.concat(candidateParses || []) || [];
     if (
@@ -409,7 +459,6 @@ const ChatItem: React.FC<Props> = ({
       (!parses[0]?.properties?.type && !parses[0]?.queryMode)
     ) {
       setParseTip(state === ParseStateEnum.FAILED && errorMsg ? errorMsg : PARSE_ERROR_TIP);
-
       setParseInfo({ queryId } as any);
       return;
     }
@@ -433,7 +482,7 @@ const ChatItem: React.FC<Props> = ({
     updateDimensionFitlers(parseInfoValue?.dimensionFilters || []);
     setDateInfo(parseInfoValue?.dateInfo);
     if (parseInfos.length === 1) {
-      onExecute(parseInfoValue, parseInfos);
+      onExecute(parseInfoValue, parseInfos, undefined, undefined, fileResultsForReqStream);
     }
   };
 
@@ -717,10 +766,21 @@ const ChatItem: React.FC<Props> = ({
               </div> : ''
             }
             <div className={`${prefixCls}-content-container`} style={{ display: streamResultContent ? 'block' : 'none' }}>
-              <div id={'result-response-' + msgId} className='result-container'>
+              <div className='toggle-content' onClick={()=>{
+                setToggleOfThouths((prev) => { return !prev})
+              }}>
+                {isThinkingOfdeepSeekStream ? `深度思考中...(${thinkingTimeInSeconds}秒)` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}  
+                <div className='toggle-content-icon'>
+                 { toggleOfThouths ? <CaretRightOutlined /> : <CaretDownOutlined />} 
+                </div>
+              </div>
+              {!toggleOfThouths ? <div className='result-container  thoughts-container'>
+                { reasonTextContent }
+              </div>: ''}
+              <div className='result-container'>
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                  remarkPlugins={[remarkGfm,remarkBreaks]}
+                  rehypePlugins={[rehypeKatex, rehypeRaw, rehypeHighlight]}
                   components={{
                     code: ({ className, children }) => {
                       const language = className?.replace('hljs language-', '') || 'text';
@@ -735,7 +795,7 @@ const ChatItem: React.FC<Props> = ({
                     }
                   }}
                 >
-                  { streamResultContent }
+                  { answerTextContent }
                 </ReactMarkdown>
               </div>
             </div>

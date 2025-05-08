@@ -8,9 +8,10 @@ type Props = {
   id: string | number;
   currentAgent?: AgentType;
   onSendMsg: (value: string) => void;
+  onSendMsgWithRecommend?: (example: string) => void;
 };
 
-const AgentTip: React.FC<Props> = ({ id,currentAgent, onSendMsg }) => {
+const AgentTip: React.FC<Props> = ({ id,currentAgent, onSendMsg, onSendMsgWithRecommend }) => {
   if (!currentAgent) {
     return null;
   }
@@ -37,7 +38,11 @@ const AgentTip: React.FC<Props> = ({ id,currentAgent, onSendMsg }) => {
                   key={example}
                   className={styles.example}
                   onClick={() => {
-                    onSendMsg(example);
+                    if (currentAgent?.chatAppConfig?.SMALL_TALK?.enable) {
+                      onSendMsgWithRecommend?.(example);
+                    } else {
+                      onSendMsg(example);
+                    }
                   }}
                 >
                   “{example}”

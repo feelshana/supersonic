@@ -30,6 +30,7 @@ export type MessageItem = {
   score?: number;
   feedback?: string;
   filters?: any;
+  fileResultsForReqStream?: FileResultsType;
 };
 
 export type ConversationDetailType = {
@@ -104,5 +105,28 @@ export type AgentType = {
     enableMultiTurn: boolean;
   };
   dataSetIds: number[];
-  chatAppConfig: any
+  chatAppConfig: any;
+  embedUrl: string;
 };
+export type FileResultType = {fileContent:string,
+  fileId:string,
+  fileName:string,
+  fileUid:string,
+  fileSize:string,
+  fileType:string,
+  fileSizePercent: string,
+}
+
+export type FileResultsType = FileResultType[]
+
+export type SendMsgWithRecommendTriggerType = {
+  example: string;
+}
+
+export type DeepSeekStreamParams = {
+    queryText: string;
+    chatId: number;
+    parseInfo: ChatContextType;
+    agentId?: number;
+    fileResultsForReqStream?: FileResultsType
+}

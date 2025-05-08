@@ -1,12 +1,12 @@
 import Text from '../components/Text';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { isEqual } from 'lodash';
-import { AgentType, MessageItem, MessageTypeEnum } from '../type';
+import { AgentType, DeepSeekStreamParams, MessageItem, MessageTypeEnum } from '../type';
 import { isMobile, updateMessageContainerScroll } from '../../utils/utils';
 import styles from './style.module.less';
 import AgentTip from '../components/AgentTip';
 import classNames from 'classnames';
-import { MsgDataType } from '../../common/type';
+import { MsgDataType, ChatContextType } from '../../common/type';
 import ChatItem from '../../components/ChatItem';
 
 type Props = {
@@ -29,6 +29,8 @@ type Props = {
   ) => void;
   onSendMsg: (value: string) => void;
   onCouldNotAnswer: () => void;
+  changeInStreamQuery: (params: DeepSeekStreamParams|undefined) => void;
+  onSendMsgWithRecommend: (example: string) => void;
 };
 
 const MessageContainer: React.FC<Props> = ({
@@ -43,8 +45,10 @@ const MessageContainer: React.FC<Props> = ({
   isSimpleMode,
   isDebugMode,
   onMsgDataLoaded,
-  onSendMsg, onCouldNotAnswer
-                                           }) => {
+  onSendMsg, onCouldNotAnswer,
+  changeInStreamQuery,
+  onSendMsgWithRecommend
+}) => {
   const [triggerResize, setTriggerResize] = useState(false);
   const onResize = useCallback(() => {
     setTriggerResize(true);
@@ -63,6 +67,67 @@ const MessageContainer: React.FC<Props> = ({
   useEffect(() => {
     onResize();
   }, [historyVisible, chatVisible]);
+
+  const processMsg = (input) => {
+    // regex1是兼容问题里没有 [文件解析进度] 的文件
+    let regex1 = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\];\s+/g
+    let regex2 = /文件\[([^\]]+)\]\s+文件id\[([^\]]+)\]\s+文件大小\[([^\]]+)\]\s+文件类型\[([^\]]+)\]\s+文件读取进度\[([^\]]+)\];\s+/g
+    let regex: RegExp;
+    if (regex1.test(input)) {
+      regex = regex1
+    } else {
+      regex = regex2
+    }
+    const fileArr: JSX.Element[] = [];
+    const text = input.replace(regex, (match, fileName, fileId, fileSize, fileType, fileSizePercent) => {
+    const ext = fileName.split('.').pop().toLowerCase();
+      let icon;
+      if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) {
+        icon = '🖼️';
+      } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+        icon = '📊';
+      } else if (['doc', 'docx'].includes(ext)) {
+        icon = '📝';
+      } else if (['ppt', 'pptx'].includes(ext)) {
+        icon = '🎥';
+      } else if (['txt', 'pdf', 'md', 'rtf'].includes(ext)) {
+        icon = '📄';
+      } else {
+        icon = '📂';
+      }
+    
+      const fileCard = (
+        <div className={styles.fileItemContainer}>
+          <div className={styles.fileItem}>
+            <div className={styles.fileIcon}>
+              {
+                <span style={{fontSize:'24px'}}>&nbsp;{ icon }&nbsp;&nbsp;</span>
+              }
+            </div>
+            <div className={styles.fileInfo}>
+              <div className={styles.fileName}>{fileName}</div>
+              <div className={styles.fileSize}>
+                  {fileType + ' ' + fileSize}
+              </div>
+            </div>
+          </div>
+          {fileSizePercent !== '100%' ? 
+          <div className={styles.fileSizePercent}>⚠️ 超出字数限制， DeepSeek 只阅读了前 {fileSizePercent} </div> : ''}
+        </div>
+      )
+      fileArr.push(fileCard)
+      return ''
+    })
+    const newText = text.replace(/以下文件已解析后标记了文件id放入了上下文中，你可以在上下文中找到文件的完整解析内容，文件后跟的提问均是针对解析内容的提问。\s+/g, (match) => {
+      return ''
+    })
+    return (
+      <>
+        { fileArr }
+        <Text position="right" data={newText} />
+      </>
+    )
+  }
 
   const messageContainerClass = classNames(styles.messageContainer, { [styles.mobile]: isMobile });
   return (
@@ -83,17 +148,22 @@ const MessageContainer: React.FC<Props> = ({
             parseTimeCost,
             msgData,
             filters,
+            fileResultsForReqStream
           } = msgItem;
 
           return (
             <div key={msgId} id={`${msgId}`} className={styles.messageItem}>
               {type === MessageTypeEnum.TEXT && <Text position="left" data={msg} />}
               {type === MessageTypeEnum.AGENT_LIST && (
-                  <AgentTip currentAgent={currentAgent} onSendMsg={onSendMsg} id={msgId}/>
+                  <AgentTip currentAgent={currentAgent} onSendMsg={onSendMsg} id={msgId} onSendMsgWithRecommend={onSendMsgWithRecommend}/>
               )}
               {type === MessageTypeEnum.QUESTION && (
                 <>
-                  <Text position="right" data={msg} />
+                  {
+                    currentAgent?.chatAppConfig?.SMALL_TALK?.enable ?
+                    processMsg(msg):
+                    <Text position="right" data={msg} />
+                  }
                   {identityMsg && <Text position="left" data={identityMsg} />}
                   <ChatItem
                     msgId={msgId}
@@ -102,6 +172,7 @@ const MessageContainer: React.FC<Props> = ({
                     isSimpleMode={isSimpleMode}
                     isDebugMode={isDebugMode}
                     msg={msgValue || msg || ''}
+                    fileResultsForReqStream={fileResultsForReqStream}
                     parseInfos={parseInfos}
                     parseTimeCostValue={parseTimeCost}
                     msgData={msgData}
@@ -120,6 +191,7 @@ const MessageContainer: React.FC<Props> = ({
                     onSendMsg={onSendMsg}
                     isLastMessage={index === messageList.length - 1}
                     onCouldNotAnswer={onCouldNotAnswer}
+                    changeInStreamQuery={changeInStreamQuery}
                   />
                 </>
               )}
