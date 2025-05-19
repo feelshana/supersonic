@@ -16,7 +16,8 @@ public interface ChatQueryDOMapper extends BaseMapper<ChatQueryDO> {
             + " FROM s2_chat_query a"
             + " INNER JOIN (SELECT  max(question_id) as question_id,query_text  FROM s2_chat_query      "
             + "WHERE  (chat_id =#{chatId}  AND user_name = #{userName} "
-            + "AND query_state = 1 AND query_result IS NOT NULL AND query_result <> '' )   GROUP BY query_text ) b"
+            + "AND query_state = 1 AND query_result IS NOT NULL AND query_result <> '' "
+            +" AND JSON_EXTRACT(query_result, '$.chatContext.sqlInfo.resultType')!='text')   GROUP BY query_text ) b"
             + " on a.question_id=b.question_id " + " ORDER BY a.question_id DESC limit 10")
 
     List<Map<String, Object>> selectByUserName(@Param("chatId") Integer chatId,

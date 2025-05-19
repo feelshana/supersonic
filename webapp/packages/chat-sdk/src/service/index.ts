@@ -7,6 +7,7 @@ import {
   ParseDataType,
   SearchRecommendItem,
 } from '../common/type';
+import type { DeepSeekStreamParams } from '../Chat/type'
 import { isMobile } from '../utils/utils';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { getToken } from '../utils/utils';
@@ -153,7 +154,7 @@ export function queryDimensionValues(
 
 export function queryThoughtsInSSE(queryText: string, chatId: number | undefined, agentId: number | undefined, messageFunc: ((arg0: any) => void), errorFunc: ((arg0: any) => void), closeFunc: (() => void) ) {
   const ctrl = new AbortController();
-  return fetchEventSource(`${prefix}/chat/query/streamParse`, {
+  return fetchEventSource(`${prefix}/stream/chat/query/streamParse`, {
     method: 'POST',
     openWhenHidden: true, // 允许后台运行
     headers: {
@@ -187,61 +188,7 @@ export function queryThoughtsInSSE(queryText: string, chatId: number | undefined
     }
   });
 }
-
-export function chatStreamExecute(
-    {
-      queryText,
-      chatId,
-      parseInfo,
-      agentId
-    }:{
-      queryText: string;
-      chatId: number;
-      parseInfo: ChatContextType;
-      agentId?: number;
-    },
-    messageFunc: ((arg0: any) => void),
-    errorFunc: ((arg0: any) => void),
-    closeFunc: (() => void)
-) {
-  const ctrl = new AbortController();
-  return fetchEventSource(`${prefix}/stream/chat/query/streamExecute`, {
-    method: 'POST',
-    openWhenHidden: true, // 允许后台运行
-    headers: {
-      'Cache-Control': 'no-cache',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + getToken()
-    },
-    body: JSON.stringify({
-      queryText,
-      agentId,
-      chatId: chatId || DEFAULT_CHAT_ID,
-      queryId: parseInfo.queryId,
-      parseId: parseInfo.id,
-    }),
-    signal: ctrl.signal,
-    onopen: async (res) => {
-      if (res.ok) {
-        return;
-      } else {
-        errorFunc(new Error('连接不成功'))
-        ctrl.abort();
-        throw new Error('连接不成功')
-      }
-    },
-    onmessage: messageFunc,
-    onerror: (error) => {
-      errorFunc(error)
-      ctrl.abort();
-      throw error
-    },
-    onclose: () => {
-      closeFunc()
-    }
-  })
-}
-
+// 智能洞察
 export function dataInterpret(
   textResult: string,
   queryText: string,
@@ -257,4 +204,94 @@ export function dataInterpret(
     queryId: parseInfo.queryId,
     parseId: parseInfo.id,
   });
+}
+// 上传并解析文件
+export function uploadAndParse(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axios.post<any>(`${prefix}/chat/file/uploadAndParse`, formData );
+}
+
+// 文件解析状态查询,查询完成后会得到解析内容
+export function fileStatus(params) {
+  return axios.post<any>(`${prefix}/chat/file/status`, params);
+}
+
+// 【开启闲聊后】流式回答
+export function deepSeekStream(
+  {
+    queryText,
+    chatId,
+    parseInfo,
+    agentId,
+    fileResultsForReqStream
+  }:DeepSeekStreamParams,
+  messageFunc: ((arg0: any) => void),
+  errorFunc: ((arg0: any) => void),
+  closeFunc: (() => void)
+) {
+const ctrl = new AbortController();
+const bodyObj: {
+  queryText: string;
+  agentId: number | undefined;
+  chatId: number;
+  queryId: number | undefined;
+  parseId: number;
+  fileInfoList: {
+    fileContent: string;
+    fileId: string;
+  }[]
+} = {
+  queryText,
+  agentId,
+  chatId: chatId || DEFAULT_CHAT_ID,
+  queryId: parseInfo.queryId,
+  parseId: parseInfo.id,
+  fileInfoList: []
+}
+for (const fileResult of fileResultsForReqStream || []) {
+  if (fileResult.fileId) {
+    const newFileContent = `文件[${fileResult.fileName}] 文件id[${fileResult.fileId}] 文件大小[${fileResult.fileSize}] 文件类型[${fileResult.fileType}] 文件读取完成度[${fileResult.fileSizePercent}];以下内容为文件解析后的内容：\n`+fileResult.fileContent
+    bodyObj.fileInfoList.push({fileContent:newFileContent,fileId:fileResult.fileId})
+  }
+}
+
+return fetchEventSource(`${prefix}/stream/chat/crab/deepSeekStream`, {
+  method: 'POST',
+  openWhenHidden: true, // 允许后台运行
+  headers: {
+    'Cache-Control': 'no-cache',
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + getToken()
+  },
+  body: JSON.stringify(bodyObj),
+  signal: ctrl.signal,
+  onopen: async (res) => {
+    if (res.ok) {
+      return;
+    } else {
+      errorFunc(new Error('连接不成功'))
+      ctrl.abort();
+      throw new Error('连接不成功')
+    }
+  },
+  onmessage: messageFunc,
+  onerror: (error) => {
+    errorFunc(error)
+    ctrl.abort();
+    throw error
+  },
+  onclose: () => {
+    closeFunc()
+  }
+})
+}
+
+// 【开启闲聊后】停止流式回答
+export function stopStream(
+  params:{
+    queryId: number;
+  }
+) {
+  return axios.post<any>(`${prefix}/chat/crab/stopStream`,params);
 }

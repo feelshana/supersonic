@@ -18,6 +18,11 @@ import { encryptPassword } from '@/utils/utils';
 
 const { Item } = Form;
 const LoginPage: React.FC = () => {
+  // #region 登录页不要了，直接跳转到4A登录(如想恢复登录页功能，比如开发环境需要登录，注释这两句即可)
+  window.parent.location.href = 'https://dc.migu.cn'
+  return
+  // #endregion 登录页不要了，直接跳转到4A登录(如想恢复登录页功能，比如开发环境需要登录，注释这两句即可)
+
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const encryptKey = CryptoJS.enc.Utf8.parse('supersonic@2024');
   const [form] = useForm();

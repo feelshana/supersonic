@@ -9,8 +9,10 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { solarizedlight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import React, { ReactNode, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from'rehype-raw';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github.css'; // 浅灰色背景主题
 
@@ -160,8 +162,8 @@ const ExecuteItem: React.FC<Props> = ({
           ) : data?.queryMode === 'PLAIN_TEXT' || data?.queryMode === 'WEB_SERVICE' ? (
             
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+              remarkPlugins={[remarkGfm,remarkBreaks]}
+              rehypePlugins={[rehypeKatex,rehypeRaw, rehypeHighlight]}
               components={{
                 code: ({ className, children }) => {
                   const language = className?.replace('hljs language-', '') || 'text';
