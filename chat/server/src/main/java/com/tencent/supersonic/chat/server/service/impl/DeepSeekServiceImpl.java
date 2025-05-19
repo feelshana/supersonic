@@ -108,7 +108,7 @@ public class DeepSeekServiceImpl implements DeepSeekService {
                 .flatMap(response -> processStreamResponse(response, contentAccumulator))
                 .doOnCancel(() -> log.warn("Downstream cancelled"))
                 .subscribe(chunk -> sendSseChunk(emitter, chunk),
-                        error -> handleStreamError(emitter, error),g
+                        error -> handleStreamError(emitter, error),
                         () -> completeStream(emitter, chatExecuteReq, contentAccumulator));
         activeSubscriptions.put(chatExecuteReq.getQueryId(), disposable);
         return emitter;
