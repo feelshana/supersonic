@@ -131,9 +131,11 @@ const ExecuteItem: React.FC<Props> = ({
               )}
             </div>
             <div>
-              {[MsgContentTypeEnum.METRIC_TREND, MsgContentTypeEnum.METRIC_BAR].includes(
-                msgContentType as MsgContentTypeEnum
-              ) && (
+              {[
+                MsgContentTypeEnum.METRIC_TREND,
+                MsgContentTypeEnum.METRIC_BAR,
+                MsgContentTypeEnum.METRIC_PIE,
+              ].includes(msgContentType as MsgContentTypeEnum) && (
                 <Switch
                   checkedChildren="表格"
                   unCheckedChildren="表格"
@@ -157,10 +159,17 @@ const ExecuteItem: React.FC<Props> = ({
           {data.queryAuthorization?.message && (
             <div className={`${prefixCls}-auth-tip`}>提示：{data.queryAuthorization.message}</div>
           )}
+          {data.textSummary && (
+            <p className={`${prefixCls}-step-title`}>
+              <span style={{ marginRight: 5 }}>总结:</span>
+              <ReactMarkdown>{data.textSummary}</ReactMarkdown>
+            </p>
+          )}
+
           {renderCustomExecuteNode && executeItemNode ? (
             executeItemNode
           ) : data?.queryMode === 'PLAIN_TEXT' || data?.queryMode === 'WEB_SERVICE' ? (
-            
+
             <ReactMarkdown
               remarkPlugins={[remarkGfm,remarkBreaks]}
               rehypePlugins={[rehypeKatex,rehypeRaw, rehypeHighlight]}
