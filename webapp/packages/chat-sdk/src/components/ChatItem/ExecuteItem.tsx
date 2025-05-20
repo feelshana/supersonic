@@ -8,6 +8,7 @@ import Loading from './Loading';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { solarizedlight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import React, { ReactNode, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 type Props = {
   queryId?: number;
@@ -122,9 +123,11 @@ const ExecuteItem: React.FC<Props> = ({
               )}
             </div>
             <div>
-              {[MsgContentTypeEnum.METRIC_TREND, MsgContentTypeEnum.METRIC_BAR].includes(
-                msgContentType as MsgContentTypeEnum
-              ) && (
+              {[
+                MsgContentTypeEnum.METRIC_TREND,
+                MsgContentTypeEnum.METRIC_BAR,
+                MsgContentTypeEnum.METRIC_PIE,
+              ].includes(msgContentType as MsgContentTypeEnum) && (
                 <Switch
                   checkedChildren="表格"
                   unCheckedChildren="表格"
@@ -151,7 +154,7 @@ const ExecuteItem: React.FC<Props> = ({
           {data.textSummary && (
             <p className={`${prefixCls}-step-title`}>
               <span style={{ marginRight: 5 }}>总结:</span>
-              {data.textSummary}
+              <ReactMarkdown>{data.textSummary}</ReactMarkdown>
             </p>
           )}
 
