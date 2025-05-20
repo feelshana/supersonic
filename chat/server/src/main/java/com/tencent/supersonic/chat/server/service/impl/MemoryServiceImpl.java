@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class MemoryServiceImpl implements MemoryService , CommandLineRunner {
+public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
 
     @Autowired
     private ChatMemoryRepository chatMemoryRepository;
@@ -90,6 +90,12 @@ public class MemoryServiceImpl implements MemoryService , CommandLineRunner {
         if (Objects.nonNull(chatMemoryUpdateReq.getHumanReviewCmt())) {
             updateWrapper.set(ChatMemoryDO::getHumanReviewCmt,
                     chatMemoryUpdateReq.getHumanReviewCmt());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getDbSchema())) {
+            updateWrapper.set(ChatMemoryDO::getDbSchema, chatMemoryUpdateReq.getDbSchema());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getS2sql())) {
+            updateWrapper.set(ChatMemoryDO::getS2sql, chatMemoryUpdateReq.getS2sql());
         }
         updateWrapper.set(ChatMemoryDO::getUpdatedAt, new Date());
         updateWrapper.set(ChatMemoryDO::getUpdatedBy, user.getName());
@@ -195,12 +201,14 @@ public class MemoryServiceImpl implements MemoryService , CommandLineRunner {
     public void run(String... args) { // 优化，启动时检查，向量数据，将记忆放到向量数据库
         loadSysExemplars();
     }
+
     public void loadSysExemplars() {
         try {
-            List<ChatMemory> memories =
-                    this.getMemories(ChatMemoryFilter.builder().status(MemoryStatus.ENABLED).build());
-            for(ChatMemory memory:memories){
-                exemplarService.storeExemplar(embeddingConfig.getMemoryCollectionName(memory.getAgentId()),
+            List<ChatMemory> memories = this
+                    .getMemories(ChatMemoryFilter.builder().status(MemoryStatus.ENABLED).build());
+            for (ChatMemory memory : memories) {
+                exemplarService.storeExemplar(
+                        embeddingConfig.getMemoryCollectionName(memory.getAgentId()),
                         Text2SQLExemplar.builder().question(memory.getQuestion())
                                 .sideInfo(memory.getSideInfo()).dbSchema(memory.getDbSchema())
                                 .sql(memory.getS2sql()).build());
