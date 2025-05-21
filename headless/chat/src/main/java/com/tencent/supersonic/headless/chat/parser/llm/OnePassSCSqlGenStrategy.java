@@ -39,6 +39,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @Slf4j
@@ -75,7 +76,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
     @Data
     static class SemanticSql {
-        @Description("告诉用户有关这个SQL的查询思路，结合表的元数据与查询的条件数据, make it short.")
+        @Description("告诉用户有关这个问题的查询思路，结合表的元数据与提示词中的查询规则")
         private String thought;
 
         @Description("sql to generate")
@@ -148,6 +149,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
     }
 
     public SseEmitter streamGenerate(LLMReq llmReq) {
+        long start = System.currentTimeMillis();
+
         // 1. 创建SSE发射器（1分钟超时）
         SseEmitter emitter = new SseEmitter(60_000L);
         // 2. 在异步线程中执行后续逻辑，线程池资源隔离
@@ -172,9 +175,18 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                 Flux<String> thought = extractor
                         .generateStreamingSemanticParse(promptText.toUserMessage().singleText())
                         .onBackpressureBuffer(100);
+
                 // 订阅响应流，设置延迟为100毫秒，并行调度
+                log.info("模型流式通道建立耗时："+(System.currentTimeMillis() - start) + "ms");
+                long subscribeStart = System.currentTimeMillis();
+
+                AtomicBoolean isFirst = new AtomicBoolean(true);
                 Disposable subscription = thought.subscribe(chunk -> {
                     try {
+                        if(isFirst.getAndSet(false)){
+                            log.info("模型流式通道响应耗时："+(System.currentTimeMillis() - subscribeStart) + "ms");
+                        }
+
                         // 发送单个数据块
                         emitter.send(SseEmitter.event().data(chunk));
                     } catch (IOException e) {
