@@ -194,8 +194,9 @@ public class ParseInfoFormatProcessor implements ParseResultProcessor {
         DateConf dateInfo = new DateConf();
         dateInfo.setDateMode(DateConf.DateMode.BETWEEN);
         FieldExpression firstExpression = dateExpressions.get(0);
-        dateInfo.setPeriod(extractDatePeriod(firstExpression.getFieldValue().toString()));
-
+        if (firstExpression.getFieldValue() != null) {
+            dateInfo.setPeriod(extractDatePeriod(firstExpression.getFieldValue().toString()));
+        }
         FilterOperatorEnum firstOperator =
                 FilterOperatorEnum.getSqlOperator(firstExpression.getOperator());
         if (FilterOperatorEnum.EQUALS.equals(firstOperator)
