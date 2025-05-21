@@ -76,7 +76,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
     @Data
     static class SemanticSql {
-        @Description("告诉用户有关这个SQL的查询思路，结合表的元数据与查询的条件数据, make it short.")
+        @Description("告诉用户有关这个问题的查询思路，结合表的元数据与提示词中的查询规则")
         private String thought;
 
         @Description("sql to generate")
@@ -177,14 +177,15 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                         .onBackpressureBuffer(100);
 
                 // 订阅响应流，设置延迟为100毫秒，并行调度
-                log.info("模型流式通道建立耗时："+(System.currentTimeMillis() - start) + "ms");
+                log.info("模型流式通道建立耗时：" + (System.currentTimeMillis() - start) + "ms");
                 long subscribeStart = System.currentTimeMillis();
 
                 AtomicBoolean isFirst = new AtomicBoolean(true);
                 Disposable subscription = thought.subscribe(chunk -> {
                     try {
-                        if(isFirst.getAndSet(false)){
-                            log.info("模型流式通道响应耗时："+(System.currentTimeMillis() - subscribeStart) + "ms");
+                        if (isFirst.getAndSet(false)) {
+                            log.info("模型流式通道响应耗时：" + (System.currentTimeMillis() - subscribeStart)
+                                    + "ms");
                         }
 
                         // 发送单个数据块

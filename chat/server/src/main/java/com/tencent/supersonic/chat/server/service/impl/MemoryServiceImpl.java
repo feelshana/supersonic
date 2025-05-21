@@ -69,7 +69,7 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
         ChatMemoryDO chatMemoryDO = chatMemoryRepository.getMemory(chatMemoryUpdateReq.getId());
         boolean hadEnabled =
                 MemoryStatus.ENABLED.toString().equals(chatMemoryDO.getStatus().trim());
-        if (MemoryStatus.ENABLED.equals(chatMemoryUpdateReq.getStatus()) && !hadEnabled) {
+        if (MemoryStatus.ENABLED.equals(chatMemoryUpdateReq.getStatus())) {
             enableMemory(chatMemoryDO);
         } else if (MemoryStatus.DISABLED.equals(chatMemoryUpdateReq.getStatus()) && hadEnabled) {
             disableMemory(chatMemoryDO);

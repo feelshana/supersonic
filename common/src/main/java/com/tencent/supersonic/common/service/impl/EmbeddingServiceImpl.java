@@ -49,11 +49,16 @@ public class EmbeddingServiceImpl implements EmbeddingService {
             try {
                 EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
                 Embedding embedding = embeddingModel.embed(question).content();
-                boolean existSegment =
-                        existSegment(collectionName, embeddingStore, query, embedding);
-                if (existSegment) {
-                    continue;
-                }
+//                boolean existSegment =
+//                        existSegment(collectionName, embeddingStore, query, embedding);
+//                if (existSegment) {
+//                    continue;
+//                }
+//                直接删了再插入，解决sql改后向量库数据不更新的问题
+                MetadataFilterBuilder filterBuilder =
+                        new MetadataFilterBuilder(TextSegmentConvert.QUERY_ID);
+                Filter filter = filterBuilder.isEqualTo(TextSegmentConvert.getQueryId(query));
+                embeddingStore.removeAll(filter);
                 embeddingStore.add(embedding, query);
                 cache.put(TextSegmentConvert.getQueryId(query), true);
 
