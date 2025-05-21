@@ -194,6 +194,13 @@ const ROUTES = [
     component: './Login',
   },
   {
+    path: '/loginForDev',
+    name: 'loginForDev',
+    layout: false,
+    hideInMenu: true,
+    component: './Login',
+  },
+  {
     path: '/database',
     name: 'database',
     component: './SemanticModel/components/Database/DatabaseTable',
