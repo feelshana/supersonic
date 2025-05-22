@@ -112,6 +112,43 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
         chatMemoryMapper.update(updateWrapper);
     }
 
+    /**
+     * 点赞、点踩只处理正确、错误的管理员评判结果
+     * @param chatMemoryUpdateReq
+     * @param user
+     */
+    @Override
+    public void updateFeedbackMemory(ChatMemoryUpdateReq chatMemoryUpdateReq, User user) {
+        ChatMemoryDO chatMemoryDO = chatMemoryRepository.getMemory(chatMemoryUpdateReq.getId());
+        LambdaUpdateWrapper<ChatMemoryDO> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(ChatMemoryDO::getId, chatMemoryDO.getId());
+        if (Objects.nonNull(chatMemoryUpdateReq.getLlmReviewRet())) {
+            updateWrapper.set(ChatMemoryDO::getLlmReviewRet,
+                    chatMemoryUpdateReq.getLlmReviewRet().toString());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getLlmReviewCmt())) {
+            updateWrapper.set(ChatMemoryDO::getLlmReviewCmt, chatMemoryUpdateReq.getLlmReviewCmt());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getHumanReviewRet())) {
+            updateWrapper.set(ChatMemoryDO::getHumanReviewRet,
+                    chatMemoryUpdateReq.getHumanReviewRet().toString());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getHumanReviewCmt())) {
+            updateWrapper.set(ChatMemoryDO::getHumanReviewCmt,
+                    chatMemoryUpdateReq.getHumanReviewCmt());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getDbSchema())) {
+            updateWrapper.set(ChatMemoryDO::getDbSchema, chatMemoryUpdateReq.getDbSchema());
+        }
+        if (Objects.nonNull(chatMemoryUpdateReq.getS2sql())) {
+            updateWrapper.set(ChatMemoryDO::getS2sql, chatMemoryUpdateReq.getS2sql());
+        }
+        updateWrapper.set(ChatMemoryDO::getUpdatedAt, new Date());
+        updateWrapper.set(ChatMemoryDO::getUpdatedBy, user.getName());
+
+        chatMemoryMapper.update(updateWrapper);
+    }
+
     @Override
     public void batchDelete(List<Long> ids) {
         chatMemoryRepository.batchDelete(ids);
