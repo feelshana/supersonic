@@ -160,7 +160,7 @@ public class NL2SQLParser implements ChatQueryParser {
             // // 1.多轮对话改写，未解析出来数据时重写
             rewriteMultiTurn(parseContext, queryNLReq);
 
-            // // 2.fowShot召回，RAG向量库中召回
+            // // 2.fowShot召回，召唤记忆中启用的，RAG向量库中召回
             addDynamicExemplars(parseContext, queryNLReq);
             // // 3.调用Llm生成语义sql
             doParse(queryNLReq, parseContext.getResponse());
