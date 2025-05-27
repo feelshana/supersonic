@@ -9,6 +9,7 @@ import com.github.pagehelper.PageInfo;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.common.pojo.*;
+import com.tencent.supersonic.common.pojo.enums.DictWordType;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
@@ -23,6 +24,8 @@ import com.tencent.supersonic.headless.api.pojo.request.DimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
 import com.tencent.supersonic.headless.api.pojo.response.*;
+import com.tencent.supersonic.headless.chat.knowledge.DictWord;
+import com.tencent.supersonic.headless.chat.knowledge.KnowledgeBaseService;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DimensionDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DimensionValueDO;
 import com.tencent.supersonic.headless.server.persistence.mapper.DimensionDOMapper;
@@ -46,6 +49,8 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.tencent.supersonic.common.pojo.Constants.DEFAULT_FREQUENCY;
 
 @Service
 @Slf4j
@@ -465,6 +470,22 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                     }
                 });
             }
+        }
+        KnowledgeBaseService.getDimValueAlias().remove(dimensionDO.getId());
+        if(org.apache.commons.collections4.CollectionUtils.isNotEmpty(dimValueMaps.getAlias())){
+//            加入真实值->别名值到dimValueAliasMap中
+            List<DictWord> dictWordList=new ArrayList<>();
+            dimValueMaps.getAlias().stream().forEach(alias->
+            {
+                DictWord name2AliaWord=new DictWord();
+                name2AliaWord.setWord(dimValueMaps.getValue());
+                name2AliaWord.setAlias(alias);
+                String nature = DictWordType.NATURE_SPILT + dimensionDO.getModelId() + DictWordType.NATURE_SPILT
+                        + dimensionDO.getId();
+                name2AliaWord.setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
+                dictWordList.add(name2AliaWord);
+            });
+            KnowledgeBaseService.addDimValueAlias(dimensionDO.getId(), dictWordList);
         }
         dimensionDO.setDimValueMaps(JsonUtil.toString(dimValueMapList));
         updateById(dimensionDO);
