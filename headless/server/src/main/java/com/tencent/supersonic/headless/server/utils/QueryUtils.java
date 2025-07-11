@@ -123,7 +123,8 @@ public class QueryUtils {
                     column.setModelId(metric.getModelId());
                 }
                 // if column nameEn contains metric alias, use metric dataFormatType
-                if (column.getDataFormatType() == null && metric.getAlias() != null) {
+                if (column.getDataFormatType() == null
+                        && StringUtils.isNotEmpty(metric.getAlias())) {
                     for (String alias : metric.getAlias().split(",")) {
                         if (finalNameEn.contains(alias)) {
                             column.setDataFormatType(metric.getDataFormatType());
