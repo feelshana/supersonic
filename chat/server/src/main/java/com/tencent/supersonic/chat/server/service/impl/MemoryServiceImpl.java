@@ -79,7 +79,6 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
 //            从启动->禁用，启用->待定都从向量库删除
             disableMemory(chatMemoryDO);
         }
-
         LambdaUpdateWrapper<ChatMemoryDO> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(ChatMemoryDO::getId, chatMemoryDO.getId());
         if (Objects.nonNull(chatMemoryUpdateReq.getStatus())) {

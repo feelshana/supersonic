@@ -54,14 +54,16 @@ public class DataInterpretProcessor implements ExecuteResultProcessor {
 
     @Override
     public boolean accept(ExecuteContext executeContext) {
-        // Agent agent = executeContext.getAgent();
-        // ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
+//        Agent agent = executeContext.getAgent();
+//        ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
         // NL2SQLParserConfig nl2SqlParserConfig = ContextUtils.getBean(NL2SQLParserConfig.class);
         // List<Integer> simpleModelAgentIds = nl2SqlParserConfig.getSimpleModelAgentIds();
         // if (simpleModelAgentIds.contains(agent.getId())) {
         // return false;
         // }
-        // return Objects.nonNull(chatApp) && chatApp.isEnable();
+        // 如果都没结果，则无法处理，直接跳过
+//        return Objects.nonNull(chatApp) && chatApp.isEnable()
+//                && StringUtils.isNotBlank(executeContext.getResponse().getTextResult());
         return false;
     }
 

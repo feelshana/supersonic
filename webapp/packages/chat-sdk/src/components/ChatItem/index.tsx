@@ -11,12 +11,12 @@ import {
 } from '../../common/type';
 import { createContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { chatExecute,
-  dataInterpret, 
-  chatParse, 
-  queryData, 
-  deleteQuery, 
-  switchEntity, 
-  queryThoughtsInSSE, 
+  dataInterpret,
+  chatParse,
+  queryData,
+  deleteQuery,
+  switchEntity,
+  queryThoughtsInSSE,
   deepSeekStream } from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
@@ -289,7 +289,7 @@ const ChatItem: React.FC<Props> = ({
         const res: any = await chatExecute(msg, conversationId!, parseInfoValue, agentId);
         if(res.data.queryResults?.length === 1 && res.data.resultType){
           setDimensionFilters(filters => {
-            const newFilters = filters.map(item => {  
+            const newFilters = filters.map(item => {
               const nameEn = res.data.queryColumns?.find((queryColumnsItem:{ name: string; nameEn: string }) => {
                 return queryColumnsItem.name === item.name
               })?.nameEn
@@ -340,7 +340,7 @@ const ChatItem: React.FC<Props> = ({
             );
             onUpdateMessageScroll?.()
             // 这里需要再执行一遍显示推荐问题，不然推荐问题会消失
-            if(res?.data?.chatContext?.sqlInfo?.resultType === 'text' 
+            if(res?.data?.chatContext?.sqlInfo?.resultType === 'text'
               || !(res?.data?.queryResults)
               || res?.data?.queryResults?.length === 0
             ) {
@@ -680,6 +680,8 @@ const ChatItem: React.FC<Props> = ({
 
   const { register, call } = useMethodRegister(() => message.error('该条消息暂不支持该操作'));
 
+  let actualQueryText=parseInfo?.properties?.CONTEXT?.queryText //  2025-05-27 增加判空，防止出现上下文没有 queryText 的情况
+  actualQueryText=actualQueryText==null?msg:actualQueryText
   return (
     <ChartItemContext.Provider value={{ register, call }}>
       <div className={prefixCls}>
@@ -769,9 +771,9 @@ const ChatItem: React.FC<Props> = ({
               <div className='toggle-content' onClick={()=>{
                 setToggleOfThouths((prev) => { return !prev})
               }}>
-                {isThinkingOfdeepSeekStream ? `深度思考中...(${thinkingTimeInSeconds}秒)` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}  
+                {isThinkingOfdeepSeekStream ? `深度思考中...(${thinkingTimeInSeconds}秒)` : `已深度思考（用时 ${thinkingTimeInSeconds} 秒）`}
                 <div className='toggle-content-icon'>
-                 { toggleOfThouths ? <CaretRightOutlined /> : <CaretDownOutlined />} 
+                 { toggleOfThouths ? <CaretRightOutlined /> : <CaretDownOutlined />}
                 </div>
               </div>
               {!toggleOfThouths ? <div className='result-container  thoughts-container'>
@@ -811,7 +813,7 @@ const ChatItem: React.FC<Props> = ({
                       <SqlItem
                         agentId={agentId}
                         queryId={parseInfo.queryId}
-                        question={msg}
+                        question={actualQueryText}
                         llmReq={llmReq}
                         llmResp={llmResp}
                         integrateSystem={integrateSystem}
@@ -821,11 +823,11 @@ const ChatItem: React.FC<Props> = ({
                         executeErrorMsg={executeErrorMsg}
                       />
                     )}
-                  
+
                   <ExecuteItem
                     isSimpleMode={isSimpleMode}
                     queryId={parseInfo?.queryId}
-                    question={msg}
+                    question={actualQueryText}
                     queryMode={parseInfo?.queryMode}
                     executeLoading={executeLoading}
                     executeTip={executeTip}
@@ -854,7 +856,7 @@ const ChatItem: React.FC<Props> = ({
             <div className={`${prefixCls}-content-container`} style={{ display: data?.textSummary ? 'block' : 'none' }}>
               {data?.textSummary}
             </div>
-            
+
             {executeMode &&
               !executeLoading &&
               !isSimpleMode &&
