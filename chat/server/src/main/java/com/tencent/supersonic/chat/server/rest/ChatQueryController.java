@@ -51,6 +51,13 @@ public class ChatQueryController {
         return chatQueryService.execute(chatExecuteReq);
     }
 
+    @PostMapping("parseAndExecute")
+    public Object parseAndExecute(@RequestBody ChatParseReq chatParseReq,
+                                  HttpServletRequest request, HttpServletResponse response) throws Exception {
+        chatParseReq.setUser(UserHolder.findUser(request, response));
+        return chatQueryService.parseAndExecute(chatParseReq);
+    }
+
     @PostMapping("streamExecute")
     public SseEmitter streamExecute(@RequestBody ChatExecuteReq chatExecuteReq,
             HttpServletRequest request, HttpServletResponse response) throws Exception {
