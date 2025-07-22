@@ -43,7 +43,8 @@ public class ChatWorkflowEngine {
     private final List<SemanticParser> semanticParsers = CoreComponentFactory.getSemanticParsers();
     private final List<SemanticCorrector> semanticCorrectors =
             CoreComponentFactory.getSemanticCorrectors();
-    private final String MAPINFO_IS_NULL_STR="您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。";
+    private final String MAPINFO_IS_NULL_STR =
+            "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。";
 
     @Autowired
     private DimensionValuesMatchHelper dimensionValuesMatchHelper;
@@ -59,25 +60,25 @@ public class ChatWorkflowEngine {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
                     if (queryCtx.getMapInfo().isEmpty()) {
-                        errDefault(parseResult,queryCtx);
-                    }else{
+                        errDefault(parseResult, queryCtx);
+                    } else {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
                     }
 
-//                    if (queryCtx.getMapInfo().isEmpty()) {
-//                        parseResult.setState(ParseResp.ParseState.FAILED);
-//                        parseResult.setErrorMsg(
-//                                "No semantic entities can be mapped against user question.");
-//                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
-//                    } else {
-//                        queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
-//                    }
+                    // if (queryCtx.getMapInfo().isEmpty()) {
+                    // parseResult.setState(ParseResp.ParseState.FAILED);
+                    // parseResult.setErrorMsg(
+                    // "No semantic entities can be mapped against user question.");
+                    // queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                    // } else {
+                    // queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
+                    // }
 
                     break;
                 case PARSING:
                     performParsing(queryCtx);
                     if (queryCtx.getCandidateQueries().isEmpty()) {
-                       errDefault(parseResult,queryCtx);
+                        errDefault(parseResult, queryCtx);
                     } else {
                         List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
                                 .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
@@ -94,23 +95,23 @@ public class ChatWorkflowEngine {
                     /**
                      * 原逻辑
                      */
-//                    if (queryCtx.getCandidateQueries().isEmpty()) {
-//                        parseResult.setState(ParseResp.ParseState.FAILED);
-//                        parseResult.setErrorMsg("No semantic queries can be parsed out.");
-//                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
-//                    } else {
-//                        List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
-//                                .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
-//                        parseResult.setSelectedParses(parseInfos);
-//                        if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
-//                                queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
-//                                "直连模式")) {
-//                            queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
-//                        } else {
-//                            parseResult.setState(ParseResp.ParseState.COMPLETED);
-//                            queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
-//                        }
-//                    }
+                    // if (queryCtx.getCandidateQueries().isEmpty()) {
+                    // parseResult.setState(ParseResp.ParseState.FAILED);
+                    // parseResult.setErrorMsg("No semantic queries can be parsed out.");
+                    // queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                    // } else {
+                    // List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
+                    // .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
+                    // parseResult.setSelectedParses(parseInfos);
+                    // if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
+                    // queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
+                    // "直连模式")) {
+                    // queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
+                    // } else {
+                    // parseResult.setState(ParseResp.ParseState.COMPLETED);
+                    // queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                    // }
+                    // }
                     break;
                 case S2SQL_CORRECTING:
                     performCorrecting(queryCtx);
@@ -138,13 +139,14 @@ public class ChatWorkflowEngine {
 
     /**
      * 当mapping为空时或queryCtx.getCandidateQueries()调用
+     * 
      * @param parseResult
      * @param queryCtx
      */
-    private void errDefault(ParseResp parseResult,ChatQueryContext queryCtx){
-        List<SemanticParseInfo> selectedParses =new ArrayList<>();
+    private void errDefault(ParseResp parseResult, ChatQueryContext queryCtx) {
+        List<SemanticParseInfo> selectedParses = new ArrayList<>();
         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
-        SqlInfo sqlInfo=new SqlInfo();
+        SqlInfo sqlInfo = new SqlInfo();
         sqlInfo.setParsedS2SQL(MAPINFO_IS_NULL_STR);
         sqlInfo.setCorrectedS2SQL(MAPINFO_IS_NULL_STR);
         sqlInfo.setQuerySQL(null);
@@ -157,6 +159,7 @@ public class ChatWorkflowEngine {
         parseResult.setState(ParseResp.ParseState.COMPLETED);
         queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
     }
+
     private void performMapping(ChatQueryContext queryCtx) {
         if (Objects.isNull(queryCtx.getMapInfo())
                 || MapUtils.isEmpty(queryCtx.getMapInfo().getDataSetElementMatches())) {

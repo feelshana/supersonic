@@ -1,7 +1,7 @@
 {
 	"pnpm": {
 		"overrides": {
-			"supersonic-chat-sdk": "link:packages/chat-sdk"
+			"supersonic-chat-sdk": "link:..\\chat-sdk"
 		}
 	},
 	"dependencies": {

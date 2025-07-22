@@ -33,7 +33,7 @@ public class ValueWordBuilder extends BaseWordWithAliasBuilder {
         dictWord.setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
         dictWord.setWord(word);
         DictWord name2AliaWord = new DictWord();
-//      加入真实值->别名值到dimValueAliasMap中
+        // 加入真实值->别名值到dimValueAliasMap中
         name2AliaWord.setWord(schemaElement.getDimValueMaps().get(0).getValue());
         name2AliaWord.setAlias(word);
         name2AliaWord.setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));

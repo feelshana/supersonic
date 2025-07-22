@@ -177,14 +177,15 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                         .onBackpressureBuffer(100);
 
                 // 订阅响应流，设置延迟为100毫秒，并行调度
-                log.info("模型流式通道建立耗时："+(System.currentTimeMillis() - start) + "ms");
+                log.info("模型流式通道建立耗时：" + (System.currentTimeMillis() - start) + "ms");
                 long subscribeStart = System.currentTimeMillis();
 
                 AtomicBoolean isFirst = new AtomicBoolean(true);
                 Disposable subscription = thought.subscribe(chunk -> {
                     try {
-                        if(isFirst.getAndSet(false)){
-                            log.info("模型流式通道响应耗时："+(System.currentTimeMillis() - subscribeStart) + "ms");
+                        if (isFirst.getAndSet(false)) {
+                            log.info("模型流式通道响应耗时：" + (System.currentTimeMillis() - subscribeStart)
+                                    + "ms");
                         }
 
                         // 发送单个数据块

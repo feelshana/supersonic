@@ -53,7 +53,7 @@ public class ChatQueryController {
 
     @PostMapping("parseAndExecute")
     public Object parseAndExecute(@RequestBody ChatParseReq chatParseReq,
-                                  HttpServletRequest request, HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         chatParseReq.setUser(UserHolder.findUser(request, response));
         return chatQueryService.parseAndExecute(chatParseReq);
     }

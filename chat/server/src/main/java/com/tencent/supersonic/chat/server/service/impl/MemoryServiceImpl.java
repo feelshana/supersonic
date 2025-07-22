@@ -70,13 +70,13 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
                 MemoryStatus.ENABLED.toString().equals(chatMemoryDO.getStatus().trim());
 
         if (MemoryStatus.ENABLED.equals(chatMemoryUpdateReq.getStatus())) {
-//            只要启用，就用最新的Sql/Schema替代到向量库
+            // 只要启用，就用最新的Sql/Schema替代到向量库
             chatMemoryDO.setS2sql(chatMemoryUpdateReq.getS2sql());
             chatMemoryDO.setDbSchema(chatMemoryUpdateReq.getDbSchema());
             enableMemory(chatMemoryDO);
         } else if ((MemoryStatus.DISABLED.equals(chatMemoryUpdateReq.getStatus())
-                ||MemoryStatus.PENDING.equals(chatMemoryUpdateReq.getStatus())) && hadEnabled) {
-//            从启动->禁用，启用->待定都从向量库删除
+                || MemoryStatus.PENDING.equals(chatMemoryUpdateReq.getStatus())) && hadEnabled) {
+            // 从启动->禁用，启用->待定都从向量库删除
             disableMemory(chatMemoryDO);
         }
         LambdaUpdateWrapper<ChatMemoryDO> updateWrapper = new LambdaUpdateWrapper<>();
@@ -113,6 +113,7 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
 
     /**
      * 点赞、点踩只处理正确、错误的管理员评判结果
+     * 
      * @param chatMemoryUpdateReq
      * @param user
      */

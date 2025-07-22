@@ -84,21 +84,21 @@ public class ChatManageServiceImpl implements ChatManageService {
             ChatHistoryFilter historyFilter = ChatHistoryFilter.builder().queryId(id).build();
             List<ChatMemory> memories = memoryService.getMemories(memoryFilter);
             List<ChatHistory> histories = historyService.getMemories(historyFilter);
-//            MemoryStatus status = score >= 5 ? MemoryStatus.ENABLED : MemoryStatus.DISABLED;
+            // MemoryStatus status = score >= 5 ? MemoryStatus.ENABLED : MemoryStatus.DISABLED;
 
             MemoryReviewResult reviewResult =
                     score >= 5 ? MemoryReviewResult.POSITIVE : MemoryReviewResult.NEGATIVE;
             memories.forEach(m -> {
-                ChatMemoryUpdateReq memoryUpdateReq=  ChatMemoryUpdateReq.builder().id(m.getId())
-                        .humanReviewRet(reviewResult)
-                        .humanReviewCmt("Reviewed as per user feedback").build();;
+                ChatMemoryUpdateReq memoryUpdateReq =
+                        ChatMemoryUpdateReq.builder().id(m.getId()).humanReviewRet(reviewResult)
+                                .humanReviewCmt("Reviewed as per user feedback").build();;
                 memoryService.updateFeedbackMemory(memoryUpdateReq, User.getDefaultUser());
 
             });
             histories.forEach(h -> {
-                ChatHistoryUpdateReq historyUpdateReq = ChatHistoryUpdateReq.builder().id(h.getId())
-                        .humanReviewRet(reviewResult)
-                        .humanReviewCmt("Reviewed as per user feedback").build();
+                ChatHistoryUpdateReq historyUpdateReq =
+                        ChatHistoryUpdateReq.builder().id(h.getId()).humanReviewRet(reviewResult)
+                                .humanReviewCmt("Reviewed as per user feedback").build();
                 historyService.updateHistory(historyUpdateReq, User.getDefaultUser());
             });
         }

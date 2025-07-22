@@ -472,17 +472,17 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
             }
         }
         KnowledgeBaseService.getDimValueAlias().remove(dimensionDO.getId());
-        if(org.apache.commons.collections4.CollectionUtils.isNotEmpty(dimValueMaps.getAlias())){
-//            加入真实值->别名值到dimValueAliasMap中
-            List<DictWord> dictWordList=new ArrayList<>();
-            dimValueMaps.getAlias().stream().forEach(alias->
-            {
-                DictWord name2AliaWord=new DictWord();
+        if (org.apache.commons.collections4.CollectionUtils.isNotEmpty(dimValueMaps.getAlias())) {
+            // 加入真实值->别名值到dimValueAliasMap中
+            List<DictWord> dictWordList = new ArrayList<>();
+            dimValueMaps.getAlias().stream().forEach(alias -> {
+                DictWord name2AliaWord = new DictWord();
                 name2AliaWord.setWord(dimValueMaps.getValue());
                 name2AliaWord.setAlias(alias);
-                String nature = DictWordType.NATURE_SPILT + dimensionDO.getModelId() + DictWordType.NATURE_SPILT
-                        + dimensionDO.getId();
-                name2AliaWord.setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
+                String nature = DictWordType.NATURE_SPILT + dimensionDO.getModelId()
+                        + DictWordType.NATURE_SPILT + dimensionDO.getId();
+                name2AliaWord
+                        .setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
                 dictWordList.add(name2AliaWord);
             });
             KnowledgeBaseService.addDimValueAlias(dimensionDO.getId(), dictWordList);
