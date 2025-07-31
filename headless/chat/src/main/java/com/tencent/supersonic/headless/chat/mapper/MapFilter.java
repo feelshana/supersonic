@@ -133,6 +133,14 @@ public class MapFilter {
                     result.add(bestMatch);
                 }
             } else {
+              // If the word  match both of the metaData and the value&the metaData has large similarity
+              // delete the value to avoid the LLM Illusion
+                if(group.get(0).getElement().getType().equals(SchemaElementType.METRIC)
+                        ||group.get(0).getElement().getType().equals(SchemaElementType.DIMENSION))
+                {
+                    group=group.stream().filter(schemaElementMatch ->! schemaElementMatch.getElement().getType().equals(SchemaElementType.VALUE))
+                            .collect(Collectors.toList());
+                }
                 // If there are no objects with similarity=1.0, keep all objects with similarity<1.0
                 result.addAll(group);
             }

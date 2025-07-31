@@ -47,20 +47,30 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
     private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
     public static final String APP_KEY = "S2SQL_PARSER";
+//    public static final String INSTRUCTION =
+//            "#Role: You are a data analyst experienced in SQL languages."
+//                    + "\n#Task: You will be provided with a natural language question asked by users,"
+//                    + "please convert it to a SQL query so that relevant data could be returned "
+//                    + "by executing the SQL query against underlying database." + "\n#Rules:"
+//                    + "\n1.SQL columns and values must be mentioned in the `Schema`, DO NOT hallucinate."
+//                    + "\n2.ALWAYS specify time range using `>`,`<`,`>=`,`<=` operator."
+//                    + "\n3.DO NOT include time range in the where clause if not explicitly expressed in the `Question`."
+//                    + "\n4.DO NOT calculate date range using functions."
+//                    + "\n5.ALWAYS use `with` statement if nested aggregation is needed."
+//                    + "\n6.ALWAYS enclose alias declared by `AS` command in underscores."
+//                    + "\n7.Alias created by `AS` command must be in the same language ast the `Question`."
+//                    + "\n#Exemplars: {{exemplar}}"
+//                    + "\n#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
     public static final String INSTRUCTION =
-            "#Role: You are a data analyst experienced in SQL languages."
-                    + "\n#Task: You will be provided with a natural language question asked by users,"
-                    + "please convert it to a SQL query so that relevant data could be returned "
-                    + "by executing the SQL query against underlying database." + "\n#Rules:"
-                    + "\n1.SQL columns and values must be mentioned in the `Schema`, DO NOT hallucinate."
-                    + "\n2.ALWAYS specify time range using `>`,`<`,`>=`,`<=` operator."
-                    + "\n3.DO NOT include time range in the where clause if not explicitly expressed in the `Question`."
-                    + "\n4.DO NOT calculate date range using functions."
-                    + "\n5.ALWAYS use `with` statement if nested aggregation is needed."
-                    + "\n6.ALWAYS enclose alias declared by `AS` command in underscores."
-                    + "\n7.Alias created by `AS` command must be in the same language ast the `Question`."
-                    + "\n#Exemplars: {{exemplar}}"
-                    + "\n#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
+            "#角色：你是一位精通SQL语言的数据分析师\n" +
+                    "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" +
+                    "#规则：\n" +
+                    "1.必须严格引用Schema中的列名，禁止捏造字段,Schema中的Dimensions代表维度，Metrics代表指标，Values代表根据通过向量匹配到的维度值，供参考，不一定要使用，请自行判断\n" +
+                    "2.时间范围必须使用>/</>=/<=运算符显式声明\n" +
+                    "4.AS定义的别名必须用下划线包裹（例：AS \"_别名_\"）\n" +
+                    "4.别名语言需与问题语言一致（中文问题用中文别名）\n" +
+                    "#Exemplars: {{exemplar}}\n" +
+                    "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
 
     public OnePassSCSqlGenStrategy() {
         ChatAppManager.register(APP_KEY, ChatApp.builder().prompt(INSTRUCTION).name("语义SQL解析")
@@ -132,8 +142,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         // 3.perform multiple self-consistency inferences parallelly
         Map<String, Prompt> output2Prompt = new ConcurrentHashMap<>();
         prompt2Exemplar.keySet().parallelStream().forEach(prompt -> {
-            SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());
-            output2Prompt.put(s2Sql.getSql(), prompt);
+            SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());output2Prompt.put(s2Sql.getSql(), prompt);
             keyPipelineLog.info("OnePassSCSqlGenStrategy modelReq:\n{} \nmodelResp:\n{}",
                     prompt.text(), s2Sql);
         });
@@ -177,14 +186,15 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                         .onBackpressureBuffer(100);
 
                 // 订阅响应流，设置延迟为100毫秒，并行调度
-                log.info("模型流式通道建立耗时："+(System.currentTimeMillis() - start) + "ms");
+                log.info("模型流式通道建立耗时：" + (System.currentTimeMillis() - start) + "ms");
                 long subscribeStart = System.currentTimeMillis();
 
                 AtomicBoolean isFirst = new AtomicBoolean(true);
                 Disposable subscription = thought.subscribe(chunk -> {
                     try {
-                        if(isFirst.getAndSet(false)){
-                            log.info("模型流式通道响应耗时："+(System.currentTimeMillis() - subscribeStart) + "ms");
+                        if (isFirst.getAndSet(false)) {
+                            log.info("模型流式通道响应耗时：" + (System.currentTimeMillis() - subscribeStart)
+                                    + "ms");
                         }
 
                         // 发送单个数据块
