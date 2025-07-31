@@ -123,7 +123,8 @@ public class QueryUtils {
                     column.setModelId(metric.getModelId());
                 }
                 // if column nameEn contains metric alias, use metric dataFormatType
-                if (column.getDataFormatType() == null && metric.getAlias() != null) {
+                if (column.getDataFormatType() == null
+                        && StringUtils.isNotEmpty(metric.getAlias())) {
                     for (String alias : metric.getAlias().split(",")) {
                         if (finalNameEn.contains(alias)) {
                             column.setDataFormatType(metric.getDataFormatType());
@@ -150,9 +151,10 @@ public class QueryUtils {
             return false;
         }
         return type.toLowerCase().endsWith("int") || type.toLowerCase().startsWith("int")
-                || type.equalsIgnoreCase("float") || type.equalsIgnoreCase("double")
+                || type.toLowerCase().endsWith("float") || type.toLowerCase().startsWith("float")
+                || type.toLowerCase().endsWith("double") || type.toLowerCase().startsWith("double")
                 || type.equalsIgnoreCase("real") || type.equalsIgnoreCase("numeric")
-                || type.toLowerCase().startsWith("decimal") || type.equalsIgnoreCase("decfloat");
+                || type.toLowerCase().startsWith("decimal");
     }
 
     private String getName(String nameEn) {

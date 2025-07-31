@@ -47,6 +47,11 @@ public class DimensionRepositoryImpl implements DimensionRepository {
     }
 
     @Override
+    public void batchUpdate(List<DimensionDO> dimensionDOS) {
+        dimensionDOCustomMapper.batchUpdate(dimensionDOS);
+    }
+
+    @Override
     public DimensionDO getDimensionById(Long id) {
         return dimensionDOMapper.selectById(id);
     }
@@ -83,10 +88,10 @@ public class DimensionRepositoryImpl implements DimensionRepository {
         }
         if (StringUtils.isNotBlank(dimensionFilter.getKey())) {
             String key = dimensionFilter.getKey();
-            queryWrapper.lambda().like(DimensionDO::getName, key).or()
+            queryWrapper.and(qw -> qw.lambda().like(DimensionDO::getName, key).or()
                     .like(DimensionDO::getBizName, key).or().like(DimensionDO::getDescription, key)
                     .or().like(DimensionDO::getAlias, key).or()
-                    .like(DimensionDO::getCreatedBy, key);
+                    .like(DimensionDO::getCreatedBy, key));
         }
 
         return dimensionDOMapper.selectList(queryWrapper);

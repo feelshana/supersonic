@@ -3,6 +3,7 @@ package com.tencent.supersonic.headless.chat.mapper;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.hankcs.hanlp.seg.common.Term;
+import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.EmbeddingResult;
@@ -62,7 +63,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
 
     @Override
     public List<EmbeddingResult> detect(ChatQueryContext chatQueryContext, List<S2Term> terms,
-            Set<Long> detectDataSetIds) {
+                                        Set<Long> detectDataSetIds) {
         if (chatQueryContext == null || CollectionUtils.isEmpty(detectDataSetIds)) {
             log.warn("Invalid input parameters: context={}, dataSetIds={}", chatQueryContext,
                     detectDataSetIds);
@@ -91,7 +92,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      * Perform enhanced detection using LLM
      */
     private List<EmbeddingResult> detectWithLLM(ChatQueryContext chatQueryContext,
-            Set<Long> detectDataSetIds) {
+                                                Set<Long> detectDataSetIds) {
         try {
             String queryText = chatQueryContext.getRequest().getQueryText();
             if (StringUtils.isBlank(queryText)) {
@@ -125,7 +126,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
 
     @Override
     public List<EmbeddingResult> detectByBatch(ChatQueryContext chatQueryContext,
-            Set<Long> detectDataSetIds, Set<String> detectSegments) {
+                                               Set<Long> detectDataSetIds, Set<String> detectSegments) {
         return detectByBatch(chatQueryContext, detectDataSetIds, detectSegments, false);
     }
 
@@ -139,7 +140,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      * @return List of embedding results
      */
     public List<EmbeddingResult> detectByBatch(ChatQueryContext chatQueryContext,
-            Set<Long> detectDataSetIds, Set<String> detectSegments, boolean useLlm) {
+                                               Set<Long> detectDataSetIds, Set<String> detectSegments, boolean useLlm) {
         Set<EmbeddingResult> results = ConcurrentHashMap.newKeySet();
         int embeddingMapperBatch = Integer
                 .valueOf(mapperConfig.getParameterValue(MapperConfig.EMBEDDING_MAPPER_BATCH));
@@ -167,7 +168,12 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
             variable.put("retrievedInfo", JSONObject.toJSONString(results));
 
             Prompt prompt = PromptTemplate.from(LLM_FILTER_PROMPT).apply(variable);
-            ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatQueryContext.getRequest().getChatAppConfig().get("REWRITE_MULTI_TURN").getChatModelConfig());
+            ChatModelConfig chatModelConfig=null;
+            if(chatQueryContext.getRequest().getChatAppConfig()!=null
+                    && chatQueryContext.getRequest().getChatAppConfig().containsKey("REWRITE_MULTI_TURN")){
+                chatModelConfig=chatQueryContext.getRequest().getChatAppConfig().get("REWRITE_MULTI_TURN").getChatModelConfig();
+            }
+            ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
             String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
 
             if (StringUtils.isBlank(response)) {
@@ -194,7 +200,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      * @return Callable task
      */
     private Callable<Void> createTask(ChatQueryContext chatQueryContext, Set<Long> detectDataSetIds,
-            List<String> queryTextsSub, Set<EmbeddingResult> results, boolean useLlm) {
+                                      List<String> queryTextsSub, Set<EmbeddingResult> results, boolean useLlm) {
         return () -> {
             List<EmbeddingResult> oneRoundResults = detectByQueryTextsSub(detectDataSetIds,
                     queryTextsSub, chatQueryContext, useLlm);
@@ -215,7 +221,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      * @return List of embedding results for this batch
      */
     private List<EmbeddingResult> detectByQueryTextsSub(Set<Long> detectDataSetIds,
-            List<String> queryTextsSub, ChatQueryContext chatQueryContext, boolean useLlm) {
+                                                        List<String> queryTextsSub, ChatQueryContext chatQueryContext, boolean useLlm) {
         Map<Long, List<Long>> modelIdToDataSetIds = chatQueryContext.getModelIdToDataSetIds();
 
         // Get configuration parameters
@@ -237,12 +243,12 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
 
         // Process results
         List<EmbeddingResult> collect = retrieveQueryResults.stream().peek(result -> {
-            if (!useLlm && CollectionUtils.isNotEmpty(result.getRetrieval())) {
-                result.getRetrieval()
-                        .removeIf(retrieval -> !result.getQuery().contains(retrieval.getQuery())
-                                && retrieval.getSimilarity() < threshold);
-            }
-        }).filter(result -> CollectionUtils.isNotEmpty(result.getRetrieval()))
+                    if (!useLlm && CollectionUtils.isNotEmpty(result.getRetrieval())) {
+                        result.getRetrieval()
+                                .removeIf(retrieval -> !result.getQuery().contains(retrieval.getQuery())
+                                        && retrieval.getSimilarity() < threshold);
+                    }
+                }).filter(result -> CollectionUtils.isNotEmpty(result.getRetrieval()))
                 .flatMap(result -> result.getRetrieval().stream()
                         .map(retrieval -> convertToEmbeddingResult(result, retrieval)))
                 .collect(Collectors.toList());
@@ -261,7 +267,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      * @return Converted EmbeddingResult
      */
     private EmbeddingResult convertToEmbeddingResult(RetrieveQueryResult queryResult,
-            Retrieval retrieval) {
+                                                     Retrieval retrieval) {
         EmbeddingResult embeddingResult = new EmbeddingResult();
         BeanUtils.copyProperties(retrieval, embeddingResult);
         embeddingResult.setDetectWord(queryResult.getQuery());

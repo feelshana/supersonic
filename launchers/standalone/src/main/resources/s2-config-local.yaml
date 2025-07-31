@@ -28,9 +28,9 @@ s2:
     enableLLM: true
 
   authentication:
-    enable: false
+    enable: true
     exclude:
-      path: /api/auth/user/register,/api/auth/user/login,/api/chat/agent/hasAgentRight
+      path: /api/auth/user/register,/api/auth/user/login,/api/chat/agent/hasAgentRight,/inner/api/*
     token:
       http:
         header:
@@ -73,6 +73,10 @@ s2:
       dataSet: 4
     database:
       name: "supersonic"
+
+    #BI智能报表
+    bi:
+      model-id: 5
 
 crab:
   api:

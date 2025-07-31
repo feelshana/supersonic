@@ -5,15 +5,15 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  supersonic-chat-sdk: link:packages/chat-sdk
+  supersonic-chat-sdk: link:..\chat-sdk
 
 importers:
 
   .:
     dependencies:
       supersonic-chat-sdk:
-        specifier: link:packages/chat-sdk
-        version: link:packages/chat-sdk
+        specifier: link:../chat-sdk
+        version: link:../chat-sdk
 
   packages/chat-sdk:
     dependencies:
@@ -451,8 +451,8 @@ importers:
         specifier: ^15.4.10
         version: 15.4.11
       supersonic-chat-sdk:
-        specifier: link:../chat-sdk
-        version: link:../chat-sdk
+        specifier: link:../../../chat-sdk
+        version: link:../../../chat-sdk
       supersonic-insights-flow-components:
         specifier: ^1.4.9
         version: 1.4.9(classnames@2.5.1)(date-fns@2.30.0)(moment@2.30.1)(rc-field-form@2.7.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(reflect-metadata@0.1.14)

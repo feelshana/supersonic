@@ -1,7 +1,0 @@
-spring:
-  datasource:
-    #本地数据库
-    url: jdbc:mysql://10.193.131.31:3306/supersonic?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true&allowPublicKeyRetrieval=true
-    username: root
-    password: wJTB$f8pNs&&b78
-    driver-class-name: com.mysql.cj.jdbc.Driver

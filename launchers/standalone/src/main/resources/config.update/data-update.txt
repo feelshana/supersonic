@@ -1,4 +1,0 @@
-#20240123
-rm /tmp/InMemory.text2dsl_agent_collection
-#20240219
-rm /tmp/InMemory.meta_collection

@@ -54,6 +54,11 @@ public class MetricRepositoryImpl implements MetricRepository {
     }
 
     @Override
+    public void batchUpdateMetric(List<MetricDO> metricDOS) {
+        metricDOCustomMapper.batchUpdate(metricDOS);
+    }
+
+    @Override
     public void batchPublish(List<MetricDO> metricDOS) {
         metricDOCustomMapper.batchPublish(metricDOS);
     }
@@ -109,9 +114,9 @@ public class MetricRepositoryImpl implements MetricRepository {
         }
         if (StringUtils.isNotBlank(metricFilter.getKey())) {
             String key = metricFilter.getKey();
-            queryWrapper.lambda().like(MetricDO::getName, key).or().like(MetricDO::getBizName, key)
-                    .or().like(MetricDO::getDescription, key).or().like(MetricDO::getAlias, key)
-                    .or().like(MetricDO::getCreatedBy, key);
+            queryWrapper.lambda().and(wrapper -> wrapper.like(MetricDO::getName, key).or()
+                    .like(MetricDO::getBizName, key).or().like(MetricDO::getDescription, key).or()
+                    .like(MetricDO::getAlias, key).or().like(MetricDO::getCreatedBy, key));
         }
 
         return metricDOMapper.selectList(queryWrapper);

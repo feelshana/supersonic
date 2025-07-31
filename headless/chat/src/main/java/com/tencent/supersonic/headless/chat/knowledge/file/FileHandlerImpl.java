@@ -87,7 +87,7 @@ public class FileHandlerImpl implements FileHandler {
     }
 
     private PageInfo<DictValueResp> getDictValueRespPagWithKey(String fileName,
-            DictValueReq dictValueReq) {
+                                                               DictValueReq dictValueReq) {
         PageInfo<DictValueResp> dictValueRespPageInfo = new PageInfo<>();
         dictValueRespPageInfo.setPageSize(dictValueReq.getPageSize());
         dictValueRespPageInfo.setPageNum(dictValueReq.getCurrent());
@@ -96,7 +96,7 @@ public class FileHandlerImpl implements FileHandler {
         Integer startLine = 1;
         List<DictValueResp> dictValueRespList =
                 getFileData(filePath, startLine, fileLineNum.intValue()).stream().filter(
-                        dictValue -> dictValue.getValue().contains(dictValueReq.getKeyValue()))
+                                dictValue -> dictValue.getValue().contains(dictValueReq.getKeyValue()))
                         .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(dictValueRespList)) {
             dictValueRespPageInfo.setList(new ArrayList<>());
@@ -119,7 +119,7 @@ public class FileHandlerImpl implements FileHandler {
     }
 
     private PageInfo<DictValueResp> getDictValueRespPagWithoutKey(String fileName,
-            DictValueReq dictValueReq) {
+                                                                  DictValueReq dictValueReq) {
         PageInfo<DictValueResp> dictValueRespPageInfo = new PageInfo<>();
         String filePath = localFileConfig.getDictDirectoryLatest() + FILE_SPILT + fileName;
         Long fileLineNum = getFileLineNum(filePath);
@@ -176,6 +176,7 @@ public class FileHandlerImpl implements FileHandler {
     private DictValueResp convert2Resp(String lineStr) {
         DictValueResp dictValueResp = new DictValueResp();
         if (StringUtils.isNotEmpty(lineStr)) {
+            lineStr=StringUtils.stripStart(lineStr,null);
             String[] itemArray = lineStr.split("\\s+");
             if (Objects.nonNull(itemArray) && itemArray.length >= 3) {
                 dictValueResp.setValue(itemArray[0].replace("#", " "));

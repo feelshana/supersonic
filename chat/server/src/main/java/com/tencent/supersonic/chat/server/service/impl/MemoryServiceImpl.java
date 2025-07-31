@@ -26,7 +26,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -71,15 +70,15 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
                 MemoryStatus.ENABLED.toString().equals(chatMemoryDO.getStatus().trim());
 
         if (MemoryStatus.ENABLED.equals(chatMemoryUpdateReq.getStatus())) {
-//            只要启用，就用最新的Sql/Schema替代到向量库
+            // 只要启用，就用最新的Sql/Schema替代到向量库
             chatMemoryDO.setS2sql(chatMemoryUpdateReq.getS2sql());
             chatMemoryDO.setDbSchema(chatMemoryUpdateReq.getDbSchema());
             enableMemory(chatMemoryDO);
-        } else if ((MemoryStatus.DISABLED.equals(chatMemoryUpdateReq.getStatus())||MemoryStatus.PENDING.equals(chatMemoryUpdateReq.getStatus())) && hadEnabled) {
-//            从启动->禁用，启用->待定都从向量库删除
+        } else if ((MemoryStatus.DISABLED.equals(chatMemoryUpdateReq.getStatus())
+                || MemoryStatus.PENDING.equals(chatMemoryUpdateReq.getStatus())) && hadEnabled) {
+            // 从启动->禁用，启用->待定都从向量库删除
             disableMemory(chatMemoryDO);
         }
-
         LambdaUpdateWrapper<ChatMemoryDO> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(ChatMemoryDO::getId, chatMemoryDO.getId());
         if (Objects.nonNull(chatMemoryUpdateReq.getStatus())) {
@@ -114,6 +113,7 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
 
     /**
      * 点赞、点踩只处理正确、错误的管理员评判结果
+     * 
      * @param chatMemoryUpdateReq
      * @param user
      */
@@ -151,6 +151,14 @@ public class MemoryServiceImpl implements MemoryService, CommandLineRunner {
 
     @Override
     public void batchDelete(List<Long> ids) {
+        QueryWrapper<ChatMemoryDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().in(ChatMemoryDO::getId, ids);
+        List<ChatMemoryDO> chatMemoryDOS = chatMemoryRepository.getMemories(queryWrapper);
+        chatMemoryDOS.forEach(chatMemoryDO -> {
+            if (MemoryStatus.ENABLED.toString().equals(chatMemoryDO.getStatus().trim())) {
+                disableMemory(chatMemoryDO);
+            }
+        });
         chatMemoryRepository.batchDelete(ids);
     }
 

@@ -28,9 +28,13 @@ public interface DimensionService {
 
     DimensionResp createDimension(DimensionReq dimensionReq, User user) throws Exception;
 
+    void alterDimensionBatch(List<DimensionReq> dimensionReqs, Long modelId, User user) throws Exception;
+
     void createDimensionBatch(List<DimensionReq> dimensionReqs, User user) throws Exception;
 
     void updateDimension(DimensionReq dimensionReq, User user) throws Exception;
+
+    void updateDimensionBatch(List<DimensionReq> dimensionReqs, User user) throws Exception;
 
     PageInfo<DimensionResp> queryDimension(PageDimensionReq pageDimensionReq);
 
@@ -39,6 +43,8 @@ public interface DimensionService {
     void batchUpdateSensitiveLevel(MetaBatchReq metaBatchReq, User user);
 
     void deleteDimension(Long id, User user);
+
+    void deleteDimensionBatch(List<Long> idList, User user);
 
     List<DimensionResp> getDimensionInModelCluster(Long modelId);
 

@@ -17,5 +17,8 @@ public class SqlInfo implements Serializable {
     // SQL to be executed finally
     private String querySQL;
 
+    // Physical SQL corrected by LLM for performance optimization
+    private String correctedQuerySQL;
+
     private String resultType = "";
 }
