@@ -28,7 +28,8 @@ public interface DimensionService {
 
     DimensionResp createDimension(DimensionReq dimensionReq, User user) throws Exception;
 
-    void alterDimensionBatch(List<DimensionReq> dimensionReqs, Long modelId, User user) throws Exception;
+    void alterDimensionBatch(List<DimensionReq> dimensionReqs, Long modelId, User user)
+            throws Exception;
 
     void createDimensionBatch(List<DimensionReq> dimensionReqs, User user) throws Exception;
 
