@@ -57,18 +57,23 @@ public class NL2SQLParser implements ChatQueryParser {
     private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
 
     public static final String APP_KEY_MULTI_TURN = "REWRITE_MULTI_TURN";
-    private static final String REWRITE_MULTI_TURN_INSTRUCTION = ""
-            + "#Role: You are a data product manager experienced in data requirements."
-            + "#Task: Your will be provided with current and history questions asked by a user,"
-            + "along with their mapped schema elements(metric, dimension and value),"
-            + "please try understanding the semantics and rewrite a question." + "#Rules: "
-            + "1.ALWAYS keep relevant entities, metrics, dimensions, values and date ranges."
-            + "2.ONLY respond with the rewritten question."
-            + "#Current Question: {{current_question}}"
-            + "#Current Mapped Schema: {{current_schema}}"
-            + "#History Question: {{history_question}}"
-            + "#History Mapped Schema: {{history_schema}}" + "#History SQL: {{history_sql}}"
-            + "#Rewritten Question: ";
+    private static final String REWRITE_MULTI_TURN_INSTRUCTION = "# 角色\n" +
+            "咪咕数据平台数据分析师\n" +
+            "\n" +
+            "### 核心任务\n" +
+            "1. 分析「当前问题」与「历史问题」的语义关联性（历史问题按时间正序排列：问题1[最早], 问题2, ...）\n" +
+            "2. **仅当满足以下全部条件时改写问题**：\n" +
+            "   - 当前问题与某个历史问题主题高度一致\n" +
+            "    - 需要补充历史问题的关键信息才能完整回答\n" +
+            "3. **无关时直接返回原始问题**\n" +
+            "\n" +
+            "### 输入\n" +
+            "- 当前问题：{{current_question}}\n" +
+            "- 历史问题：{{history}}\n" +
+            "\n" +
+            "### 输出规则\n" +
+            "1. 必须且仅返回最终问题文本（无任何前缀/解释）  \n" +
+            "2. 拒绝改写时直接输出当前问题";
     // private static final String REWRITE_MULTI_TURN_INSTRUCTION = ""
     // +"根据历史问题对当前问题进行改写，只需替换关键维度，不要随意改写,生成一条最符合语意的问题"
     // + "#当前问题: {{current_question}}"
@@ -88,6 +93,9 @@ public class NL2SQLParser implements ChatQueryParser {
 
     @Override
     public void parse(ParseContext parseContext) {
+        // // 1.多轮对话改写，未解析出来数据时重写
+        rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),parseContext.getRequest().getQueryText());
+
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
@@ -157,8 +165,7 @@ public class NL2SQLParser implements ChatQueryParser {
                     : parseContext.getResponse().getSelectedParses().get(0));
             parseContext.setResponse(new ChatParseResp(parseContext.getResponse().getQueryId()));
 
-            // // 1.多轮对话改写，未解析出来数据时重写
-            rewriteMultiTurn(parseContext, queryNLReq);
+
 
             // // 2.fowShot召回，召唤记忆中启用的，RAG向量库中召回
             addDynamicExemplars(parseContext, queryNLReq);
@@ -185,24 +192,24 @@ public class NL2SQLParser implements ChatQueryParser {
         resp.setErrorMsg(parseResp.getErrorMsg());
     }
 
-    public void rewriteMultiTurn(ParseContext parseContext, QueryNLReq queryNLReq) {
+    public void rewriteMultiTurn(ParseContext parseContext, Integer agentId,String queryText) {
         ChatApp chatApp = parseContext.getAgent().getChatAppConfig().get(APP_KEY_MULTI_TURN);
         RecommendedQuestionsService recommendedQuestionsService =
                 ContextUtils.getBean(RecommendedQuestionsService.class);
         boolean isRecommendQuestion = recommendedQuestionsService.findQuerySqlByQuestion(
-                Math.toIntExact(queryNLReq.getAgentId()), queryNLReq.getQueryText()) != null;
+                Math.toIntExact(agentId), queryText) != null;
         // 示例问题
         AgentService agentService = ContextUtils.getBean(AgentService.class);
         List<String> examples =
                 agentService.getAgent(parseContext.getRequest().getAgentId()).getExamples();
         if (Objects.isNull(chatApp) || !chatApp.isEnable() || isRecommendQuestion
-                || examples.contains(queryNLReq.getQueryText())) {
+                || examples.contains(queryText)) {
             return;
         }
 
         // derive mapping result of current question and parsing result of last question.
         ChatLayerService chatLayerService = ContextUtils.getBean(ChatLayerService.class);
-        MapResp currentMapResult = chatLayerService.map(queryNLReq);
+//        MapResp currentMapResult = chatLayerService.map(queryNLReq);
 
         List<QueryResp> historyQueries =
                 getHistoryQueries(parseContext.getRequest().getUser().getName(),
@@ -210,46 +217,14 @@ public class NL2SQLParser implements ChatQueryParser {
         if (historyQueries.isEmpty()) {
             return;
         }
-        Long dataId = queryNLReq.getDataSetIds().stream().findFirst().get();
-        String curtMapStr =
-                generateSchemaPrompt(currentMapResult.getMapInfo().getMatchedElements(dataId));
-        List<HistoryQuery> historyQueryList = new ArrayList<>();
         ParserConfig parserConfig = ContextUtils.getBean(ParserConfig.class);
-        historyQueries.forEach(hq -> {
-            SemanticParseInfo lastParseInfo = hq.getParseInfos().get(0);
-            String histMapStr = generateSchemaPrompt(lastParseInfo.getElementMatches());
-            String histSQL = lastParseInfo.getSqlInfo().getCorrectedS2SQL();
-            List<Map<String, Object>> results = hq.getQueryResult().getQueryResults();
-            if (!CollectionUtils.isEmpty(results)) {
-                results = results.subList(0,
-                        Math.min(Integer.parseInt(parserConfig.getParameterValue(CHAT_HISTORY_NUM)),
-                                results.size()));
-            } else {
-                results = new ArrayList<>();
-            }
+        List<String> historyQueryList = historyQueries.subList(0,
+                Math.min(Integer.parseInt(parserConfig.getParameterValue(CHAT_HISTORY_NUM)),
+                        historyQueries.size())).stream().map(queryResp -> queryResp.getQueryText()).collect(Collectors.toUnmodifiableList());
 
-            // String histQuestion = hq.getQueryText();
-            String histQuestion = "";
-            try {
-                Map<String, Object> sqlExemplarMap =
-                        JsonUtil.objectToMap(lastParseInfo.getProperties().get("sql_exemplar"));
-                histQuestion = sqlExemplarMap.get("question").toString();
-            } catch (Exception e) {
-                log.error("REWRITE_MULTI_TURN error: {}", e);
-            }
-            if (StringUtils.isBlank(histQuestion)) {
-                return;
-            }
-            NL2SQLParser.HistoryQuery historyQuery = new HistoryQuery(histSQL, histQuestion,
-                    histMapStr, StringUtils.join(results, ","));
-            historyQueryList.add(historyQuery);
-        });
         if (CollectionUtils.isEmpty(historyQueryList)) {
             return;
         }
-        String history_question = historyQueryList.stream().map(historyQuery -> {
-            return historyQuery.getQuestion();
-        }).collect(Collectors.joining("||"));
         // 指令：请根据语义理解并重写问题。
         // 规则：
         // 1. 始终保持相关的实体、指标、维度、值和日期范围不变。
@@ -270,19 +245,9 @@ public class NL2SQLParser implements ChatQueryParser {
         // - 历史数据：{{history}}
         //
         // 改写后的问题：
-        List<Object> historyList = new ArrayList<>();
         Map<String, Object> variables = new HashMap<>();
-        variables.put("current_question", currentMapResult.getQueryText());
-        variables.put("current_schema", curtMapStr);
-        for (HistoryQuery list : historyQueryList) {
-            Map<String, Object> historyMap = new HashMap<>();
-            historyMap.put("history_question", list.getQuestion());
-            historyMap.put("history_schema", list.getSchema());
-            historyMap.put("history_sql", list.sql);
-            historyMap.put("history_query_results", list.queryResults);
-            historyList.add(historyMap);
-        }
-        variables.put("history", historyList);
+        variables.put("current_question", queryText);
+        variables.put("history", String.join(",",historyQueryList.reversed()));
         String st = "规则补充：只返回生成的结果，不需要返回推理过程";
         Prompt prompt = PromptTemplate.from(chatApp.getPrompt() + st).apply(variables);
         ChatLanguageModel chatLanguageModel =
@@ -291,102 +256,10 @@ public class NL2SQLParser implements ChatQueryParser {
         String rewrittenQuery = response.content().text();
         keyPipelineLog.info("QueryRewrite modelReq:\n{} \nmodelResp:\n{}", prompt.text(), response);
         parseContext.getRequest().setQueryText(rewrittenQuery);
-        queryNLReq.setQueryText(rewrittenQuery);
-        log.info("Last Querys: {} Current Query: {}, Rewritten Query: {}", history_question,
-                currentMapResult.getQueryText(), rewrittenQuery);
-        if (StringUtils.isNotBlank(rewrittenQuery)) {
-            parseContext.getRequest().setQueryText(rewrittenQuery);
-            queryNLReq.setQueryText(rewrittenQuery);
-        }
+        log.info(" Current Query: {}, Rewritten Query: {}",
+                queryText, rewrittenQuery);
     }
 
-    public void rewriteMultiTurnNew(ParseContext parseContext, QueryNLReq queryNLReq) {
-        // ChatApp chatApp = ChatAppManager.getApp(APP_KEY_MULTI_TURN).get();
-        ChatApp chatApp = parseContext.getAgent().getChatAppConfig().get(APP_KEY_MULTI_TURN);
-        RecommendedQuestionsService recommendedQuestionsService =
-                ContextUtils.getBean(RecommendedQuestionsService.class);
-        boolean isRecommendQuestion = recommendedQuestionsService.findQuerySqlByQuestion(
-                Math.toIntExact(queryNLReq.getAgentId()), queryNLReq.getQueryText()) != null;
-        if (Objects.isNull(chatApp) || !chatApp.isEnable() || isRecommendQuestion) {
-            return;
-        }
-
-        // List<QueryResp> historyQueries =
-        // getHistoryQueries(parseContext.getRequest().getUser().getName(),
-        // parseContext.getRequest().getChatId());
-        // if (historyQueries.isEmpty()) {
-        // return;
-        // }
-        // String history_question = historyQueries.stream().map(historyQuery -> {
-        // return historyQuery.getQueryText();
-        // }).collect(Collectors.joining("||"));
-        // Map<String, Object> variables = new HashMap<>();
-        // variables.put("current_question", parseContext.getRequest().getQueryText());
-        // variables.put("history_question", history_question);
-        //
-
-        // derive mapping result of current question and parsing result of last question.
-        ChatLayerService chatLayerService = ContextUtils.getBean(ChatLayerService.class);
-        MapResp currentMapResult = chatLayerService.map(queryNLReq);
-
-        List<QueryResp> historyQueries =
-                getHistoryQueries(parseContext.getRequest().getUser().getName(),
-                        parseContext.getRequest().getChatId());
-        if (historyQueries.isEmpty()) {
-            return;
-        }
-        Long dataId = queryNLReq.getDataSetIds().stream().findFirst().get();
-        String curtMapStr =
-                generateSchemaPrompt(currentMapResult.getMapInfo().getMatchedElements(dataId));
-        List<HistoryQuery> historyQueryList = new ArrayList<>();
-        historyQueries.forEach(hq -> {
-            SemanticParseInfo lastParseInfo = hq.getParseInfos().get(0);
-            String histMapStr = generateSchemaPrompt(lastParseInfo.getElementMatches());
-            String histSQL = lastParseInfo.getSqlInfo().getCorrectedS2SQL();
-            List<Map<String, Object>> aa = hq.getQueryResult().getQueryResults();
-            String histQuestion = hq.getQueryText();
-            NL2SQLParser.HistoryQuery historyQuery = new HistoryQuery(histSQL, histQuestion,
-                    histMapStr, StringUtils.join(hq.getQueryResult().getQueryResults(), ","));
-            historyQueryList.add(historyQuery);
-        });
-        String history_question = historyQueryList.stream().map(historyQuery -> {
-            return historyQuery.getQuestion();
-        }).collect(Collectors.joining("||"));
-        String history_schema = historyQueryList.stream().map(historyQuery -> {
-            return historyQuery.getSchema();
-        }).collect(Collectors.joining("||"));
-        String history_sql = historyQueryList.stream().map(historyQuery -> {
-            return historyQuery.getSql();
-        }).collect(Collectors.joining("||"));
-
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("current_question", currentMapResult.getQueryText());
-        variables.put("current_schema", curtMapStr);
-        variables.put("history_question", history_question);
-        variables.put("history_schema", history_schema);
-        variables.put("history_sql", history_sql);
-
-        Prompt prompt = PromptTemplate.from(chatApp.getPrompt()).apply(variables);
-        ChatLanguageModel chatLanguageModel =
-                ModelProvider.getChatModel(ModelConfigHelper.getChatModelConfig(chatApp));
-
-        Response<AiMessage> response = chatLanguageModel.generate(prompt.toUserMessage());
-        String rewrittenQuery = response.content().text();
-        keyPipelineLog.info("QueryRewrite modelReq:\n{} \nmodelResp:\n{}", prompt.text(), response);
-        log.info("Last Querys: {} Current Query: {}, Rewritten Query: {}", history_question,
-                parseContext.getRequest().getQueryText(), rewrittenQuery);
-
-        if (StringUtils.isNotBlank(rewrittenQuery)) {
-            parseContext.getRequest().setQueryText(rewrittenQuery);
-            queryNLReq.setQueryText(rewrittenQuery);
-            ChatManageService chatManageService = ContextUtils.getBean(ChatManageService.class);
-            ChatQueryDO chatQueryDO = new ChatQueryDO();
-            chatQueryDO.setQuestionId(parseContext.getRequest().getQueryId());
-            chatQueryDO.setQueryText(rewrittenQuery);
-            chatManageService.updateQuery(chatQueryDO);
-        }
-
-    }
 
 
 
@@ -454,25 +327,9 @@ public class NL2SQLParser implements ChatQueryParser {
     }
 
     public static class HistoryQuery {
-        String sql;
         String question;
-        String schema;
-        String queryResults;
 
-        public HistoryQuery(String sql, String question, String schema, String queryResults) {
-            this.sql = sql;
-            this.question = question;
-            this.schema = schema;
-            this.queryResults = queryResults;
-        }
 
-        public String getSql() {
-            return sql;
-        }
-
-        public void setSql(String sql) {
-            this.sql = sql;
-        }
 
         public String getQuestion() {
             return question;
@@ -482,20 +339,5 @@ public class NL2SQLParser implements ChatQueryParser {
             this.question = question;
         }
 
-        public String getSchema() {
-            return schema;
-        }
-
-        public void setSchema(String schema) {
-            this.schema = schema;
-        }
-
-        public String getQueryResults() {
-            return queryResults;
-        }
-
-        public void setQueryResults(String queryResults) {
-            this.queryResults = queryResults;
-        }
     }
 }
