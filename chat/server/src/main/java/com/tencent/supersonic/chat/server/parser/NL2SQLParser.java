@@ -109,20 +109,43 @@ public class NL2SQLParser implements ChatQueryParser {
                     queryNLReq.setMapModeEnum(mode);
                     doParse(queryNLReq, parseResp);
                 }
-                Integer valueSize = 0;
+                // Integer valueSize = 0;
+                // if (!parseResp.getSelectedParses().isEmpty()) {
+                // valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
+                // .filter(schemaElementMatch -> schemaElementMatch.getElement()
+                // .getType() == SchemaElementType.VALUE)
+                // .collect(Collectors.toList()).size();
+                // }
+                // if ((parseResp.getSelectedParses().isEmpty() && candidateParses.isEmpty())
+                // || valueSize == 0) {
+                // queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
+                // doParse(queryNLReq, parseResp);
+                //
+                // }
+                List<SchemaElementMatch> keyWordsValues = new ArrayList<>();
                 if (!parseResp.getSelectedParses().isEmpty()) {
-                    valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
-                            .filter(schemaElementMatch -> schemaElementMatch.getElement()
+                    keyWordsValues = parseResp.getSelectedParses().getFirst().getElementMatches()
+                            .stream().filter(schemaElementMatch -> schemaElementMatch.getElement()
                                     .getType() == SchemaElementType.VALUE)
-                            .collect(Collectors.toList()).size();
+                            .toList();
+                    parseResp.getSelectedParses().clear();
                 }
-                if ((parseResp.getSelectedParses().isEmpty() && candidateParses.isEmpty())
-                        || valueSize == 0) {
-                    queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
-                    doParse(queryNLReq, parseResp);
-
+                keyPipelineLog.info("严格+适中模式映射到了value类型的keyWordsValues数量: {}",
+                        keyWordsValues.size());
+                queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
+                doParse(queryNLReq, parseResp);
+                if (!CollectionUtils.isEmpty(keyWordsValues)) {
+                    keyPipelineLog.info("严格+适中模式映射到的keyWordsValues为: {}", keyWordsValues);
+                    Set<SchemaElementMatch> uniqueElements = new HashSet<>(
+                            parseResp.getSelectedParses().getFirst().getElementMatches());
+                    keyPipelineLog.info("宽松模式映射到的ElementMatches数量: {}", uniqueElements.size());
+                    uniqueElements.addAll(keyWordsValues);
+                    keyPipelineLog.info("宽松模式下合并keyWordsValues后的ElementMatches数量: {}",
+                            uniqueElements.size());
+                    parseResp.getSelectedParses().getFirst().getElementMatches().clear();
+                    parseResp.getSelectedParses().getFirst().getElementMatches()
+                            .addAll(uniqueElements);
                 }
-
                 if (parseResp.getSelectedParses().isEmpty()) {
                     errMsg.append(parseResp.getErrorMsg());
                     continue;
