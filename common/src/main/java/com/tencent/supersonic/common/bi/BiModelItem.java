@@ -20,5 +20,5 @@ public class BiModelItem {
     private String description;
     private String databaseTableColumnName;
     private Integer type;
-    private String isDict;
+    private String aggregationType;
 }

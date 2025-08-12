@@ -6,6 +6,7 @@ public enum StatusEnum {
     OFFLINE("OFFLINE", 2),
     DELETED("DELETED", 3),
     UNAVAILABLE("UNAVAILABLE", 4),
+    LOCKED("LOCKED", 99),
     UNKNOWN("UNKNOWN", -1);
 
     private String status;

@@ -60,4 +60,6 @@ public interface DimensionService {
     DataEvent getAllDataEvents();
 
     Boolean updateDimValueAlias(DimValueAliasReq req, User user);
+
+    Boolean updateDimValueAliasBatch(Long dimId, List<DimValueMap> valueMaps, User user);
 }

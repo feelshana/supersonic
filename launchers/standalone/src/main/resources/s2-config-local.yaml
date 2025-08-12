@@ -30,7 +30,7 @@ s2:
   authentication:
     enable: true
     exclude:
-      path: /api/auth/user/register,/api/auth/user/login,/api/chat/agent/hasAgentRight,/inner/api/*
+      path: /api/auth/user/register,/api/auth/user/login,/api/chat/agent/hasAgentRight,/private/api/*
     token:
       http:
         header:
@@ -77,9 +77,10 @@ s2:
     database:
       name: "supersonic"
 
-    #BI智能报表
-    bi:
-      model-id: 5
+  #BI智能报表
+  bi:
+    model-id: 5
+    url: http://10.193.131.27:7888
 
 crab:
   api:

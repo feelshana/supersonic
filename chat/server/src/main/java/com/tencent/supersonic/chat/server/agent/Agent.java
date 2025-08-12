@@ -42,6 +42,7 @@ public class Agent extends RecordInfo {
     private List<String> adminOrgs = Lists.newArrayList();
     private List<String> viewOrgs = Lists.newArrayList();
     private Integer isOpen = 0;
+    private Integer isBi = 0;
 
     public List<String> getTools(AgentToolType type) {
         Map<String, Object> map = JSONObject.parseObject(toolConfig, Map.class);

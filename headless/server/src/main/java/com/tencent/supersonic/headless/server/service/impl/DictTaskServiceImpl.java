@@ -77,6 +77,9 @@ public class DictTaskServiceImpl implements DictTaskService {
             return 0L;
         }
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
+        if (dictItemResp.getLocked() == 1) {
+            return 0L;
+        }
         return handleDictTaskByItemResp(dictItemResp, user);
     }
 
@@ -199,7 +202,7 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (!dictFlushDailyEnable) {
             log.info("dictFlushDailyEnable is false, now finish dailyDictTask");
         }
-        DictItemFilter filter = DictItemFilter.builder().status(StatusEnum.ONLINE).build();
+        DictItemFilter filter = DictItemFilter.builder().status(StatusEnum.ONLINE).locked(0).build();
         List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(filter);
         dictItemRespList.stream().forEach(item -> handleDictTaskByItemResp(item, null));
         log.info("[dailyDictTask] finish");
@@ -340,5 +343,31 @@ public class DictTaskServiceImpl implements DictTaskService {
                 dictValueReq.getType().name(), dictValueReq.getItemId()) + Constants.DOT
                 + dictFileType;
         return fileHandler.queryDictFilePath(fileName);
+    }
+    
+    @Override
+    public void importDictData(DictItemResp dictItemResp, List<String> data, User user) {
+        // Change dictionary file
+        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+        fileHandler.writeFile(data, fileName, false);
+
+        // Change in-memory dictionary data in real time
+        try {
+            dictWordService.loadDictWord();
+        } catch (Exception e) {
+            log.error("reloadCustomDictionary error", e);
+        }
+        if (!data.isEmpty() && user != null) {
+            // 维度值存向量库
+            List<DimensionValueDO> dimensionValueDOS;
+            dimensionValueDOS = data.stream().map(this::convert2DimValueDO)
+                    .filter(line -> Objects.nonNull(line)).toList();
+            dimensionValueDOS.forEach(dimensionValueDO -> {
+                dimensionValueDO.setDimBizName(dictItemResp.getBizName());
+                dimensionValueDO.setModelId(dictItemResp.getModelId());
+                dimensionValueDO.setDimId(dictItemResp.getItemId());
+            });
+            dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
+        }
     }
 }
