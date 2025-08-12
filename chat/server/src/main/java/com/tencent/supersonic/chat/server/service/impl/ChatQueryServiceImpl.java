@@ -313,7 +313,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             // 遍历 chatQueryParsers，找到 NL2SQLParser 并调用 rewriteQuery 方法
             for (ChatQueryParser parser : chatQueryParsers) {
                 if (parser instanceof NL2SQLParser) {
-                    ((NL2SQLParser) parser).rewriteMultiTurn(parseContext, queryNLReq);
+                    ((NL2SQLParser) parser).rewriteMultiTurn(parseContext, parseContext.getAgent().getId(), parseContext.getRequest().getQueryText());
                     // 更新 chatParseReq 中的问题文本为改写后的文本
                     chatParseReq.setQueryText(queryNLReq.getQueryText());
                     break;
