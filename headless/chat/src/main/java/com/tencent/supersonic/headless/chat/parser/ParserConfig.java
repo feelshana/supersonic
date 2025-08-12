@@ -65,6 +65,10 @@ public class ParserConfig extends ParameterConfig {
                     "多轮对话时的会话上线下文持续时间秒", "number", "语义解析配置");
 
 
+    public static final Parameter PARSER_FORMAT_JSON_TYPE =
+            new Parameter("s2.parser.format.json-type", "", "请求llm返回json格式,默认不设置json格式",
+                    "选项：json_schema或者json_object", "string", "语义解析配置");
+
     @Override
     public List<Parameter> getSysParameters() {
         return Lists.newArrayList(PARSER_LINKING_VALUE_ENABLE, PARSER_RULE_CORRECTOR_ENABLE,

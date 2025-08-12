@@ -51,7 +51,7 @@ public class KeywordMapper extends BaseMapper {
     }
 
     private void convertMapResultToMapInfo(List<HanlpMapResult> mapResults,
-                                           ChatQueryContext chatQueryContext, List<S2Term> terms) {
+            ChatQueryContext chatQueryContext, List<S2Term> terms) {
         if (CollectionUtils.isEmpty(mapResults)) {
             return;
         }
@@ -88,7 +88,8 @@ public class KeywordMapper extends BaseMapper {
                         .similarity(hanlpMapResult.getSimilarity())
                         .detectWord(hanlpMapResult.getDetectWord()).build();
                 // doDimValueAliasLogic 将维度值别名进行替换成真实维度值
-                doDimValueAliasLogic(schemaElementMatch,chatQueryContext.getSemanticSchema().getDimensionValues());
+                doDimValueAliasLogic(schemaElementMatch,
+                        chatQueryContext.getSemanticSchema().getDimensionValues());
                 addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
             }
         }
@@ -182,7 +183,7 @@ public class KeywordMapper extends BaseMapper {
     // }
 
     private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch,
-                                      List<SchemaElement> dimensionValues) {
+            List<SchemaElement> dimensionValues) {
         SchemaElement element = schemaElementMatch.getElement();
         if (SchemaElementType.VALUE.equals(element.getType())) {
             Long dimId = element.getId();
@@ -214,7 +215,7 @@ public class KeywordMapper extends BaseMapper {
     }
 
     private void convertMapResultToMapInfo(ChatQueryContext chatQueryContext,
-                                           List<DatabaseMapResult> mapResults) {
+            List<DatabaseMapResult> mapResults) {
         for (DatabaseMapResult match : mapResults) {
             SchemaElement schemaElement = match.getSchemaElement();
             Set<Long> regElementSet =
@@ -241,8 +242,8 @@ public class KeywordMapper extends BaseMapper {
             return new HashSet<>();
         }
         return elements.stream().filter(
-                        elementMatch -> SchemaElementType.METRIC.equals(elementMatch.getElement().getType())
-                                || SchemaElementType.DIMENSION.equals(elementMatch.getElement().getType()))
+                elementMatch -> SchemaElementType.METRIC.equals(elementMatch.getElement().getType())
+                        || SchemaElementType.DIMENSION.equals(elementMatch.getElement().getType()))
                 .map(elementMatch -> elementMatch.getElement().getId()).collect(Collectors.toSet());
     }
 }
