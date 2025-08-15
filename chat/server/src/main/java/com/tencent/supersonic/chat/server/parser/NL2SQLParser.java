@@ -54,7 +54,7 @@ import static dev.langchain4j.data.message.UserMessage.userMessage;
 @Slf4j
 public class NL2SQLParser implements ChatQueryParser {
 
-    private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
+    private static final Logger logger = LoggerFactory.getLogger(NL2SQLParser.class);
 
     public static final String APP_KEY_MULTI_TURN = "REWRITE_MULTI_TURN";
     private static final String REWRITE_MULTI_TURN_INSTRUCTION = "# 角色\n" +
@@ -112,11 +112,11 @@ public class NL2SQLParser implements ChatQueryParser {
             for (Long datasetId : requestedDatasets) {
                 queryNLReq.setDataSetIds(Collections.singleton(datasetId));
                 ChatParseResp parseResp = new ChatParseResp(parseContext.getRequest().getQueryId());
-                for (MapModeEnum mode : Lists.newArrayList(MapModeEnum.STRICT,
-                        MapModeEnum.MODERATE)) {
-                    queryNLReq.setMapModeEnum(mode);
-                    doParse(queryNLReq, parseResp);
-                }
+//                for (MapModeEnum mode : Lists.newArrayList(MapModeEnum.STRICT,
+//                        MapModeEnum.MODERATE)) {
+//                    queryNLReq.setMapModeEnum(mode);
+//                    doParse(queryNLReq, parseResp);
+//                }
                 // Integer valueSize = 0;
                 // if (!parseResp.getSelectedParses().isEmpty()) {
                 // valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
@@ -130,25 +130,41 @@ public class NL2SQLParser implements ChatQueryParser {
                 // doParse(queryNLReq, parseResp);
                 //
                 // }
+                queryNLReq.setMapModeEnum(MapModeEnum.MODERATE);
+                doParse(queryNLReq, parseResp);
                 List<SchemaElementMatch> keyWordsValues = new ArrayList<>();
                 if (!parseResp.getSelectedParses().isEmpty()) {
                     keyWordsValues = parseResp.getSelectedParses().getFirst().getElementMatches()
                             .stream().filter(schemaElementMatch -> schemaElementMatch.getElement()
-                                    .getType() == SchemaElementType.VALUE)
+                                    .getType() == SchemaElementType.VALUE || schemaElementMatch.getElement().getType() == SchemaElementType.TERM)
                             .toList();
                     parseResp.getSelectedParses().clear();
                 }
-                keyPipelineLog.info("严格+适中模式映射到了value类型的keyWordsValues数量: {}",
+                logger.info("适中模式映射到了value类型的keyWordsValues数量: {}",
                         keyWordsValues.size());
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
                 if (!CollectionUtils.isEmpty(keyWordsValues)) {
-                    keyPipelineLog.info("严格+适中模式映射到的keyWordsValues为: {}", keyWordsValues);
-                    Set<SchemaElementMatch> uniqueElements = new HashSet<>(
-                            parseResp.getSelectedParses().getFirst().getElementMatches());
-                    keyPipelineLog.info("宽松模式映射到的ElementMatches数量: {}", uniqueElements.size());
+                    logger.info("适中模式映射到的keyWordsValues为: {}", keyWordsValues);
+                    List<SchemaElementMatch> looseElementMatches = parseResp.getSelectedParses().getFirst().getElementMatches();
+                    Set<SchemaElementMatch> uniqueElements = new LinkedHashSet<>();
+                    logger.info("宽松模式映射到的ElementMatches数量: {}", looseElementMatches.size());
+
+                    // 移除非value类型和term类型的元素
+                    looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
+                            .getType() != SchemaElementType.VALUE && schemaElementMatch.getElement().getType() != SchemaElementType.TERM);
+                    // 移除重复的元素
+                    Iterator<SchemaElementMatch> iterator = looseElementMatches.iterator();
+                    while (iterator.hasNext()) {
+                        SchemaElementMatch looseElementMatch = iterator.next();
+                        if (isDuplicate(looseElementMatch, keyWordsValues)) {
+                            iterator.remove();
+                        }
+                    }
+//                    uniqueElements.removeIf(schemaElementMatch -> uniqueElements.contains(schemaElementMatch));
                     uniqueElements.addAll(keyWordsValues);
-                    keyPipelineLog.info("宽松模式下合并keyWordsValues后的ElementMatches数量: {}",
+                    uniqueElements.addAll(looseElementMatches);
+                    logger.info("宽松模式下合并keyWordsValues后的ElementMatches数量: {}",
                             uniqueElements.size());
                     parseResp.getSelectedParses().getFirst().getElementMatches().clear();
                     parseResp.getSelectedParses().getFirst().getElementMatches()
@@ -202,6 +218,15 @@ public class NL2SQLParser implements ChatQueryParser {
                 doParse(queryNLReq, parseContext.getResponse());
             }
         }
+    }
+
+    private boolean isDuplicate(SchemaElementMatch element, List<SchemaElementMatch> elementsToCompare) {
+        return elementsToCompare.stream().anyMatch(e ->
+                element.getWord().equals(e.getWord())
+                        && element.getElement().getName().equals(e.getElement().getName())
+                        && element.getElement().getBizName().equals(e.getElement().getBizName())
+                        && element.getElement().getType().equals(e.getElement().getType())
+        );
     }
 
     private void doParse(QueryNLReq req, ChatParseResp resp) {
@@ -277,7 +302,7 @@ public class NL2SQLParser implements ChatQueryParser {
                 ModelProvider.getChatModel(ModelConfigHelper.getChatModelConfig(chatApp));
         Response<AiMessage> response = chatLanguageModel.generate(prompt.toUserMessage());
         String rewrittenQuery = response.content().text();
-        keyPipelineLog.info("QueryRewrite modelReq:\n{} \nmodelResp:\n{}", prompt.text(), response);
+//        logger.info("QueryRewrite modelReq:\n{} \nmodelResp:\n{}", prompt.text(), response);
         parseContext.getRequest().setQueryText(rewrittenQuery);
         log.info(" Current Query: {}, Rewritten Query: {}",
                 queryText, rewrittenQuery);
