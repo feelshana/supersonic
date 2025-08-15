@@ -55,12 +55,12 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
     public static final String INSTRUCTION = "#角色：你是一位精通SQL语言的数据分析师\n" +
             "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" +
             "#规则：\n" +
-            "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表根据通过向量匹配到的维度值，请自行判断选择其中的一个或者多个值作为查询条件\n" +
+            "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表系统通过向量匹配到的可选维度值列表，供参考，请根据问题内容，选择其中的一个或者多个值作为查询条件\n" +
             "2.SQL语句中查询的列名必须严格引用Schema中的Dimensions和Metrics中字段名，禁止任意改造字段\n" +
             "3.时间范围必须使用>/</>=/<=运算符显式声明\n" +
             "4.别名使用中文\n" +
             "#Exemplars: {{exemplar}}\n" +
-            "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}\n";
+            "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
 
     @Autowired
     private ParserConfig parserConfig;
