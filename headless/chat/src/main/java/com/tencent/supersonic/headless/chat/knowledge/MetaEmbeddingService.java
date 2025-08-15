@@ -42,6 +42,8 @@ public class MetaEmbeddingService {
                     allModels.stream().map(modelId -> modelId + DictWordType.NATURE_SPILT)
                             .collect(Collectors.toList()));
             retrieveQuery.setFilterCondition(filterCondition);
+//            只召回维度值。维度/指标全部给大模型
+            filterCondition.put("type","VALUE");
         }
 
         String collectionName = embeddingConfig.getMetaCollectionName();

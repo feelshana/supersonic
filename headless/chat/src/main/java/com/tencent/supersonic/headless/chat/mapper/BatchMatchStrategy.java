@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.mapper;
 
 import com.alibaba.fastjson.JSON;
 import com.tencent.supersonic.common.pojo.ChatApp;
+import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
@@ -26,9 +27,9 @@ import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
     public static final String LLM_WORDS_SEGMENT_PROMPT =
-            "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "提取其中的维度/指标/维度值"
-                    + "每个词汇或短语应当能够作为搜索数据中台内对应指标名称/维度名词/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？"
-                    + "输出格式应为json数据格式，只输出json数组，不要输出其他内容，输出格式示例：[\"国色芳华\",\"播放次数\"]\n"
+            "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "，提取其中的维度/指标/维度值"
+                    + "每个词汇或短语能够作为指标/维度/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？"
+                    + "输出格式应为多个词语字符串，用英文逗号分隔，不要输出其他内容，输出格式示例：国色芳华,播放次数"
                     + "输入问题为:{{text}}";
 
     @Autowired
@@ -68,12 +69,14 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         variable.put("text", text);
 
         ChatApp chatApp = request.getChatAppConfig().get(OnePassSCSqlGenStrategy.APP_KEY);
+
         Prompt prompt = PromptTemplate.from(LLM_WORDS_SEGMENT_PROMPT).apply(variable);
+        ChatModelConfig chatModelConfig = chatApp.getChatModelConfig();
         ChatLanguageModel chatLanguageModel =
-                ModelProvider.getChatModel(chatApp.getChatModelConfig());
+                ModelProvider.getChatModel(chatModelConfig);
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
-            List<String> words = JSON.parseArray(response, String.class);
+            List<String> words = Arrays.stream(response.split(",")).toList();
             detectSegments.addAll(words);
 
         }
