@@ -151,14 +151,18 @@ public class NL2SQLParser implements ChatQueryParser {
                     List<SchemaElementMatch> looseElementMatches =
                             parseResp.getSelectedParses().getFirst().getElementMatches();
                     Set<SchemaElementMatch> uniqueElements = new LinkedHashSet<>();
-                    logger.info("宽松模式映射到的ElementMatches数量: {}", looseElementMatches.size());
+                    StringBuilder looseMatchesInfo = new StringBuilder();
                     for (SchemaElementMatch matchResult : looseElementMatches) {
-                        log.info(
-                                "宽松模式映射到的ElementMatche DetectWord=[{}],Word=[{}],similarity=[{}],dim_name=[{}],type=[{}]",
-                                matchResult.getDetectWord(), matchResult.getWord(),
-                                matchResult.getSimilarity(), matchResult.getElement().getName(),
-                                matchResult.getElement().getType());
+                        looseMatchesInfo.append(String.format(
+                                "DetectWord=[%s],Word=[%s],similarity=[%s]; ",
+                                matchResult.getDetectWord(),
+                                matchResult.getWord(),
+                                matchResult.getSimilarity()
+                        ));
                     }
+                    logger.info("宽松模式映射到的ElementMatches数量有 {} 个，分别是：{}",
+                            looseElementMatches.size(),
+                            looseMatchesInfo.toString().trim());
 
                     // 移除非value类型和term类型的元素
                     looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch
@@ -176,15 +180,18 @@ public class NL2SQLParser implements ChatQueryParser {
                     // uniqueElements.contains(schemaElementMatch));
                     uniqueElements.addAll(keyWordsValues);
                     uniqueElements.addAll(looseElementMatches);
-                    logger.info("宽松模式下合并keyWordsValues后的ElementMatches数量: {}",
-                            uniqueElements.size());
+                    StringBuilder matchesInfo = new StringBuilder();
                     for (SchemaElementMatch matchResult : uniqueElements) {
-                        log.info(
-                                "合并后的ElementMatche DetectWord=[{}],Word=[{}],similarity=[{}],dim_name=[{}],type=[{}]",
-                                matchResult.getDetectWord(), matchResult.getWord(),
-                                matchResult.getSimilarity(), matchResult.getElement().getName(),
-                                matchResult.getElement().getType());
+                        matchesInfo.append(String.format(
+                                "DetectWord=[%s],Word=[%s],similarity=[%s]; ",
+                                matchResult.getDetectWord(),
+                                matchResult.getWord(),
+                                matchResult.getSimilarity()
+                        ));
                     }
+                    logger.info("宽松模式下合并keyWordsValues后的ElementMatches数量有 {} 个，分别是：{}",
+                            uniqueElements.size(),
+                            matchesInfo.toString().trim());
                     parseResp.getSelectedParses().getFirst().getElementMatches().clear();
                     parseResp.getSelectedParses().getFirst().getElementMatches()
                             .addAll(uniqueElements);
