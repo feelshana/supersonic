@@ -38,13 +38,13 @@ public class DataInterpretProcessor implements ExecuteResultProcessor {
     private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
 
     public static final String APP_KEY = "DATA_INTERPRETER";
-    private static final String INSTRUCTION = ""
-            + "#Role: You are a data expert who communicates with business users everyday."
-            + "\n#Task: Your will be provided with a question asked by a user and the relevant "
-            + "result data queried from the databases, please interpret the data and organize a brief answer."
-            + "\n#Rules: " + "\n1.ALWAYS respond in the use the same language as the `#Question`."
-            + "\n2.ALWAYS reference some key data in the `#Answer`."
-            + "\n#Question:{{question}} #Data:{{data}} #Answer:";
+    private static final String INSTRUCTION = "#角色：您是一位每天与业务用户沟通的数据专家。\n" +
+            "#任务：您将收到用户提出的问题以及从数据库查询的相关结果数据，请解读数据并整理出简要回答。\n" +
+            "#规则：\n" +
+            "1.回答必须使用与#question相同的语言。\n" +
+            "2.回答必须引用#data中的关键数据点。\n"+
+            "3.如果#data中明确表明问题与当前知识范畴无关，那么#Answer原样返回#data。\n"+
+            "#Question:{{question}} #Data:{{data}} #Answer:";
 
     public DataInterpretProcessor() {
         ChatAppManager.register(APP_KEY, ChatApp.builder().prompt(INSTRUCTION).name("结果数据解读")

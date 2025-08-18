@@ -3,10 +3,7 @@ package com.tencent.supersonic.headless.server.utils;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
-import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
-import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.SqlInfo;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
@@ -147,8 +144,9 @@ public class ChatWorkflowEngine {
         List<SemanticParseInfo> selectedParses = new ArrayList<>();
         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
         SqlInfo sqlInfo = new SqlInfo();
-        sqlInfo.setParsedS2SQL(MAPINFO_IS_NULL_STR);
-        sqlInfo.setCorrectedS2SQL(MAPINFO_IS_NULL_STR);
+        String emptyMapTips=produceEmptyMapTips(queryCtx.getSemanticSchema());
+        sqlInfo.setParsedS2SQL(emptyMapTips);
+        sqlInfo.setCorrectedS2SQL(emptyMapTips);
         sqlInfo.setQuerySQL(null);
         sqlInfo.setResultType("text");
         semanticParseInfo.setSqlInfo(sqlInfo);
@@ -255,5 +253,18 @@ public class ChatWorkflowEngine {
                 }
             }
         }
+    }
+
+    public String produceEmptyMapTips(SemanticSchema semanticSchema) {
+        String baseTips="您好~这里是红海ChatBI，你所提问的问题不在当前助手的知识范畴中，" +
+                "请针对以下维度：【%s】" +
+                "以下指标：【%s】"+
+                ",进行提问";
+        String dimensionStr=String.join(",",semanticSchema.getDimensions().stream().map(schemaElement -> schemaElement.getName()).collect(Collectors.toUnmodifiableList()));
+        String metricStr=String.join(",",semanticSchema.getMetrics().stream().map(schemaElement -> schemaElement.getName()).collect(Collectors.toUnmodifiableList()));
+       return String.format(baseTips,dimensionStr,metricStr);
+
+
+
     }
 }
