@@ -6,6 +6,7 @@ import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
 import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
+import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.helper.HanlpHelper;
@@ -51,7 +52,7 @@ public abstract class BaseMapper implements SchemaMapper {
     public abstract void doMap(ChatQueryContext chatQueryContext);
 
     protected boolean accept(ChatQueryContext chatQueryContext) {
-        return true;
+        return !MapModeEnum.LOOSE.equals(chatQueryContext.getRequest().getMapModeEnum());
     }
 
     public void addToSchemaMap(SchemaMapInfo schemaMap, Long dataSetId,
