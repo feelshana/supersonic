@@ -36,10 +36,7 @@ import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
-import com.tencent.supersonic.headless.api.pojo.SchemaElement;
-import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.SqlInfo;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionValueReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
@@ -54,6 +51,7 @@ import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMSqlQuery;
 import com.tencent.supersonic.headless.server.facade.service.ChatLayerService;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
+import com.tencent.supersonic.headless.server.service.SchemaService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.service.TokenStream;
 import lombok.extern.slf4j.Slf4j;
@@ -99,7 +97,8 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     private HistoryService historyService;
     @Autowired
     private VoiceService voiceService;
-
+    @Autowired
+    private SchemaService schemaService;
     private final List<ChatQueryParser> chatQueryParsers = ComponentFactory.getChatParsers();
     private final List<ChatQueryExecutor> chatQueryExecutors = ComponentFactory.getChatExecutors();
     private final List<ParseResultProcessor> parseResultProcessors =
@@ -298,6 +297,8 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         // 获取Agent配置
         AgentService agentService = ContextUtils.getBean(AgentService.class);
         Agent chatAgent = agentService.getAgent(chatParseReq.getAgentId());
+        Set<Long> dataSetIds = chatAgent.getDataSetIds();
+        SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
         // 检查是否开启多轮对话
         ChatApp chatApp = chatAgent.getChatAppConfig().get(APP_KEY_MULTI_TURN);
         if (chatApp != null && chatApp.isEnable()) {
@@ -313,7 +314,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             // 遍历 chatQueryParsers，找到 NL2SQLParser 并调用 rewriteQuery 方法
             for (ChatQueryParser parser : chatQueryParsers) {
                 if (parser instanceof NL2SQLParser) {
-                    ((NL2SQLParser) parser).rewriteMultiTurn(parseContext, parseContext.getAgent().getId(), parseContext.getRequest().getQueryText());
+                    ((NL2SQLParser) parser).rewriteMultiTurn(parseContext,
+                            parseContext.getAgent().getId(),
+                            parseContext.getRequest().getQueryText());
                     // 更新 chatParseReq 中的问题文本为改写后的文本
                     chatParseReq.setQueryText(queryNLReq.getQueryText());
                     break;
@@ -325,7 +328,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         llmReq.setChatAppConfig(chatAgent.getChatAppConfig());
         OnePassSCSqlGenStrategy sqlGenStrategy =
                 (OnePassSCSqlGenStrategy) SqlGenStrategyFactory.get(ONE_PASS_SELF_CONSISTENCY);
-        return sqlGenStrategy.streamGenerate(llmReq);
+        return sqlGenStrategy.streamGenerate(llmReq,semanticSchema);
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.parser.llm;
 
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
+import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
@@ -63,7 +64,7 @@ public class SimpleStrategy {
         return PromptTemplate.from(String.valueOf(context)).apply(variable);
     }
 
-    public Prompt generateStreamPrompt(LLMReq llmReq) {
+    public Prompt generateStreamPrompt(LLMReq llmReq, SemanticSchema semanticSchema) {
         StringBuilder context = new StringBuilder();
         // 添加SQL专家说明
         context.append("您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");
@@ -77,7 +78,16 @@ public class SimpleStrategy {
         String replyGuideline = "===回复指南\n"
                 + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"
                 + "2. 如果用户的问题与业务背景信息无关，请礼貌引导用户提问与当前表及数据的相关问题。例：\n"
-                + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。\n"
+                + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内。"
+                + "我可以帮您查询以下维度的数据："
+                + semanticSchema.getDimensions().stream()
+                .map(d -> "【" + d.getName() + "】")
+                .collect(Collectors.joining("，"))
+                + "；以及以下指标："
+                + semanticSchema.getMetrics().stream()
+                .map(m -> "【" + m.getName() + "】")
+                .collect(Collectors.joining("，"))
+                + "。\n"
                 + "3. 只需要查询思考思路，**严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，必须使用中文描述查询逻辑。\n"
                 + "4. 输出内容请尽量格式清晰，思路正确，字数控制在80-100字左右。\n"
                 + "5. 如果问题提及集团考核/考核/考核指标，那么在输出的思路中增加提示：\"暂时以24年考核目标作为参照，待25年考核指标下达后再更新\",其他任何情况请不要添加如上的提示\n";

@@ -8,6 +8,7 @@ import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
 import com.tencent.supersonic.common.pojo.enums.AppModule;
 import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.common.util.ContextUtils;
+import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.chat.parser.ParserConfig;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMResp;
@@ -166,7 +167,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         return llmResp;
     }
 
-    public SseEmitter streamGenerate(LLMReq llmReq) {
+    public SseEmitter streamGenerate(LLMReq llmReq, SemanticSchema semanticSchema) {
         long start = System.currentTimeMillis();
 
         // 1. 创建SSE发射器（1分钟超时）
@@ -187,7 +188,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                         AiServices.create(StreamingSemanticParseExtractor.class, streamChatModel);
                 // 生成prompt
                 SimpleStrategy simpleStrategy = new SimpleStrategy();
-                Prompt promptText = simpleStrategy.generateStreamPrompt(llmReq);
+                Prompt promptText = simpleStrategy.generateStreamPrompt(llmReq, semanticSchema);
 
                 // 获取响应流，设置背压为最大100个元素
                 Flux<String> thought = extractor

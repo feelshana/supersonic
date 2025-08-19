@@ -256,15 +256,19 @@ public class ChatWorkflowEngine {
     }
 
     public String produceEmptyMapTips(SemanticSchema semanticSchema) {
-        String baseTips="您好~这里是红海ChatBI，你所提问的问题不在当前助手的知识范畴中，" +
-                "请针对以下维度：【%s】" +
-                "以下指标：【%s】"+
-                ",进行提问";
-        String dimensionStr=String.join(",",semanticSchema.getDimensions().stream().map(schemaElement -> schemaElement.getName()).collect(Collectors.toUnmodifiableList()));
-        String metricStr=String.join(",",semanticSchema.getMetrics().stream().map(schemaElement -> schemaElement.getName()).collect(Collectors.toUnmodifiableList()));
-       return String.format(baseTips,dimensionStr,metricStr);
-
-
-
+        String baseTips= """
+                您好~这里是红海ChatBI，你所提问的问题不在当前助手的知识范畴中。
+                请针对以下维度：
+                %s
+                以下指标：
+                %s
+                进行提问""";
+        String dimensionStr=semanticSchema.getDimensions().stream()
+                .map(schemaElement -> "【" + schemaElement.getName() + "】")
+                .collect(Collectors.joining("，"));
+        String metricStr=semanticSchema.getMetrics().stream()
+                .map(schemaElement -> "【" + schemaElement.getName() + "】")
+                .collect(Collectors.joining("，"));
+        return String.format(baseTips,dimensionStr,metricStr);
     }
 }
