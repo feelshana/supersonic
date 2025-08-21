@@ -12,12 +12,16 @@ import SelectTMEPerson from '@/components/SelectTMEPerson';
 import { getLlmModelAppList, getLlmList } from '../../services/system';
 import MemorySection from './MemorySection';
 import PermissionSection from './PermissionSection';
+import ClassDimensionTable1 from '../SemanticModel/components/ClassDimensionTable1';
+import TermTable1 from '../SemanticModel/components/Term/TermTable1';
 
 const FormItem = Form.Item;
 const { TextArea } = Input;
 
 type Props = {
   editAgent?: AgentType;
+  modelId?: number;
+  domainId?: number;
   onSaveAgent: (agent: AgentType) => Promise<void>;
   onCreateToolBtnClick?: () => void;
 };
@@ -27,7 +31,7 @@ const defaultAgentConfig = {
   debugMode: true,
 };
 
-const AgentForm: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnClick }) => {
+const AgentForm1: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnClick, modelId, domainId }) => {
   const [saveLoading, setSaveLoading] = useState(false);
   const [examples, setExamples] = useState<{ id: string; question?: string }[]>([]);
   const [activeKey, setActiveKey] = useState('basic');
@@ -350,20 +354,30 @@ const AgentForm: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnCli
         </div>
       ),
     },
-    {
-      label: '工具配置',
-      key: 'tools',
-      children: <ToolsSection currentAgent={editAgent} onSaveAgent={onSaveAgent} />,
-    },
+    // {
+    //   label: '工具配置',
+    //   key: 'tools',
+    //   children: <ToolsSection currentAgent={editAgent} onSaveAgent={onSaveAgent} />,
+    // },
     {
       label: '记忆管理',
       key: 'memory',
       children: <MemorySection agentId={editAgent?.id} />,
     },
+    // {
+    //   label: '权限管理',
+    //   key: 'permissonSetting',
+    //   children: <PermissionSection currentAgent={editAgent} onSaveAgent={onSaveAgent} />,
+    // },
     {
-      label: '权限管理',
-      key: 'permissonSetting',
-      children: <PermissionSection currentAgent={editAgent} onSaveAgent={onSaveAgent} />,
+      label: '维度管理',
+      key: 'dimension',
+      children: <ClassDimensionTable1 domainId={domainId} modelId={modelId} />
+    },
+    {
+      label: '术语管理',
+      key: 'termManage',
+      children: <TermTable1 selectDomainId={domainId} />
     },
   ];
 
@@ -414,4 +428,4 @@ const AgentForm: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnCli
   );
 };
 
-export default AgentForm;
+export default AgentForm1;

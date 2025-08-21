@@ -201,6 +201,12 @@ const ROUTES = [
     component: './Login',
   },
   {
+    path: '/AgentFormForLink',
+    name: 'AgentFormForLink',
+    hideInMenu: true,
+    component: './Agent/AgentFormForLink',
+  },
+  {
     path: '/database',
     name: 'database',
     component: './SemanticModel/components/Database/DatabaseTable',

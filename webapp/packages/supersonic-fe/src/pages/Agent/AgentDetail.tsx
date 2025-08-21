@@ -33,7 +33,7 @@ const ToolsSection: React.FC<Props> = ({
               size="small"
               defaultChecked={currentAgent?.status === 1}
               onChange={(value) => {
-                onSaveAgent({ ...currentAgent, status: value ? 1 : 0 }, true);
+                onSaveAgent({ ...currentAgent!, status: value ? 1 : 0 }, true);
               }}
             />
           </span>

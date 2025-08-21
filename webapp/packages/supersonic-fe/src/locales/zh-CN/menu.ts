@@ -21,4 +21,5 @@ export default {
   'menu.system': '系统设置',
   'menu.chat': '问答对话',
   'menu.agent': '助理管理',
+  'menu.AgentFormForLink': '助手(报表训练)管理'
 };

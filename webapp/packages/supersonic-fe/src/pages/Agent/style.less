@@ -402,3 +402,23 @@
   row-gap: 40px;
   overflow-y: auto;
 }
+
+.agentFormForLink { 
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  z-index: 100;
+  .mask {
+    position: fixed;
+    background: rgba(0,0,0,0.2);
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

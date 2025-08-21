@@ -22,14 +22,13 @@ import BatchSensitiveLevelModal from '@/components/BatchCtrlDropDownButton/Batch
 import { toDimensionEditPage } from '@/pages/SemanticModel/utils';
 import styles from './style.less';
 
-type Props = {};
+type Props = {
+  domainId: number | undefined;
+  modelId: number | undefined;
+};
 
-const ClassDimensionTable: React.FC<Props> = ({}) => {
-  const domainModel = useModel('SemanticModel.domainData');
-  const modelModel = useModel('SemanticModel.modelData');
+const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
   const dimensionModel = useModel('SemanticModel.dimensionData');
-  const { selectDomainId: domainId } = domainModel;
-  const { selectModelId: modelId } = modelModel;
   const { MrefreshDimensionList } = dimensionModel;
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [dimensionItem, setDimensionItem] = useState<ISemantic.IDimensionItem>();
@@ -93,6 +92,7 @@ const ClassDimensionTable: React.FC<Props> = ({}) => {
   };
 
   useEffect(() => {
+    console.log(modelId, 'modelId?????????')
     queryDimensionList({ ...filterParams, ...defaultPagination });
   }, [filterParams, modelId]);
 
@@ -510,4 +510,4 @@ const ClassDimensionTable: React.FC<Props> = ({}) => {
     </>
   );
 };
-export default ClassDimensionTable;
+export default ClassDimensionTable1;

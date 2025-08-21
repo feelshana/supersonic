@@ -56,7 +56,7 @@ const ToolsSection: React.FC<Props> = ({ currentAgent, onSaveAgent }) => {
       newAgentConfig.tools.push({ ...tool, id: uuid() });
     }
     await saveAgent({
-      ...currentAgent,
+      ...currentAgent!,
       toolConfig: JSON.stringify(newAgentConfig) as any,
     });
     setModalVisible(false);
@@ -71,7 +71,7 @@ const ToolsSection: React.FC<Props> = ({ currentAgent, onSaveAgent }) => {
       (item: AgentToolType) => item.id !== tool.id,
     );
     await saveAgent({
-      ...currentAgent,
+      ...currentAgent!,
       toolConfig: JSON.stringify(newAgentConfig) as any,
     });
   };

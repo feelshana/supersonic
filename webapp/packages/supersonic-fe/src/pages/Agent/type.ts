@@ -103,6 +103,7 @@ export type AgentType = {
   viewers?: string[];
   viewOrgs?: string[];
   isOpen: number;
+  dataSetIds?: number[];
 };
 
 export type ModelType = {
@@ -111,6 +112,7 @@ export type ModelType = {
   name: string;
   bizName: string;
   type: 'DOMAIN' | 'DATASET';
+  children?: ModelType[];
 };
 
 export type MetricType = {
