@@ -121,6 +121,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         // 删除旧的模型和主题域
         if (config.getAgentId() != null) {
             dimAliasMap = clearOldConfig(config.getAgentId(), user);
+        } else {
+            dimAliasMap = Collections.emptyMap();
         }
         // 创建数据源
         DatabaseResp databaseResp = createDataSource(config.getDataSource(), user);
@@ -339,7 +341,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             if (!customs.isEmpty()) {
                 for (BiModelItem custom : customs) {
                     // 非可见的维度或指标跳过
-                    if (!"YES".equals(custom.getIsLook())) {
+                    if (!"YES".equals(custom.getIsLook()) || custom.getType() == null) {
                         continue;
                     }
                     if (custom.getType() == 2) {
