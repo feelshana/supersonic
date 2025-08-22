@@ -159,9 +159,9 @@ public class SqlBuilder {
         SqlNode left = null;
         TableView leftTable = null;
         TableView outerTable = new TableView();
-        Map<String, SqlNode> outerSelect = new HashMap<>();
+//        Map<String, SqlNode> outerSelect = new HashMap<>();
         Map<String, String> beforeModels = new HashMap<>();
-        EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
+//        EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
 
         for (ModelResp dataModel : dataModels) {
             final Set<DimSchemaResp> queryDimensions =
@@ -181,9 +181,9 @@ public class SqlBuilder {
             tableView.setAlias(alias);
             tableView.setPrimary(primary);
             tableView.setDataModel(dataModel);
-            for (String field : tableView.getFields()) {
-                outerSelect.put(field, SemanticNode.parse(alias + "." + field, scope, engineType));
-            }
+//            for (String field : tableView.getFields()) {
+//                outerSelect.put(field, SemanticNode.parse(alias + "." + field, scope, engineType));
+//            }
             if (left == null) {
                 left = SemanticNode.buildAs(tableView.getAlias(), getTable(tableView));
             } else {
@@ -194,9 +194,10 @@ public class SqlBuilder {
             beforeModels.put(dataModel.getName(), leftTable.getAlias());
         }
 
-        for (Map.Entry<String, SqlNode> entry : outerSelect.entrySet()) {
-            outerTable.getSelect().add(entry.getValue());
-        }
+//        for (Map.Entry<String, SqlNode> entry : outerSelect.entrySet()) {
+//            outerTable.getSelect().add(entry.getValue());
+//        }
+        outerTable.getSelect().add(SqlIdentifier.STAR);
         outerTable.setTable(left);
 
         return outerTable;
@@ -328,19 +329,20 @@ public class SqlBuilder {
             Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
             S2CalciteSchema schema) {
         TableView tableView = new TableView();
-        EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
-        Set<String> queryFields = tableView.getFields();
-        if (Objects.nonNull(queryMetrics)) {
-            queryMetrics.stream().forEach(m -> queryFields.addAll(m.getFields()));
-        }
-        if (Objects.nonNull(queryDimensions)) {
-            queryDimensions.stream().forEach(d -> queryFields.addAll(d.getFields()));
-        }
+//        EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
+//        Set<String> queryFields = tableView.getFields();
+//        if (Objects.nonNull(queryMetrics)) {
+//            queryMetrics.stream().forEach(m -> queryFields.addAll(m.getFields()));
+//        }
+//        if (Objects.nonNull(queryDimensions)) {
+//            queryDimensions.stream().forEach(d -> queryFields.addAll(d.getFields()));
+//        }
 
         try {
-            for (String field : queryFields) {
-                tableView.getSelect().add(SemanticNode.parse(field, scope, engineType));
-            }
+//            for (String field : queryFields) {
+//                tableView.getSelect().add(SemanticNode.parse(field, scope, engineType));
+//            }
+            tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope));
         } catch (Exception e) {
             log.error("Failed to create sqlNode for data model {}", dataModel);

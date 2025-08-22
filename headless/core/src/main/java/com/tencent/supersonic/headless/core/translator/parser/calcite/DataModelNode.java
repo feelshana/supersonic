@@ -69,7 +69,7 @@ public class DataModelNode extends SemanticNode {
         }
         SqlNode source = getTable(sqlTable, scope,
                 EngineType.fromString(dataModel.getModelDetail().getDbType()));
-        addSchema(scope, dataModel, sqlTable);
+//        addSchema(scope, dataModel, sqlTable);
         return buildAs(dataModel.getName(), source);
     }
 
