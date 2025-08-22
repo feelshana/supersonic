@@ -57,6 +57,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   },
   ref
 ) => {
+  const onlyChatWindow = new URLSearchParams(window.location.search).get('onlyChatWindow') === 'true'
   const [messageList, setMessageList] = useState<MessageItem[]>([]);
   const [inputMsg, setInputMsg] = useState('');
   const [pageNo, setPageNo] = useState(1);
@@ -119,7 +120,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
       updateAgentConfigMode(agent);
     }
     if (!isCopilot) {
-      window.history.replaceState({}, '', `${window.location.pathname}?agentId=${agent?.id}`);
+      window.history.replaceState({}, '', `${window.location.pathname}?agentId=${agent?.id}${onlyChatWindow ? '&onlyChatWindow=true' : ''}`);
     }
   };
 
@@ -141,6 +142,12 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   };
 
   useEffect(() => {
+    if(onlyChatWindow) {
+      const header = document.querySelector('header')
+      if(header?.style){
+        header.style.display = 'none'
+      }
+    } 
     initAgentList();
   }, []);
 
@@ -418,7 +425,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
     <ConfigProvider locale={locale}>
       <div className={chatClass}>
         <div className={styles.chatSection}>
-          {!isMobile && agentList.length > 1 && agentListVisible && (
+          {!isMobile && agentList.length > 1 && agentListVisible && !onlyChatWindow && (
             <AgentList
               agentList={agentList}
               currentAgent={currentAgent}
