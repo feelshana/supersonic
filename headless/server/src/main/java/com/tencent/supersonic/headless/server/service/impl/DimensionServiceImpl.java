@@ -553,6 +553,31 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         updateById(dimensionDO);
         return true;
     }
+    
+    @Override
+    public Boolean updateDimValueAliasBatch(Long dimId, List<DimValueMap> valueMaps, User user) {
+        DimensionDO dimensionDO = getById(dimId);
+        KnowledgeBaseService.getDimValueAlias().remove(dimensionDO.getId());
+        valueMaps.forEach(valueMap -> {
+            if (!CollectionUtils.isEmpty(valueMap.getAlias())) {
+                List<DictWord> dictWordList = new ArrayList<>();
+                valueMap.getAlias().stream().forEach(alias -> {
+                    DictWord name2AliaWord = new DictWord();
+                    name2AliaWord.setWord(valueMap.getValue());
+                    name2AliaWord.setAlias(alias);
+                    String nature = DictWordType.NATURE_SPILT + dimensionDO.getModelId()
+                            + DictWordType.NATURE_SPILT + dimensionDO.getId();
+                    name2AliaWord
+                            .setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
+                    dictWordList.add(name2AliaWord);
+                });
+                KnowledgeBaseService.addDimValueAlias(dimensionDO.getId(), dictWordList);
+            }
+        });
+        dimensionDO.setDimValueMaps(JsonUtil.toString(valueMaps));
+        updateById(dimensionDO);
+        return true;
+    }
 
     private DataItem getDataItem(DimensionDO dimensionDO) {
         ModelResp modelResp = modelService.getModel(dimensionDO.getModelId());

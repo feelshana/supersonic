@@ -5,8 +5,6 @@ import java.util.List;
 
 @Data
 public class BiModelConfig {
-    private Integer agentId;
-    
     private String dbType;
     private String dataSourceId;
     private String dataSourceName;
@@ -15,10 +13,6 @@ public class BiModelConfig {
     private String modelId;
     private String modelName;
     private String querySql;
-    
-    private String isGroupBy;
-    
-    private BiDataSource dataSource;
     
     private List<BiModelItem> customs;
     private List<BiModelItem> dimensions;

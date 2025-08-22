@@ -139,7 +139,14 @@ public class DataModelNode extends SemanticNode {
 
     private static SqlNode getTable(String sqlQuery, SqlValidatorScope scope, EngineType engineType)
             throws Exception {
-        SqlParser sqlParser = SqlParser.create(sqlQuery, Configuration.getParserConfig(engineType));
+        SqlParser.Config config = null;
+        if (sqlQuery.contains("`")) {
+            config = Configuration.getParserConfig(engineType);
+        } else {
+            // 没有`符号时切换config以兼容别名用双引号包裹的情况
+            config= Configuration.getOracleParserConfig();
+        }
+        SqlParser sqlParser = SqlParser.create(sqlQuery, config);
         SqlNode sqlNode = sqlParser.parseQuery();
         scope.validateExpr(sqlNode);
         return sqlNode;

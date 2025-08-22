@@ -26,4 +26,5 @@ public class DictItemReq {
     /** ONLINE - 正常更新 OFFLINE - 停止更新,但字典文件不删除 DELETED - 停止更新,且删除字典文件 */
     @NotNull
     private StatusEnum status;
+    private Integer locked;
 }

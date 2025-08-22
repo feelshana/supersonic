@@ -163,6 +163,9 @@ public class DictRepositoryImpl implements DictRepository {
         if (Objects.nonNull(dictItemFilter.getStatus())) {
             wrapper.lambda().eq(DictConfDO::getStatus, dictItemFilter.getStatus().name());
         }
+        if (Objects.nonNull(dictItemFilter.getLocked())) {
+            wrapper.lambda().eq(DictConfDO::getLocked, dictItemFilter.getLocked());
+        }
         List<DictConfDO> dictConfDOList = dictConfMapper.selectList(wrapper);
         return dictConfDOList;
     }

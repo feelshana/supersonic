@@ -18,6 +18,7 @@ public class DictConfDO {
     private Long itemId;
     private String config;
     private String status;
+    private Integer locked;
     private Date createdAt;
     private String createdBy;
 }

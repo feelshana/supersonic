@@ -52,4 +52,6 @@ public class AgentDO {
     private String viewOrg;
 
     private Integer isOpen;
+    
+    private Integer isBi;
 }

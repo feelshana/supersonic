@@ -12,4 +12,5 @@ public class DictItemFilter {
     private TypeEnums type;
     private Long itemId;
     private StatusEnum status;
+    private Integer locked;
 }

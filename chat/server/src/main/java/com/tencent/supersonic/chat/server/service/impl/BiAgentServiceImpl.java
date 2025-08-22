@@ -1,13 +1,16 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
+import static com.tencent.supersonic.common.pojo.Constants.POUND;
+import static com.tencent.supersonic.common.pojo.Constants.SPACE;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.directory.api.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,16 +19,19 @@ import org.springframework.util.CollectionUtils;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
 import com.tencent.supersonic.chat.server.agent.ToolConfig;
+import com.tencent.supersonic.chat.server.parser.NL2SQLParser;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.BiAgentService;
+import com.tencent.supersonic.common.bi.BiAgentConfig;
 import com.tencent.supersonic.common.bi.BiDataSource;
+import com.tencent.supersonic.common.bi.BiDimensionCofig;
 import com.tencent.supersonic.common.bi.BiModelConfig;
 import com.tencent.supersonic.common.bi.BiModelItem;
+import com.tencent.supersonic.common.bi.BiPageConfig;
 import com.tencent.supersonic.common.bi.BiTable;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.User;
@@ -36,8 +42,10 @@ import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.common.util.ChatAppManager;
+import com.tencent.supersonic.common.util.HttpUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
+import com.tencent.supersonic.headless.api.pojo.DimValueMap;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.Measure;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
@@ -48,18 +56,16 @@ import com.tencent.supersonic.headless.api.pojo.enums.ModelDefineType;
 import com.tencent.supersonic.headless.api.pojo.request.DataSetReq;
 import com.tencent.supersonic.headless.api.pojo.request.DatabaseReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemReq;
-import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
 import com.tencent.supersonic.headless.api.pojo.request.DomainReq;
-import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.ModelReq;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
+import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
 import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
-import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
 import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.service.DatabaseService;
 import com.tencent.supersonic.headless.server.service.DictConfService;
@@ -68,13 +74,16 @@ import com.tencent.supersonic.headless.server.service.DimensionService;
 import com.tencent.supersonic.headless.server.service.DomainService;
 import com.tencent.supersonic.headless.server.service.MetricService;
 import com.tencent.supersonic.headless.server.service.ModelService;
+import lombok.extern.slf4j.Slf4j;
 
-
+@Slf4j
 @Service
 public class BiAgentServiceImpl implements BiAgentService {
 
     @Value("${s2.bi.model-id:7}")
     private Integer chatModelId;
+    @Value("${s2.bi.url}")
+    private String biUrl;
 
     @Autowired
     private DatabaseService databaseService;
@@ -96,31 +105,34 @@ public class BiAgentServiceImpl implements BiAgentService {
     private DictTaskService dictTaskService;
 
     @Override
-    public Agent createBiAgent(BiModelConfig config) throws Exception {
+    public Agent createBiAgent(BiAgentConfig config) throws Exception {
+        BiModelConfig modelConfig = config.getModel();
+        BiPageConfig pageConfig = config.getPageConfig();
         // 参数检查
-        if (config.getSqlConditionParams() != null && !config.getSqlConditionParams().isEmpty()) {
+        if (modelConfig.getSqlConditionParams() != null && !modelConfig.getSqlConditionParams().isEmpty()) {
             throw new IllegalArgumentException("暂不支持带参数的模型创建智能助手");
         }
         // 不支持多表模型
-        if (config.getTables() != null && config.getTables().size() > 1) {
+        if (modelConfig.getTables() != null && modelConfig.getTables().size() > 1) {
             throw new IllegalArgumentException("暂不支持含多张表的模型创建智能助手");
         }
         User user = User.getDefaultUser();
+        Map<String, List<DimValueMap>> dimAliasMap = null;
         // 删除旧的模型和主题域
         if (config.getAgentId() != null) {
-            clearOldConfig(config.getAgentId(), user);
+            dimAliasMap = clearOldConfig(config.getAgentId(), user);
         }
         // 创建数据源
-        DatabaseResp databaseResp = createDataSource(config, user);
+        DatabaseResp databaseResp = createDataSource(config.getDataSource(), user);
         // 创建主题域
         DomainReq domainReq = new DomainReq();
-        domainReq.setName("BI-" + config.getModelName());
-        domainReq.setBizName("bi-" + config.getModelId());
+        domainReq.setName("BI-" + modelConfig.getModelName());
+        domainReq.setBizName("bi-" + modelConfig.getModelId());
         DomainResp domainResp = domainService.createDomain(domainReq, user);
         // 创建模型
-        List<ModelResp> modelResps = createModel(config, user, databaseResp, domainResp);
+        List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, user, databaseResp, domainResp);
         // 创建数据集
-        DataSetResp dataSetResp = createDataSet(config, user, domainResp, modelResps);
+        DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps);
         // 工具配置
         ToolConfig toolConfig = new ToolConfig();
         DatasetTool datasetTool = new DatasetTool();
@@ -137,28 +149,58 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         // 创建智能助理
         Agent agent = new Agent();
+        agent.setIsBi(1);
+        agent.setAdmins(config.getAdmins());
+        agent.setViewers(config.getViewers());
         agent.setToolConfig(JSONObject.toJSONString(toolConfig));
-        agent.setName("BI-" + config.getModelName());
+        agent.setName("BI-" + modelConfig.getModelName());
         // 模型配置
         Map<String, ChatApp> chatAppConfig =
                 Maps.newHashMap(ChatAppManager.getAllApps(AppModule.CHAT));
         chatAppConfig.values().forEach(app -> app.setChatModelId(this.chatModelId));
-        if (!"1".equals(config.getIsGroupBy())) {
-            ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
-            chatApp.setPrompt(chatApp.getPrompt() + "\n#规则:\n1.不要对结果进行聚合。");
+        chatAppConfig.get(NL2SQLParser.APP_KEY_MULTI_TURN).setEnable(true);
+        ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
+        String prompt = chatApp.getPrompt();
+        prompt = prompt + "\n#其它规则：";
+        if (!"1".equals(pageConfig.getIsGroupBy())) {
+            prompt = prompt + "\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT，并展示所有维度，其他例外的情况：计算均值、环比、维度分组统计等则可以聚合";
         }
+        prompt = prompt + "\n-维度值处理：";
+        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+            for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
+                if (item.getDefaultValue() != null) {
+                    prompt = prompt + "\n√ 未提及的维度 → " + item.getName() + "赋值'" + item.getDefaultValue() + "'";
+                }
+            }
+        }
+        prompt = prompt + "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
+        chatApp.setPrompt(prompt);
         agent.enableSearch();
         agent.enableFeedback();
         agent.setChatAppConfig(chatAppConfig);
         agent = agentService.createAgent(agent, user);
         return agent;
     }
+    
+    @Override
+    public void biAgentCallback(Agent agent, BiAgentConfig config) {
+        try {
+            String url = biUrl + "/report/trainingCallback";
+            String body = "reportId=%s&agentId=%s&agentName=%s".formatted(config.getReportId(), agent.getId(), agent.getName());
+            String result = HttpUtils.post(url, body);
+            log.info("回调BI成功：{}", result);
+        } catch (Exception e) {
+            log.error("回调BI出错", e);
+        }
+    }
 
-    private void clearOldConfig(Integer agentId, User user) {
+    private Map<String, List<DimValueMap>> clearOldConfig(Integer agentId, User user) {
         Agent agent = agentService.getAgent(agentId);
         if (agent == null) {
-            return;
+            return Collections.emptyMap();
         }
+        // 保存维度值别名
+        Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
         List<DatasetTool> tools = agent.getParserTools(AgentToolType.DATASET);
         for (DatasetTool tool : tools) {
             List<Long> dataSetIds = tool.getDataSetIds();
@@ -176,27 +218,28 @@ public class BiAgentServiceImpl implements BiAgentService {
                     MetaFilter modelFilter = new MetaFilter(Lists.newArrayList(model.getId()));
                     List<DimensionResp> dimensions = dimensionService.getDimensions(modelFilter);
                     if (!CollectionUtils.isEmpty(dimensions)) {
+                        dimensions.forEach(item -> {
+                            List<DimValueMap> dimValueMaps = item.getDimValueMaps();
+                            if (!CollectionUtils.isEmpty(dimValueMaps)) {
+                                dimAliasMap.put(item.getName(), dimValueMaps);
+                            }
+                        });
                         List<Long> dimensionIds = dimensions.stream().map(DimensionResp::getId)
                                 .collect(Collectors.toList());
-                        MetaBatchReq batchReq = new MetaBatchReq();
-                        batchReq.setIds(dimensionIds);
-                        batchReq.setStatus(StatusEnum.DELETED.getCode());
-                        dimensionService.batchUpdateStatus(batchReq, user);
+                        dimensionService.deleteDimensionBatch(dimensionIds, user);
                     }
                     List<MetricResp> metrics = metricService.getMetrics(filter);
                     if (!CollectionUtils.isEmpty(metrics)) {
                         List<Long> metricIds = metrics.stream().map(MetricResp::getId)
                                 .collect(Collectors.toList());
-                        MetaBatchReq batchReq = new MetaBatchReq();
-                        batchReq.setIds(metricIds);
-                        batchReq.setStatus(StatusEnum.DELETED.getCode());
-                        metricService.batchUpdateStatus(batchReq, user);
+                        metricService.deleteMetricBatch(metricIds, user);
                     }
                     modelService.deleteModel(model.getId(), user);
                 }
                 domainService.deleteDomain(domainId);
             }
         }
+        return dimAliasMap;
     }
 
     private DataSetResp createDataSet(BiModelConfig config, User user, DomainResp domainResp,
@@ -229,14 +272,13 @@ public class BiAgentServiceImpl implements BiAgentService {
         return dataSetResp;
     }
 
-    private List<ModelResp> createModel(BiModelConfig config, User user, DatabaseResp databaseResp,
-            DomainResp domainResp) throws Exception {
+    private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig, Map<String, List<DimValueMap>> dimAliasMap,
+            User user, DatabaseResp databaseResp, DomainResp domainResp) throws Exception {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
         List<BiModelItem> biMeasures = config.getMeasures();
         // 拖拽建模
         if (config.getCreateModelType() == 1) {
-            Set<String> dictDimensions = Sets.newHashSet();
             List<BiModelItem> customs = processCustom(config.getCustoms());
             BiTable table = config.getTables().get(0);
             String tableName = table.getDatabaseName() + "." + table.getTableName();
@@ -267,11 +309,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setType(DimensionType.categorical);
                     }
                     dimension.setBizName(modelDimension.getColumnName());
+                    dimension.setDescription(modelDimension.getDescription());
                     dimension.setIsCreateDimension(1);
                     dimensions.add(dimension);
-                    if ("YES".equalsIgnoreCase(modelDimension.getIsDict())) {
-                        dictDimensions.add(modelDimension.getName());
-                    }
                 }
             }
             if (biMeasures != null) {
@@ -286,6 +326,12 @@ public class BiAgentServiceImpl implements BiAgentService {
                     measure.setName(modelMeasure.getName());
                     measure.setBizName(modelMeasure.getColumnName());
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
+                    if (modelMeasure.getAggregationType() != null) {
+                        AggOperatorEnum aggOperator = AggOperatorEnum.of(modelMeasure.getAggregationType());
+                        if (!AggOperatorEnum.UNKNOWN.equals(aggOperator)) {
+                            measure.setAgg(aggOperator.getOperator());
+                        }
+                    }
                     measure.setIsCreateMetric(1);
                     measures.add(measure);
                 }
@@ -307,6 +353,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                             dimension.setType(DimensionType.categorical);
                         }
                         dimension.setBizName(custom.getColumnName());
+                        dimension.setDescription(custom.getDescription());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
                         if (dimensions == null) {
@@ -314,14 +361,17 @@ public class BiAgentServiceImpl implements BiAgentService {
                             modelDetail.setDimensions(dimensions);
                         }
                         dimensions.add(dimension);
-                        if ("YES".equalsIgnoreCase(custom.getIsDict())) {
-                            dictDimensions.add(custom.getName());
-                        }
                     } else if (custom.getType() == 1) {
                         Measure measure = new Measure();
                         measure.setName(custom.getName());
                         measure.setBizName(custom.getColumnName());
                         measure.setAgg(AggOperatorEnum.NONE.getOperator());
+                        if (custom.getAggregationType() != null) {
+                            AggOperatorEnum aggOperator = AggOperatorEnum.of(custom.getAggregationType());
+                            if (!AggOperatorEnum.UNKNOWN.equals(aggOperator)) {
+                                measure.setAgg(aggOperator.getOperator());
+                            }
+                        }
                         measure.setIsCreateMetric(1);
                         List<Measure> measures = modelDetail.getMeasures();
                         if (measures == null) {
@@ -335,11 +385,10 @@ public class BiAgentServiceImpl implements BiAgentService {
             ModelResp modelResp = modelService.createModel(modelReq, user);
             modelResps.add(modelResp);
             // 处理维度字典导入
-            if (!dictDimensions.isEmpty()) {
-                createDimensionDict(user, dictDimensions);
+            if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+                importDimension(user, pageConfig.getDimensionConfigs(), modelResp.getId(), dimAliasMap);
             }
         } else if (config.getCreateModelType() == 2) {
-            Set<String> dictDimensions = Sets.newHashSet();
             List<BiModelItem> modelDimensions = config.getDimensions();
             List<BiModelItem> modelMeasures = config.getMeasures();
             ModelReq modelReq = new ModelReq();
@@ -366,10 +415,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                     }
                     dimension.setBizName(modelDimension.getName());
                     dimension.setIsCreateDimension(1);
+                    dimension.setDescription(modelDimension.getDescription());
                     dimensions.add(dimension);
-                    if ("YES".equalsIgnoreCase(modelDimension.getIsDict())) {
-                        dictDimensions.add(modelDimension.getName());
-                    }
                 }
             }
             if (modelMeasures != null) {
@@ -379,7 +426,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                     Measure measure = new Measure();
                     measure.setName(modelMeasure.getName());
                     measure.setBizName(modelMeasure.getName());
-                    measure.setAgg(AggOperatorEnum.SUM.getOperator());
+                    measure.setAgg(AggOperatorEnum.NONE.getOperator());
+                    if (modelMeasure.getAggregationType() != null) {
+                        AggOperatorEnum aggOperator = AggOperatorEnum.of(modelMeasure.getAggregationType());
+                        if (!AggOperatorEnum.UNKNOWN.equals(aggOperator)) {
+                            measure.setAgg(aggOperator.getOperator());
+                        }
+                    }
                     measure.setIsCreateMetric(1);
                     measures.add(measure);
                 }
@@ -387,8 +440,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             ModelResp modelResp = modelService.createModel(modelReq, user);
             modelResps.add(modelResp);
             // 处理维度字典导入
-            if (!dictDimensions.isEmpty()) {
-                createDimensionDict(user, dictDimensions);
+            if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+                importDimension(user, pageConfig.getDimensionConfigs(), modelResp.getId(), dimAliasMap);
             }
         } else {
             throw new IllegalArgumentException("不支持的建模类型 : " + config.getCreateModelType());
@@ -396,19 +449,39 @@ public class BiAgentServiceImpl implements BiAgentService {
         return modelResps;
     }
 
-    private void createDimensionDict(User user, Set<String> dictDimensions) {
-        DimensionsFilter filter = new DimensionsFilter();
-        filter.setDimensionNames(Lists.newArrayList(dictDimensions));
-        List<DimensionResp> queryDimensions = dimensionService.queryDimensions(filter);
-        for (DimensionResp dimensionResp : queryDimensions) {
-            DictItemReq dictItemReq = new DictItemReq();
-            dictItemReq.setType(TypeEnums.DIMENSION);
-            dictItemReq.setItemId(dimensionResp.getId());
-            dictItemReq.setStatus(StatusEnum.ONLINE);
-            dictConfService.addDictConf(dictItemReq, user);
-            DictSingleTaskReq taskReq = DictSingleTaskReq.builder()
-                    .type(TypeEnums.DIMENSION).itemId(dimensionResp.getId()).build();
-            dictTaskService.addDictTask(taskReq, user);
+    private void importDimension(User user, List<BiDimensionCofig> dimensionConfigs, Long modelId,
+            Map<String, List<DimValueMap>> dimAliasMap) {
+        MetaFilter filter = new MetaFilter();
+        filter.setModelIds(Collections.singletonList(modelId));
+        for (BiDimensionCofig dimensionConfig : dimensionConfigs) {
+            List<String> values = dimensionConfig.getValues();
+            if (!CollectionUtils.isEmpty(values)) {
+                filter.setName(dimensionConfig.getName());
+                List<DimensionResp> resps = dimensionService.getDimensions(filter);
+                if (resps == null || resps.size() != 1) {
+                    continue;
+                }
+                DimensionResp resp = resps.get(0);
+                DictItemReq dictItemReq = new DictItemReq();
+                dictItemReq.setType(TypeEnums.DIMENSION);
+                dictItemReq.setItemId(resp.getId());
+                // 导入的维度值锁定不允许刷新
+                dictItemReq.setStatus(StatusEnum.ONLINE);
+                dictItemReq.setLocked(1);
+                DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
+                String nature = dictItemResp.getNature();
+                List<String> lines = values.stream().map(value -> {
+                    if (!StringUtils.isEmpty(value)) {
+                        value = value.replace(SPACE, POUND);
+                    }
+                    return String.format("%s %s %s", value, nature, 1L);
+                }).toList();
+                dictTaskService.importDictData(dictItemResp, lines, user);
+                List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
+                if (alias != null) {
+                    dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
+                }
+            }
         }
     }
 
@@ -435,8 +508,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         return customs;
     }
     
-    private DatabaseResp createDataSource(BiModelConfig config, User user) {
-        BiDataSource dataSource = config.getDataSource();
+    private DatabaseResp createDataSource(BiDataSource dataSource, User user) {
         DatabaseReq databaseReq = new DatabaseReq();
         databaseReq.setName("BI-" + dataSource.getName());
         switch (dataSource.getType()) {
