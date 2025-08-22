@@ -125,6 +125,8 @@ export function onRouteChange() {
 }
 
 export const layout: RunTimeLayoutConfig = (params) => {
+  const searchObj = new URLSearchParams(window.location.search);
+  const onlyChatWindow = searchObj.get('onlyChatWindow') === 'true';
   const { initialState } = params as any;
   return {
     onMenuHeaderClick: (e) => {
@@ -153,7 +155,9 @@ export const layout: RunTimeLayoutConfig = (params) => {
         <ConfigProvider theme={configProviderTheme}>
           <div
             style={{
-              height: location.pathname.includes('chat') ? 'calc(100vh - 56px)' : undefined,
+              height: (location.pathname.includes('chat') && !onlyChatWindow) ? 'calc(100vh - 56px)':
+                (location.pathname.includes('chat') && onlyChatWindow) ? '100vh'
+                : undefined,
             }}
           >
             {/* <AppPage dom={dom} /> */}
