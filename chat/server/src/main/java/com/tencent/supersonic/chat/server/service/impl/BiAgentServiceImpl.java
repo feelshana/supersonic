@@ -160,7 +160,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         Map<String, ChatApp> chatAppConfig =
                 Maps.newHashMap(ChatAppManager.getAllApps(AppModule.CHAT));
         chatAppConfig.values().forEach(app -> app.setChatModelId(this.chatModelId));
-        chatAppConfig.get(NL2SQLParser.APP_KEY_MULTI_TURN).setEnable(true);
+        // 多轮对话
+        //chatAppConfig.get(NL2SQLParser.APP_KEY_MULTI_TURN).setEnable(true);
         ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
         String prompt = chatApp.getPrompt();
         prompt = prompt + "\n#其它规则：";
