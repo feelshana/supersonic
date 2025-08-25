@@ -23,7 +23,6 @@ import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
 import com.tencent.supersonic.chat.server.agent.ToolConfig;
-import com.tencent.supersonic.chat.server.parser.NL2SQLParser;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.BiAgentService;
 import com.tencent.supersonic.common.bi.BiAgentConfig;
@@ -75,6 +74,11 @@ import com.tencent.supersonic.headless.server.service.DomainService;
 import com.tencent.supersonic.headless.server.service.MetricService;
 import com.tencent.supersonic.headless.server.service.ModelService;
 import lombok.extern.slf4j.Slf4j;
+import net.sf.jsqlparser.expression.Alias;
+import net.sf.jsqlparser.parser.CCJSqlParserUtil;
+import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.select.SelectItem;
 
 @Slf4j
 @Service
@@ -168,15 +172,17 @@ public class BiAgentServiceImpl implements BiAgentService {
         if (!"1".equals(pageConfig.getIsGroupBy())) {
             prompt = prompt + "\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT，并展示所有维度，其他例外的情况：计算均值、环比、维度分组统计等则可以聚合";
         }
-        prompt = prompt + "\n-维度值处理：";
         if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+            prompt = prompt + "\n-维度值处理：";
             for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
-                if (item.getDefaultValue() != null) {
-                    prompt = prompt + "\n√ 未提及的维度 → " + item.getName() + "赋值'" + item.getDefaultValue() + "'";
+                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+                    String itemValues = item.getDefaultValues().size() == 1 ? item.getDefaultValues().get(0)
+                            : item.getDefaultValues().stream().collect(Collectors.joining(",", "[", "]"));
+                    prompt = prompt + "\n√ 未提及的维度 → " + item.getName() + "赋值：" + itemValues;
                 }
             }
+            prompt = prompt + "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
         }
-        prompt = prompt + "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
         chatApp.setPrompt(prompt);
         agent.enableSearch();
         agent.enableFeedback();
@@ -392,6 +398,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                 importDimension(user, pageConfig.getDimensionConfigs(), modelResp.getId(), dimAliasMap);
             }
         } else if (config.getCreateModelType() == 2) {
+            // 使用JsqlPareser解析sql，替换掉别名的引号，避免supersonic解析时报错
+            String querySql = processQuerySql(config.getQuerySql());
             List<BiModelItem> modelDimensions = config.getDimensions();
             List<BiModelItem> modelMeasures = config.getMeasures();
             ModelReq modelReq = new ModelReq();
@@ -401,7 +409,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             modelReq.setBizName(config.getModelId());
             ModelDetail modelDetail = new ModelDetail();
             modelDetail.setQueryType(ModelDefineType.SQL_QUERY.getName());
-            modelDetail.setSqlQuery(config.getQuerySql());
+            modelDetail.setSqlQuery(querySql);
             modelReq.setModelDetail(modelDetail);
             if (modelDimensions != null) {
                 List<Dimension> dimensions = Lists.newArrayList();
@@ -450,6 +458,26 @@ public class BiAgentServiceImpl implements BiAgentService {
             throw new IllegalArgumentException("不支持的建模类型 : " + config.getCreateModelType());
         }
         return modelResps;
+    }
+
+    private String processQuerySql(String querySql) {
+        try {
+            Select statement = (Select) CCJSqlParserUtil.parse(querySql);
+            if (statement instanceof PlainSelect select) {
+                List<SelectItem<?>> items = select.getSelectItems();
+                items.forEach(item -> {
+                    Alias alias = item.getAlias();
+                    if (alias != null && alias.getName() != null) {
+                        String name = alias.getName().replace("\"", "").replace("'", "");
+                        alias.setName(name);
+                    }
+                });
+                return select.toString();
+            }
+        } catch (Exception e) {
+            log.error("解析sql出错: {}", querySql, e);
+        }
+        return querySql;
     }
 
     private void importDimension(User user, List<BiDimensionCofig> dimensionConfigs, Long modelId,
