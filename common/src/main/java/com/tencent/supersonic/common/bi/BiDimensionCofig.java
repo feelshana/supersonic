@@ -10,6 +10,6 @@ public class BiDimensionCofig {
 
     private List<String> values;
     
-    private String defaultValue;
+    private List<String> defaultValues;
     
 }
