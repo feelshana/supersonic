@@ -35,5 +35,7 @@ public interface DomainService {
 
     List<DomainDO> getDomainByBizName(String bizName);
 
+    List<DomainDO> getDomainByBizName(String name, String bizName);
+
     Set<DomainResp> getDomainChildren(List<Long> domainId);
 }

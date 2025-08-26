@@ -79,7 +79,7 @@ s2:
 
   #BI智能报表
   bi:
-    model-id: 5
+    model-id: 2
     url: http://10.193.131.27:7888
 
 crab:
