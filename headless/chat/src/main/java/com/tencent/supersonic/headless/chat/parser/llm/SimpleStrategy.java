@@ -10,6 +10,7 @@ import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -100,6 +101,9 @@ public class SimpleStrategy {
         variable.put("question", llmReq.getQueryText());
         variable.put("schema", "");
         variable.put("information", "");
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
+        String currentDate = dateFormat.format(new Date());
+        variable.put("currentDate", currentDate);
         String currentDayRule = new StringBuilder("所有日期不用日期函数，根据今天的日期去推算过去，今天的日期是")
                 .append(DateFormatUtils.format(new Date(), "yyyyMMdd")).append("\n").toString();
         variable.put("current-day-rule", currentDayRule);
