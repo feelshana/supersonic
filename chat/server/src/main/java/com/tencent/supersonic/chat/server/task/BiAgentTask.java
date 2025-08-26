@@ -9,9 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 public class BiAgentTask implements Runnable {
 
     private BiAgentService service;
-    
+
     private BiAgentConfig config;
-    
+
     public BiAgentTask(BiAgentService service, BiAgentConfig config) {
         this.service = service;
         this.config = config;
@@ -29,5 +29,5 @@ public class BiAgentTask implements Runnable {
             log.error("创建BI助手失败", e);
         }
     }
-    
+
 }

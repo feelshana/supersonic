@@ -553,7 +553,7 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         updateById(dimensionDO);
         return true;
     }
-    
+
     @Override
     public Boolean updateDimValueAliasBatch(Long dimId, List<DimValueMap> valueMaps, User user) {
         DimensionDO dimensionDO = getById(dimId);
@@ -567,8 +567,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                     name2AliaWord.setAlias(alias);
                     String nature = DictWordType.NATURE_SPILT + dimensionDO.getModelId()
                             + DictWordType.NATURE_SPILT + dimensionDO.getId();
-                    name2AliaWord
-                            .setNatureWithFrequency(String.format("%s " + DEFAULT_FREQUENCY, nature));
+                    name2AliaWord.setNatureWithFrequency(
+                            String.format("%s " + DEFAULT_FREQUENCY, nature));
                     dictWordList.add(name2AliaWord);
                 });
                 KnowledgeBaseService.addDimValueAlias(dimensionDO.getId(), dictWordList);

@@ -1,6 +1,5 @@
 package com.tencent.supersonic.headless.server.service;
 
-import java.util.List;
 import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
@@ -9,6 +8,8 @@ import com.tencent.supersonic.headless.api.pojo.request.ValueTaskQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictTaskResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictValueDimResp;
+
+import java.util.List;
 
 /** Manage dictionary tasks */
 public interface DictTaskService {

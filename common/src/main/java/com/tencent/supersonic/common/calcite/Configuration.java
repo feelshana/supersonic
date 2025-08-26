@@ -87,7 +87,7 @@ public class Configuration {
         parserConfig = parserConfig.setUnquotedCasing(Casing.UNCHANGED);
         return parserConfig.build();
     }
-    
+
     public static SqlValidator getSqlValidator(CalciteSchema rootSchema, EngineType engineType) {
         List<SqlOperatorTable> tables = new ArrayList<>();
         tables.add(SqlStdOperatorTable.instance());

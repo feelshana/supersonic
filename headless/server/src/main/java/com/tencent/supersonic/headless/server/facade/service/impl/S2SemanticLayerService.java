@@ -266,9 +266,9 @@ public class S2SemanticLayerService implements SemanticLayerService {
 
         // try to query dimensionValue from the database.
         // 维度值只查询词典
-        //if (CollectionUtils.isEmpty(dimensionValues)) {
-        //    return getDimensionValuesFromDb(dimensionValueReq, user);
-        //}
+        // if (CollectionUtils.isEmpty(dimensionValues)) {
+        // return getDimensionValuesFromDb(dimensionValueReq, user);
+        // }
 
         List<QueryColumn> columns = createQueryColumns(dimensionValueReq);
         List<Map<String, Object>> resultList = createResultList(dimensionValueReq, dimensionValues);

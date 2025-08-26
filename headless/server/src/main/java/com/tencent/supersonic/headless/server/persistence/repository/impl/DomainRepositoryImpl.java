@@ -51,6 +51,7 @@ public class DomainRepositoryImpl implements DomainRepository {
         queryWrapper.lambda().eq(DomainDO::getBizName, bizName);
         return domainDOMapper.selectList(queryWrapper);
     }
+
     @Override
     public List<DomainDO> getDomainByNameAndBizName(String name, String bizName) {
         QueryWrapper<DomainDO> queryWrapper = new QueryWrapper<>();

@@ -188,6 +188,7 @@ public class DomainServiceImpl implements DomainService {
     public List<DomainDO> getDomainByBizName(String bizName) {
         return domainRepository.getDomainByBizName(bizName);
     }
+
     @Override
     public List<DomainDO> getDomainByBizName(String name, String bizName) {
         return domainRepository.getDomainByNameAndBizName(name, bizName);

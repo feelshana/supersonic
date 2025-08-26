@@ -202,7 +202,8 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (!dictFlushDailyEnable) {
             log.info("dictFlushDailyEnable is false, now finish dailyDictTask");
         }
-        DictItemFilter filter = DictItemFilter.builder().status(StatusEnum.ONLINE).locked(0).build();
+        DictItemFilter filter =
+                DictItemFilter.builder().status(StatusEnum.ONLINE).locked(0).build();
         List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(filter);
         dictItemRespList.stream().forEach(item -> handleDictTaskByItemResp(item, null));
         log.info("[dailyDictTask] finish");
@@ -344,7 +345,7 @@ public class DictTaskServiceImpl implements DictTaskService {
                 + dictFileType;
         return fileHandler.queryDictFilePath(fileName);
     }
-    
+
     @Override
     public void importDictData(DictItemResp dictItemResp, List<String> data, User user) {
         // Change dictionary file
