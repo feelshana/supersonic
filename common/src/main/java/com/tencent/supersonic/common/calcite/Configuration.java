@@ -88,13 +88,6 @@ public class Configuration {
         return parserConfig.build();
     }
     
-    public static SqlParser.Config getOracleParserConfig() {
-        SqlParser.ConfigBuilder parserConfig = SqlParser.configBuilder();
-        parserConfig.setLex(Lex.ORACLE);
-        parserConfig.setCaseSensitive(false);
-        return parserConfig.build();
-    }
-
     public static SqlValidator getSqlValidator(CalciteSchema rootSchema, EngineType engineType) {
         List<SqlOperatorTable> tables = new ArrayList<>();
         tables.add(SqlStdOperatorTable.instance());

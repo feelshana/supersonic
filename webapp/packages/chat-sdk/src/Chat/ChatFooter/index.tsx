@@ -65,6 +65,8 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   },
   ref
 ) => {
+  const params = new URLSearchParams(window.location.search);
+  const onlyChatWindow = params.get('onlyChatWindow') === 'true'
   const [modelOptions, setModelOptions] = useState<(ModelType | AgentType)[]>([]);
   const [stepOptions, setStepOptions] = useState<Record<string, any[]>>({});
   const [open, setOpen] = useState(false);
@@ -665,7 +667,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             <div>历史对话</div>
           </div>
         )}
-        {agentList?.length > 1 && (
+        {agentList?.length > 1 && !onlyChatWindow && (
           <div className={styles.toolItem} onClick={onOpenAgents}>
             <IconFont type="icon-zhinengzhuli" className={styles.toolIcon} />
             <div>智能助理</div>

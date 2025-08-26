@@ -97,6 +97,7 @@ const Conversation: ForwardRefRenderFunction<any, Props> = (
 
   const conversationClass = classNames(styles.conversation, {
     [styles.historyVisible]: historyVisible,
+    [styles.historyHidden]: !historyVisible,
   });
 
   const convertTime = (date: string) => {
