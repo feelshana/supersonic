@@ -48,6 +48,13 @@ public class DefaultUserAdaptor implements UserAdaptor {
         UserRepository userRepository = ContextUtils.getBean(UserRepository.class);
         return userRepository.getUser(name);
     }
+    @Override
+    public User getUserByName(String name) {
+        UserDO userDO = getUser(name);
+        User user = User.get(userDO.getId(), userDO.getName(), userDO.getDisplayName(),
+                userDO.getEmail(), userDO.getIsAdmin());
+        return user;
+    }
 
     @Override
     public List<String> getUserNames() {
@@ -90,6 +97,7 @@ public class DefaultUserAdaptor implements UserAdaptor {
         }
         UserDO userDO = new UserDO();
         BeanUtils.copyProperties(userReq, userDO);
+        userDO.setDisplayName(userReq.getName());
         try {
             byte[] salt = AESEncryptionUtil.generateSalt(userDO.getName());
             userDO.setSalt(AESEncryptionUtil.getStringFromBytes(salt));

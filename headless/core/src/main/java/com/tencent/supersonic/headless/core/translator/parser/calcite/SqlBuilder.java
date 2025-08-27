@@ -110,7 +110,7 @@ public class SqlBuilder {
     }
 
     private boolean isGraphPathContainsAll(GraphPath<String, DefaultEdge> graphPath,
-            Set<String> vertex) {
+                                           Set<String> vertex) {
         Set<String> allVertex = Sets.newHashSet();
         for (DefaultEdge edge : graphPath.getEdgeList()) {
             allVertex.add(graphPath.getGraph().getEdgeSource(edge));
@@ -155,7 +155,7 @@ public class SqlBuilder {
     }
 
     private TableView render(OntologyQuery ontologyQuery, Set<ModelResp> dataModels,
-            SqlValidatorScope scope, S2CalciteSchema schema) throws Exception {
+                             SqlValidatorScope scope, S2CalciteSchema schema) throws Exception {
         SqlNode left = null;
         TableView leftTable = null;
         TableView outerTable = new TableView();
@@ -209,8 +209,8 @@ public class SqlBuilder {
     }
 
     private SqlNode buildJoin(SqlNode leftNode, TableView leftTable, TableView rightTable,
-            Map<String, String> before, ModelResp dataModel, S2CalciteSchema schema,
-            SqlValidatorScope scope) throws Exception {
+                              Map<String, String> before, ModelResp dataModel, S2CalciteSchema schema,
+                              SqlValidatorScope scope) throws Exception {
         EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
         SqlNode condition =
                 getCondition(leftTable, rightTable, dataModel, schema, scope, engineType);
@@ -231,7 +231,7 @@ public class SqlBuilder {
     }
 
     private JoinRelation getMatchJoinRelation(Map<String, String> before, TableView tableView,
-            S2CalciteSchema schema) {
+                                              S2CalciteSchema schema) {
         JoinRelation matchJoinRelation = JoinRelation.builder().build();
         if (!CollectionUtils.isEmpty(schema.getJoinRelations())) {
             for (JoinRelation joinRelation : schema.getJoinRelations()) {
@@ -267,7 +267,7 @@ public class SqlBuilder {
     }
 
     private SqlNode getCondition(JoinRelation joinRelation, SqlValidatorScope scope,
-            EngineType engineType) throws Exception {
+                                 EngineType engineType) throws Exception {
         SqlNode condition = null;
         for (Triple<String, String, String> con : joinRelation.getJoinCondition()) {
             List<SqlNode> ons = new ArrayList<>();
@@ -288,7 +288,7 @@ public class SqlBuilder {
     }
 
     private SqlNode getCondition(TableView left, TableView right, ModelResp dataModel,
-            S2CalciteSchema schema, SqlValidatorScope scope, EngineType engineType)
+                                 S2CalciteSchema schema, SqlValidatorScope scope, EngineType engineType)
             throws Exception {
 
         Set<String> selectLeft = SemanticNode.getSelect(left.getTable());
@@ -327,8 +327,8 @@ public class SqlBuilder {
     }
 
     public static TableView renderOne(Set<MetricSchemaResp> queryMetrics,
-            Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
-            S2CalciteSchema schema) {
+                                      Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
+                                      S2CalciteSchema schema) {
         TableView tableView = new TableView();
         // EngineType engineType =
         // EngineType.fromString(schema.getOntology().getDatabase().getType());
@@ -347,7 +347,9 @@ public class SqlBuilder {
             tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope));
         } catch (Exception e) {
-            log.error("Failed to create sqlNode for data model {}", dataModel);
+            log.error("Failed to create sqlNode for table,tableQuery:{},SqlQuery:{}",
+                    dataModel.getModelDetail().getTableQuery(), dataModel.getModelDetail().getSqlQuery(),
+                    e);
         }
 
         return tableView;

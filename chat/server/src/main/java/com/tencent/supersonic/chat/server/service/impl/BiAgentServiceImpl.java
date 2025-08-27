@@ -3,6 +3,8 @@ package com.tencent.supersonic.chat.server.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.tencent.supersonic.auth.api.authentication.request.UserReq;
+import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
@@ -25,6 +27,7 @@ import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.common.util.ChatAppManager;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.HttpUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
@@ -112,7 +115,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     private DictConfService dictConfService;
     @Autowired
     private DictTaskService dictTaskService;
-
+    @Autowired
+    private UserService userService;
     @Override
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
         BiModelConfig modelConfig = config.getModel();
@@ -170,6 +174,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             uniqueAgent = agentService.updateAgent(uniqueAgent, user);
             return uniqueAgent;
         }
+        //检查BI的用户名，没有就创建
+        checkBIUsers(config.getAdmins(),config.getViewers());
         // 创建智能助理
         Agent agent = new Agent();
         agent.setIsBi(1);
@@ -216,6 +222,30 @@ public class BiAgentServiceImpl implements BiAgentService {
         agent.setChatAppConfig(chatAppConfig);
         agent = agentService.createAgent(agent, user);
         return agent;
+    }
+
+    private void checkBIUsers(List<String> admins, List<String> viewers) {
+        for (String admin : admins) {
+            User user = userService.getUserByName(admin);
+            if (user == null) {
+                UserReq userReq = new UserReq();
+                userReq.setName(admin);
+                userReq.setPassword("123456");
+                userReq.setNewPassword("123456");
+                userService.register(userReq);
+            }
+        }
+        for (String viewer : viewers) {
+            User user = userService.getUserByName(viewer);
+            if (user == null) {
+                UserReq userReq = new UserReq();
+                userReq.setName(viewer);
+                userReq.setPassword("123456");
+                userReq.setNewPassword("123456");
+                userService.register(userReq);
+            }
+        }
+
     }
 
     private Agent findUniqueAgent(List<Agent> agents, List<DomainDO> domains) {
@@ -578,7 +608,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 items.forEach(item -> {
                     Alias alias = item.getAlias();
                     if (alias != null && alias.getName() != null) {
-                        String name = alias.getName().replace("\"", "").replace("'", "");
+                        String name = alias.getName().replace("\"", "`");
                         alias.setName(name);
                     }
                 });
