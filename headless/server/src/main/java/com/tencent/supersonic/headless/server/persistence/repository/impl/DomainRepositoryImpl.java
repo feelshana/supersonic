@@ -52,4 +52,11 @@ public class DomainRepositoryImpl implements DomainRepository {
         return domainDOMapper.selectList(queryWrapper);
     }
 
+    @Override
+    public List<DomainDO> getDomainByNameAndBizName(String name, String bizName) {
+        QueryWrapper<DomainDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().eq(DomainDO::getBizName, bizName);
+        queryWrapper.lambda().eq(DomainDO::getName, name);
+        return domainDOMapper.selectList(queryWrapper);
+    }
 }

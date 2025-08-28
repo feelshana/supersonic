@@ -1,6 +1,7 @@
 package com.tencent.supersonic.common.bi;
 
 import lombok.Data;
+
 import java.util.List;
 
 @Data
@@ -13,11 +14,11 @@ public class BiModelConfig {
     private String modelId;
     private String modelName;
     private String querySql;
-    
+
     private List<BiModelItem> customs;
     private List<BiModelItem> dimensions;
     private List<BiModelItem> measures;
     private List<BiModelParam> sqlConditionParams;
     private List<BiTable> tables;
-    
+
 }

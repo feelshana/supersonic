@@ -29,8 +29,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
     public static final String LLM_WORDS_SEGMENT_PROMPT =
             "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "，提取其中的维度/指标/维度值"
                     + "每个词汇或短语能够作为指标/维度/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？"
-                    + "输出格式应为多个词语字符串，用英文逗号分隔，不要输出其他内容，输出格式示例：国色芳华,播放次数"
-                    + "输入问题为:{{text}}";
+                    + "输出格式应为多个词语字符串，用英文逗号分隔，不要输出其他内容，输出格式示例：国色芳华,播放次数" + "输入问题为:{{text}}";
 
     @Autowired
     protected MapperConfig mapperConfig;
@@ -72,8 +71,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
         Prompt prompt = PromptTemplate.from(LLM_WORDS_SEGMENT_PROMPT).apply(variable);
         ChatModelConfig chatModelConfig = chatApp.getChatModelConfig();
-        ChatLanguageModel chatLanguageModel =
-                ModelProvider.getChatModel(chatModelConfig);
+        ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
             List<String> words = Arrays.stream(response.split(",")).toList();

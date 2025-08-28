@@ -24,7 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * query controller
  */
 @RestController
-@RequestMapping({"/api/chat/query", "/openapi/chat/query"})
+@RequestMapping({"/api/chat/query", "/api/stream/chat/query", "/openapi/chat/query"})
 public class ChatQueryController {
 
     @Autowired

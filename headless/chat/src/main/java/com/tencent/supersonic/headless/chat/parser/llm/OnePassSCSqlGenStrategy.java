@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
@@ -54,22 +53,17 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
     private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
     public static final String APP_KEY = "S2SQL_PARSER";
-    public static final String INSTRUCTION = "#角色：你是一位精通SQL语言的数据分析师\n" +
-            "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" +
-            "#规则：\n" +
-            "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表系统通过向量匹配到的可选维度值列表，供参考，请根据问题内容，选择其中的一个或者多个值作为查询条件\n" +
-            "2.SQL语句中查询的列名必须严格引用Schema中的Dimensions和Metrics中字段名，禁止任意改造字段\n" +
-            "3.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n" +
-            "4.别名使用中文\n" +
-            "#维度值智能查询规则\n" +
-            "   - 当问题属于**维度值查询**（如“有哪些场景”、“列出XX”等开放式查询），\n" +
-            "   - 对维度进行 distinct查询\n" +
-            "    - 若提示词中包含当前日期为2025年10月2日\n" +
-            "    - 若Dimensions中包含format为'yyyyMMdd'格式的**日期字段**时，（如 `创建日期`），根据提示词中声明的当前日期，自动根据日期格式添加：创建日期 = '20251001'\n" +
-            "     - 若Dimensions中包含format为'yyyyMM'格式的**日期字段**时，（如 `订单月份`），根据提示词中声明的当前日期，自动根据日期格式添加：订单月份 = 202509\n" +
-            "     - **例外情况**：问题中已包含明确日期条件（如“查询昨天的场景”）时，不再额外添加.\n" +
-            "#Exemplars: {{exemplar}}\n" +
-            "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
+    public static final String INSTRUCTION = "#角色：你是一位精通SQL语言的数据分析师\n"
+            + "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" + "#规则：\n"
+            + "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表系统通过向量匹配到的可选维度值列表，供参考，请根据问题内容，选择其中的一个或者多个值作为查询条件\n"
+            + "2.SQL语句中查询的列名必须严格引用Schema中的Dimensions和Metrics中字段名，禁止任意改造字段\n"
+            + "3.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n"
+            + "4.别名使用中文\n" + "#维度值智能查询规则\n" + "   - 当问题属于**维度值查询**（如“有哪些场景”、“列出XX”等开放式查询），\n"
+            + "   - 对维度进行 distinct查询\n" + "    - 若提示词中包含当前日期为2025年10月2日\n"
+            + "    - 若Dimensions中包含format为'yyyyMMdd'格式的**日期字段**时，（如 `创建日期`），根据提示词中声明的当前日期，自动根据日期格式添加：创建日期 = '20251001'\n"
+            + "     - 若Dimensions中包含format为'yyyyMM'格式的**日期字段**时，（如 `订单月份`），根据提示词中声明的当前日期，自动根据日期格式添加：订单月份 = 202509\n"
+            + "     - **例外情况**：问题中已包含明确日期条件（如“查询昨天的场景”）时，不再额外添加.\n" + "#Exemplars: {{exemplar}}\n"
+            + "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
 
     @Autowired
     private ParserConfig parserConfig;

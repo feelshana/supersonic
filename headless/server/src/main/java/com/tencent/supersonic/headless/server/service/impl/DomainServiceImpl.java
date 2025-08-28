@@ -190,6 +190,11 @@ public class DomainServiceImpl implements DomainService {
     }
 
     @Override
+    public List<DomainDO> getDomainByBizName(String name, String bizName) {
+        return domainRepository.getDomainByNameAndBizName(name, bizName);
+    }
+
+    @Override
     public Set<DomainResp> getDomainChildren(List<Long> domainIds) {
         Set<DomainResp> childDomains = new HashSet<>();
         if (CollectionUtils.isEmpty(domainIds)) {

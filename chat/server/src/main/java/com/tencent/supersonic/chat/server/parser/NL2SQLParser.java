@@ -57,23 +57,12 @@ public class NL2SQLParser implements ChatQueryParser {
     private static final Logger logger = LoggerFactory.getLogger(NL2SQLParser.class);
 
     public static final String APP_KEY_MULTI_TURN = "REWRITE_MULTI_TURN";
-    private static final String REWRITE_MULTI_TURN_INSTRUCTION = "# 角色\n" +
-            "咪咕数据平台数据分析师\n" +
-            "\n" +
-            "### 核心任务\n" +
-            "1. 分析「当前问题」与「历史问题」的语义关联性（历史问题按时间正序排列：问题1[最早], 问题2, ...）\n" +
-            "2. **仅当满足以下全部条件时改写问题**：\n" +
-            "   - 当前问题与某个历史问题主题高度一致\n" +
-            "    - 需要补充历史问题的关键信息才能完整回答\n" +
-            "3. **无关时直接返回原始问题**\n" +
-            "\n" +
-            "### 输入\n" +
-            "- 当前问题：{{current_question}}\n" +
-            "- 历史问题：{{history}}\n" +
-            "\n" +
-            "### 输出规则\n" +
-            "1. 必须且仅返回最终问题文本（无任何前缀/解释）  \n" +
-            "2. 拒绝改写时直接输出当前问题";
+    private static final String REWRITE_MULTI_TURN_INSTRUCTION = "# 角色\n" + "咪咕数据平台数据分析师\n" + "\n"
+            + "### 核心任务\n" + "1. 分析「当前问题」与「历史问题」的语义关联性（历史问题按时间正序排列：问题1[最早], 问题2, ...）\n"
+            + "2. **仅当满足以下全部条件时改写问题**：\n" + "   - 当前问题与某个历史问题主题高度一致\n"
+            + "    - 需要补充历史问题的关键信息才能完整回答\n" + "3. **无关时直接返回原始问题**\n" + "\n" + "### 输入\n"
+            + "- 当前问题：{{current_question}}\n" + "- 历史问题：{{history}}\n" + "\n" + "### 输出规则\n"
+            + "1. 必须且仅返回最终问题文本（无任何前缀/解释）  \n" + "2. 拒绝改写时直接输出当前问题";
     // private static final String REWRITE_MULTI_TURN_INSTRUCTION = ""
     // +"根据历史问题对当前问题进行改写，只需替换关键维度，不要随意改写,生成一条最符合语意的问题"
     // + "#当前问题: {{current_question}}"
@@ -94,7 +83,8 @@ public class NL2SQLParser implements ChatQueryParser {
     @Override
     public void parse(ParseContext parseContext) {
         // // 1.多轮对话改写，未解析出来数据时重写
-        rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),parseContext.getRequest().getQueryText());
+        rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),
+                parseContext.getRequest().getQueryText());
 
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
@@ -112,11 +102,11 @@ public class NL2SQLParser implements ChatQueryParser {
             for (Long datasetId : requestedDatasets) {
                 queryNLReq.setDataSetIds(Collections.singleton(datasetId));
                 ChatParseResp parseResp = new ChatParseResp(parseContext.getRequest().getQueryId());
-//                for (MapModeEnum mode : Lists.newArrayList(MapModeEnum.STRICT,
-//                        MapModeEnum.MODERATE)) {
-//                    queryNLReq.setMapModeEnum(mode);
-//                    doParse(queryNLReq, parseResp);
-//                }
+                // for (MapModeEnum mode : Lists.newArrayList(MapModeEnum.STRICT,
+                // MapModeEnum.MODERATE)) {
+                // queryNLReq.setMapModeEnum(mode);
+                // doParse(queryNLReq, parseResp);
+                // }
                 // Integer valueSize = 0;
                 // if (!parseResp.getSelectedParses().isEmpty()) {
                 // valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
@@ -153,15 +143,12 @@ public class NL2SQLParser implements ChatQueryParser {
                     Set<SchemaElementMatch> uniqueElements = new LinkedHashSet<>();
                     StringBuilder looseMatchesInfo = new StringBuilder();
                     for (SchemaElementMatch matchResult : looseElementMatches) {
-                        looseMatchesInfo.append(String.format(
-                                "DetectWord=[%s],Word=[%s],similarity=[%s]; ",
-                                matchResult.getDetectWord(),
-                                matchResult.getWord(),
-                                matchResult.getSimilarity()
-                        ));
+                        looseMatchesInfo
+                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
+                                        matchResult.getDetectWord(), matchResult.getWord(),
+                                        matchResult.getSimilarity()));
                     }
-                    logger.info("宽松模式映射到的ElementMatches数量有 {} 个，分别是：{}",
-                            looseElementMatches.size(),
+                    logger.info("宽松模式映射到的ElementMatches数量有 {} 个，分别是：{}", looseElementMatches.size(),
                             looseMatchesInfo.toString().trim());
 
                     // 移除非value类型和term类型的元素
@@ -182,16 +169,13 @@ public class NL2SQLParser implements ChatQueryParser {
                     uniqueElements.addAll(looseElementMatches);
                     StringBuilder matchesInfo = new StringBuilder();
                     for (SchemaElementMatch matchResult : uniqueElements) {
-                        matchesInfo.append(String.format(
-                                "DetectWord=[%s],Word=[%s],similarity=[%s]; ",
-                                matchResult.getDetectWord(),
-                                matchResult.getWord(),
-                                matchResult.getSimilarity()
-                        ));
+                        matchesInfo
+                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
+                                        matchResult.getDetectWord(), matchResult.getWord(),
+                                        matchResult.getSimilarity()));
                     }
                     logger.info("宽松模式下合并keyWordsValues后的ElementMatches数量有 {} 个，分别是：{}",
-                            uniqueElements.size(),
-                            matchesInfo.toString().trim());
+                            uniqueElements.size(), matchesInfo.toString().trim());
                     parseResp.getSelectedParses().getFirst().getElementMatches().clear();
                     parseResp.getSelectedParses().getFirst().getElementMatches()
                             .addAll(uniqueElements);

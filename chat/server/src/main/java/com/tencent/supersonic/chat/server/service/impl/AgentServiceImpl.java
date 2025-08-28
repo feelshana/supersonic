@@ -1,5 +1,6 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
@@ -31,11 +32,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
@@ -115,6 +112,22 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
             return null;
         }
         return convert(getById(id));
+    }
+
+    @Override
+    public List<Agent> getAgentByName(String name) {
+        if (name == null) {
+            return new ArrayList<>();
+        }
+        List<AgentDO> agentDOList = getByName(name);
+        if (CollectionUtils.isEmpty(agentDOList)) {
+            return new ArrayList<>();
+        }
+        return agentDOList.stream().map(this::convert).collect(Collectors.toList());
+    }
+
+    private List<AgentDO> getByName(String name) {
+        return baseMapper.selectList(new LambdaQueryWrapper<AgentDO>().eq(AgentDO::getName, name));
     }
 
     @Override

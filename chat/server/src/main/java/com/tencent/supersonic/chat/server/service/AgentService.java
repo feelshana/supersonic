@@ -17,5 +17,7 @@ public interface AgentService {
 
     Agent getAgent(Integer id);
 
+    List<Agent> getAgentByName(String name);
+
     void deleteAgent(Integer id);
 }
