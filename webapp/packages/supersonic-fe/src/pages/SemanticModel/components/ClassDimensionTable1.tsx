@@ -92,7 +92,6 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
   };
 
   useEffect(() => {
-    console.log(modelId, 'modelId?????????')
     queryDimensionList({ ...filterParams, ...defaultPagination });
   }, [filterParams, modelId]);
 
