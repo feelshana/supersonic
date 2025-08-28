@@ -23,4 +23,6 @@ public interface DimensionRepository {
     List<DimensionDO> getDimension(DimensionFilter dimensionFilter);
 
     List<DimensionDO> getDimensions(DimensionsFilter dimensionsFilter);
+
+    void removeByIds(List<Long> idList);
 }

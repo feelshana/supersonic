@@ -36,4 +36,6 @@ public interface MetricRepository {
     void updateDefaultQueryConfig(MetricQueryDefaultConfigDO defaultConfigDO);
 
     MetricQueryDefaultConfigDO getDefaultQueryConfig(Long metricId, String userName);
+
+    void removeByIds(List<Long> idList);
 }

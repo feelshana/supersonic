@@ -75,4 +75,9 @@ public class ModelRepositoryImpl implements ModelRepository {
     public void batchUpdate(List<ModelDO> modelDOS) {
         modelDOCustomMapper.batchUpdateStatus(modelDOS);
     }
+
+    @Override
+    public void removeById(Long id) {
+        modelDOMapper.deleteById(id);
+    }
 }

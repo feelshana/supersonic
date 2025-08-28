@@ -48,9 +48,13 @@ public class DefaultUserAdaptor implements UserAdaptor {
         UserRepository userRepository = ContextUtils.getBean(UserRepository.class);
         return userRepository.getUser(name);
     }
+
     @Override
     public User getUserByName(String name) {
         UserDO userDO = getUser(name);
+        if (userDO == null) {
+            return null;
+        }
         User user = User.get(userDO.getId(), userDO.getName(), userDO.getDisplayName(),
                 userDO.getEmail(), userDO.getIsAdmin());
         return user;

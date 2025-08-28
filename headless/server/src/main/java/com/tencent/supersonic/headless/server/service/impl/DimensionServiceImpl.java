@@ -265,12 +265,14 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
             throw new RuntimeException(
                     String.format("the dimension %s not exist", StringUtils.join(",", idList)));
         }
-        dimensionDOList.forEach(dimensionDO -> {
-            dimensionDO.setStatus(StatusEnum.DELETED.getCode());
-            dimensionDO.setUpdatedAt(new Date());
-            dimensionDO.setUpdatedBy(user.getName());
-        });
-        dimensionRepository.batchUpdateStatus(dimensionDOList);
+        // dimensionDOList.forEach(dimensionDO -> {
+        // dimensionDO.setStatus(StatusEnum.DELETED.getCode());
+        // dimensionDO.setUpdatedAt(new Date());
+        // dimensionDO.setUpdatedBy(user.getName());
+        // });
+        // dimensionRepository.batchUpdateStatus(dimensionDOList);
+        // 物理删除
+        dimensionRepository.removeByIds(idList);
         // should update modelDetail
         modelService.deleteModelDetailByDimAndMetric(dimensionDOList.get(0).getModelId(),
                 dimensionDOList, null);
