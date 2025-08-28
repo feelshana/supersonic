@@ -67,12 +67,13 @@ const AgentFormForLink: React.FC = () => {
     }, [currentAgent])
 
     useEffect(() => {
-      if(modelId && domainDataSetTree.length) outer:{
+      const dataSetId = currentAgent?.dataSetIds?.[0]
+      if(dataSetId && domainDataSetTree.length) outer:{
         for (let i = 0; i < domainDataSetTree.length; i++) {
           for (let j = 0; j < domainDataSetTree[i].children!.length; j++) {
-            if (domainDataSetTree[i].children![j].id === modelId) {
+            if (domainDataSetTree[i].children![j].id === dataSetId) {
+              setDomainId(domainDataSetTree[i].children![j].parentId)
               const domainId = domainDataSetTree[i].children![j].parentId
-              setDomainId(domainId)
               getAllModelByDomainId(domainId).then((res)=>{
                 if (res?.code === 200) {
                   setModelId(res.data[0].id)
@@ -83,7 +84,7 @@ const AgentFormForLink: React.FC = () => {
           }
         }
       }
-    }, [modelId, domainDataSetTree])
+    }, [domainDataSetTree, currentAgent])
 
   return (
     <div className={styles.agentFormForLink}>
