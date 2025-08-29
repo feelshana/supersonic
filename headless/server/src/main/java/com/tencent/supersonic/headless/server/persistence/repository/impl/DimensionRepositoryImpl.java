@@ -101,4 +101,9 @@ public class DimensionRepositoryImpl implements DimensionRepository {
     public List<DimensionDO> getDimensions(DimensionsFilter dimensionsFilter) {
         return dimensionDOCustomMapper.queryDimensions(dimensionsFilter);
     }
+
+    @Override
+    public void removeByIds(List<Long> idList) {
+        dimensionDOMapper.deleteByIds(idList);
+    }
 }

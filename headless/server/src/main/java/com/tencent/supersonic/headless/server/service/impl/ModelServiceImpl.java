@@ -161,15 +161,17 @@ public class ModelServiceImpl implements ModelService {
 
     @Override
     public void deleteModel(Long id, User user) {
-        ModelDO datasourceDO = modelRepository.getModelById(id);
-        if (datasourceDO == null) {
-            return;
-        }
+        // ModelDO datasourceDO = modelRepository.getModelById(id);
+        // if (datasourceDO == null) {
+        // return;
+        // }
         checkDelete(id);
-        datasourceDO.setStatus(StatusEnum.DELETED.getCode());
-        datasourceDO.setUpdatedAt(new Date());
-        datasourceDO.setUpdatedBy(user.getName());
-        modelRepository.updateModel(datasourceDO);
+        // 物理删除
+        modelRepository.removeById(id);
+        // datasourceDO.setStatus(StatusEnum.DELETED.getCode());
+        // datasourceDO.setUpdatedAt(new Date());
+        // datasourceDO.setUpdatedBy(user.getName());
+        // modelRepository.updateModel(datasourceDO);
     }
 
     @Override

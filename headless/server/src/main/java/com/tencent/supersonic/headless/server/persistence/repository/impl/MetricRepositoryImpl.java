@@ -144,4 +144,9 @@ public class MetricRepositoryImpl implements MetricRepository {
                 .eq(MetricQueryDefaultConfigDO::getCreatedBy, userName);
         return metricQueryDefaultConfigDOMapper.selectOne(queryWrapper);
     }
+
+    @Override
+    public void removeByIds(List<Long> idList) {
+        metricDOMapper.deleteByIds(idList);
+    }
 }

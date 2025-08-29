@@ -26,10 +26,7 @@ import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,7 +39,9 @@ public class ChatWorkflowEngine {
             CoreComponentFactory.getSemanticCorrectors();
     private final String MAPINFO_IS_NULL_STR =
             "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。";
-
+    private static final List<String> DATE_KEYWORDS =
+            Arrays.asList("日", "月", "年", "周", "季度", "号", "天", "星期", "最近", "近期", "上个月", "上月", "下个月",
+                    "下月", "去年", "前年", "本周", "上周", "下周", "今天", "昨天", "明天");
     @Autowired
     private DimensionValuesMatchHelper dimensionValuesMatchHelper;
 
@@ -56,7 +55,8 @@ public class ChatWorkflowEngine {
                     if (queryCtx.getIsTip()) {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
-                    if (queryCtx.getMapInfo().isEmpty()) {
+                    if (queryCtx.getMapInfo().isEmpty()
+                            || !containsDateKeywords(queryCtx.getRequest().getQueryText())) {
                         errDefault(parseResult, queryCtx);
                     } else {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
@@ -134,6 +134,13 @@ public class ChatWorkflowEngine {
         }
     }
 
+    private boolean containsDateKeywords(String question) {
+        if (StringUtils.isBlank(question)) {
+            return false;
+        }
+        return DATE_KEYWORDS.stream().anyMatch(question::contains);
+    }
+
     /**
      * 当mapping为空时或queryCtx.getCandidateQueries()调用
      * 
@@ -144,7 +151,13 @@ public class ChatWorkflowEngine {
         List<SemanticParseInfo> selectedParses = new ArrayList<>();
         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
         SqlInfo sqlInfo = new SqlInfo();
-        String emptyMapTips = produceEmptyMapTips(queryCtx.getSemanticSchema());
+        String emptyMapTips;
+        if (!queryCtx.getMapInfo().isEmpty()
+                && !containsDateKeywords(queryCtx.getRequest().getQueryText())) {
+            emptyMapTips = produceDateTips(queryCtx.getSemanticSchema());
+        } else {
+            emptyMapTips = produceEmptyMapTips(queryCtx.getSemanticSchema());
+        }
         sqlInfo.setParsedS2SQL(emptyMapTips);
         sqlInfo.setCorrectedS2SQL(emptyMapTips);
         sqlInfo.setQuerySQL(null);
@@ -270,5 +283,18 @@ public class ChatWorkflowEngine {
                 .map(schemaElement -> "【" + schemaElement.getName() + "】")
                 .collect(Collectors.joining("，"));
         return String.format(baseTips, dimensionStr, metricStr);
+    }
+
+    public String produceDateTips(SemanticSchema semanticSchema) {
+        String baseTips = """
+                您好，你所提问的问题缺少日期范围。
+                请基于以下维度：
+                %s
+
+                补充日期范围后进行提问""";
+        String dimensionStr = semanticSchema.getDimensions().stream()
+                .map(schemaElement -> "【" + schemaElement.getName() + "】")
+                .collect(Collectors.joining("，"));
+        return String.format(baseTips, dimensionStr);
     }
 }

@@ -50,6 +50,17 @@ public class DefaultUserAdaptor implements UserAdaptor {
     }
 
     @Override
+    public User getUserByName(String name) {
+        UserDO userDO = getUser(name);
+        if (userDO == null) {
+            return null;
+        }
+        User user = User.get(userDO.getId(), userDO.getName(), userDO.getDisplayName(),
+                userDO.getEmail(), userDO.getIsAdmin());
+        return user;
+    }
+
+    @Override
     public List<String> getUserNames() {
         return getUserDOList().stream().map(UserDO::getName).collect(Collectors.toList());
     }
@@ -90,6 +101,7 @@ public class DefaultUserAdaptor implements UserAdaptor {
         }
         UserDO userDO = new UserDO();
         BeanUtils.copyProperties(userReq, userDO);
+        userDO.setDisplayName(userReq.getName());
         try {
             byte[] salt = AESEncryptionUtil.generateSalt(userDO.getName());
             userDO.setSalt(AESEncryptionUtil.getStringFromBytes(salt));

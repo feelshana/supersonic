@@ -16,4 +16,6 @@ public interface ModelRepository {
     ModelDO getModelById(Long id);
 
     void batchUpdate(List<ModelDO> modelDOS);
+
+    void removeById(Long id);
 }

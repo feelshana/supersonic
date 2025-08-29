@@ -297,12 +297,14 @@ public class MetricServiceImpl extends ServiceImpl<MetricDOMapper, MetricDO>
             throw new RuntimeException(
                     String.format("the metrics %s not exist", StringUtils.join(",", idList)));
         }
-        metricDOList.forEach(metricDO -> {
-            metricDO.setStatus(StatusEnum.DELETED.getCode());
-            metricDO.setUpdatedAt(new Date());
-            metricDO.setUpdatedBy(user.getName());
-        });
-        metricRepository.batchUpdateStatus(metricDOList);
+        // metricDOList.forEach(metricDO -> {
+        // metricDO.setStatus(StatusEnum.DELETED.getCode());
+        // metricDO.setUpdatedAt(new Date());
+        // metricDO.setUpdatedBy(user.getName());
+        // });
+        // metricRepository.batchUpdateStatus(metricDOList);
+        // 物理删除
+        metricRepository.removeByIds(idList);
         // should update modelDetail
         modelService.deleteModelDetailByDimAndMetric(metricDOList.get(0).getModelId(), null,
                 metricDOList);
