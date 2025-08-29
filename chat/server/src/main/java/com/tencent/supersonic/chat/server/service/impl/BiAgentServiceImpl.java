@@ -77,10 +77,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -187,7 +184,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         BiPageConfig pageConfig = config.getPageConfig();
 
         // 构建新的规则内容
-        String newRulesContent = buildNewRulesContent(pageConfig);
+        String newRulesContent = buildNewRulesContent(pageConfig, config.getModel());
 
         // 更新智能助理
         if (config.getAgentId() != null) {
@@ -207,13 +204,20 @@ public class BiAgentServiceImpl implements BiAgentService {
     /**
      * 构建新的规则内容
      */
-    private String buildNewRulesContent(BiPageConfig pageConfig) {
+    private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
         StringBuilder newRules = new StringBuilder("#其它规则：");
 
         if (!"1".equals(pageConfig.getIsGroupBy())) {
-            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT，并展示所有维度，其他例外的情况：计算均值、环比、维度分组统计等则可以聚合");
+            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.查询的维度字段固定为:");
         }
 
+        if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
+            List<String> dimensionNames = new ArrayList<>();
+            model.getDimensions().stream().filter(BiModelItem::isSelected)
+                    .forEach(item -> dimensionNames.add(item.getName()));
+            newRules.append(String.join(",", dimensionNames));
+            newRules.append("，指标字段根据语义理解后进行筛选");
+        }
         if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
             newRules.append("\n-维度值处理：");
             for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
@@ -665,8 +669,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setMeasures(measures);;
                 for (BiModelItem modelMeasure : modelMeasures) {
                     Measure measure = new Measure();
-                    measure.setName(modelMeasure.getName());
-                    measure.setBizName(modelMeasure.getName());
+                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1").replaceAll("\\(([^)]*)\\)", "$1");
+                    measure.setName(name);
+                    measure.setBizName(name);
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
                     if (modelMeasure.getAggregationType() != null) {
                         AggOperatorEnum aggOperator =
@@ -699,9 +704,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                 List<SelectItem<?>> items = select.getSelectItems();
                 items.forEach(item -> {
                     Alias alias = item.getAlias();
+                    log.info("BI传递的sql alias name: {}", alias.getName());
                     if (alias != null && alias.getName() != null) {
-                        String name = alias.getName().replace("\"", "`");
+                        String name =
+                                alias.getName().replace("\"", "`").replaceAll("\\（([^)]*)\\）", "$1")
+                                        .replaceAll("\\(([^)]*)\\)", "$1");
                         alias.setName(name);
+                        log.info("替换后的sql alias name: {}", name);
                     }
                 });
                 return select.toString();

@@ -6,6 +6,8 @@ import com.tencent.supersonic.chat.server.memory.MemoryReviewTask;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.RecordInfo;
 import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
+import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 
@@ -43,6 +45,8 @@ public class Agent extends RecordInfo {
     private List<String> viewOrgs = Lists.newArrayList();
     private Integer isOpen = 0;
     private Integer isBi = 0;
+    private List<DimensionResp> dimensionList;
+    private List<MetricResp> metricList;
 
     public List<String> getTools(AgentToolType type) {
         Map<String, Object> map = JSONObject.parseObject(toolConfig, Map.class);

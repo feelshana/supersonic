@@ -21,4 +21,5 @@ public class BiModelItem {
     private String databaseTableColumnName;
     private Integer type;
     private String aggregationType;
+    private boolean selected;
 }
