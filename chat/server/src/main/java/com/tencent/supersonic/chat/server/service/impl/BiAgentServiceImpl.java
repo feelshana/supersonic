@@ -541,8 +541,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     }
                     Dimension dimension = new Dimension();
                     dimension.setName(modelDimension.getName());
-                    Integer columnType = modelDimension.getColumnType();
-                    if (columnType != null && columnType == 2) {
+                    if (StringUtils.isNotBlank(modelDimension.getFormat())) {
                         dimension.setType(DimensionType.time);
                         dimension.setDateFormat(modelDimension.getFormat());
                     } else {
