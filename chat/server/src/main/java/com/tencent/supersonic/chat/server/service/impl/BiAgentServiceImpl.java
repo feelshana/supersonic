@@ -650,7 +650,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setDimensions(dimensions);
                 for (BiModelItem modelDimension : modelDimensions) {
                     Dimension dimension = new Dimension();
-                    dimension.setName(modelDimension.getName());
+                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1").replaceAll("\\(([^)]*)\\)", "$1");
+                    dimension.setName(name);
                     Integer columnType = modelDimension.getColumnType();
                     if (columnType != null && columnType == 2) {
                         dimension.setType(DimensionType.time);
@@ -658,7 +659,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     } else {
                         dimension.setType(DimensionType.categorical);
                     }
-                    dimension.setBizName(modelDimension.getName());
+                    dimension.setBizName(name);
                     dimension.setIsCreateDimension(1);
                     dimension.setDescription(modelDimension.getDescription());
                     dimensions.add(dimension);
