@@ -1,6 +1,6 @@
 import IconFont from '../../components/IconFont';
 import { getTextWidth, groupByColumn, isMobile } from '../../utils/utils';
-import { AutoComplete, Select, Tag, Button, Upload, Image, message } from 'antd';
+import { AutoComplete, Select, Tag, Button, Upload, Image, message, Popover, List } from 'antd';
 import classNames from 'classnames';
 import { debounce } from 'lodash';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -8,11 +8,12 @@ import type { ForwardRefRenderFunction } from 'react';
 import { SemanticTypeEnum, SEMANTIC_TYPE_MAP, HOLDER_TAG } from '../constants';
 import { AgentType, ModelType, FileResultType,FileResultsType, SendMsgWithRecommendTriggerType, DeepSeekStreamParams } from '../type';
 import { ChatContextType } from '../../common/type';
-import { searchRecommend ,uploadAndParse, fileStatus, stopStream } from '../../service';
+import { searchRecommend ,uploadAndParse, fileStatus, stopStream, queryDimensionValues } from '../../service';
 import styles from './style.module.less';
 import { useComposing } from '../../hooks/useComposing';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
 import { LoadingOutlined, CloseCircleOutlined,UploadOutlined,PauseCircleFilled } from '@ant-design/icons';
+import { getAgentDetail } from '../service'
 
 
 type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
@@ -75,6 +76,13 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
   const [previewOpen, setPreviewOpen] = useState(false);
   const inputRef = useRef<any>();
   const fetchRef = useRef(0);
+  const [ dimensionList, setDimensionList ] = useState<any[]>([]);
+  const [ metricList, setMetricList ] = useState<any[]>([]);
+  const [ dimensionValuesObj, setDimensionValuesObj] = useState<any>({});
+  const [ containerFocused, setContainerFocused ] = useState<boolean>(false); 
+  const [ popShowState, setPopShowState ] = useState<boolean>(false);
+  const containerRef = useRef<any>(null);
+
   // #region 文件上传相关功能
 
   // 上传的文件列表，即文件上传组件里的fileList
@@ -134,6 +142,30 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
       removeEvents();
     };
   }, []);
+
+  useEffect(() => {
+    if (onlyChatWindow) {
+      getAgentDetail(currentAgent?.id as number).then((res)=>{
+        if ((res as any)?.code === 200) {
+          setDimensionList(res?.data?.dimensionList || [])
+          setMetricList(res?.data?.metricList || [])
+        }
+      })
+    }
+  }, [currentAgent])
+
+  useEffect(() => { 
+    dimensionList.forEach(async (item)=>{
+      queryDimensionValues(item.modelId, item.bizName, currentAgent?.id as number, item.id, '').then((res) => {
+        setDimensionValuesObj(prev => {
+          const dimensionValueItem = res?.data?.resultList?.map((value:any)=>value?.[item?.bizName])
+          if (dimensionValueItem) {
+            return {...prev, [item.id]: dimensionValueItem}
+          } else return prev
+        })
+      })
+    })
+  }, [dimensionList]);
 
   const getStepOptions = (recommends: any[]) => {
     const data = groupByColumn(recommends, 'dataSetName');
@@ -619,6 +651,13 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
     </>
   )
 
+  const popChange = (open) => {
+    setPopShowState(open)
+    if (!open) {
+      containerRef.current?.focus()
+    }
+  }
+
   useEffect(() => {
     fileListRef.current = fileList;
   }, [fileList])
@@ -673,133 +712,169 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
             <div>智能助理</div>
           </div>
         )}
-        <div className={styles.toolItem} onClick={onOpenShowcase}>
+        {!onlyChatWindow && <div className={styles.toolItem} onClick={onOpenShowcase}>
           <IconFont type="icon-showcase" className={styles.toolIcon} />
           <div>showcase</div>
-        </div>
+        </div>}
       </div>
-      <div className={styles.composer}>
-        <div className={styles.composerInputWrapper}>
-          <AutoComplete
-            className={styles.composerInput}
-            placeholder={
-              currentAgent
-                ? `【${currentAgent.name}】将与您对话，点击${!isMobile ? '左侧' : ''}【智能助理】${
-                    !isMobile ? '列表' : ''
-                  }可切换`
-                : '请输入您的问题'
-            }
-            value={inputMsg}
-            onChange={(value: string) => {
-              onInputMsgChange(value);
-            }}
-            onSelect={onSelect}
-            autoFocus={!isMobile}
-            ref={inputRef}
-            id="chatInput"
-            onKeyDown={e => {
-              if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-                const chatInputEl: any = document.getElementById('chatInput');
-                const agent = agentList.find(
-                  item => chatInputEl.value[0] === '/' && chatInputEl.value.includes(item.name)
-                );
-                if (agent) {
-                  if (agent.id !== currentAgent?.id) {
-                    onSelectAgent(agent);
-                  }
-                  onInputMsgChange('');
-                  return;
-                }
-                if (!isSelect && !isComposing) {
-                  sendMsgWithFile()
-                  setOpen(false);
-                }
+      <div ref={containerRef} className={styles.container} tabIndex={-1} onFocus={() => setContainerFocused(true)} onBlur={() => setContainerFocused(false)}>
+        {onlyChatWindow && (containerFocused || popShowState) && <div className={styles.extraArea}>
+          <div className={styles.row1}>
+            <div className={styles.title}>
+                <span style={{color: '#1677ff'}}>维度</span>
+            </div>
+            <div>
+              { 
+                dimensionList.map((item:any, index:number) => {
+                  return <Popover key={item.id} content={(
+                    <div style={{ minHeight: '50px', maxHeight: '500px', overflowY: 'auto' }}>
+                      <List dataSource={dimensionValuesObj[item.id]} renderItem={(ritem:any) => (<div>{ritem}</div>)}/>
+                    </div>
+                  )} 
+                  onOpenChange={popChange}
+                  title="维度值" trigger="hover">
+                     <Tag  color='processing' className={styles.tag} bordered={false}>{ item.name }</Tag>
+                  </Popover>
+                }) 
               }
-            }}
-            onFocus={() => {
-              setFocused(true);
-            }}
-            onBlur={() => {
-              setFocused(false);
-            }}
-            dropdownClassName={autoCompleteDropdownClass}
-            listHeight={500}
-            allowClear
-            open={open}
-            defaultActiveFirstOption={false}
-            getPopupContainer={triggerNode => triggerNode.parentNode}>
-            {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
-          </AutoComplete>
-          {
-            // #region 文件上传相关功能
-          }
-          {/* 发送按钮 */}
-          <div
-            className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: 
-              (inputMsg?.length > 0 || fileResults?.length > 0) && 
-              !fileUidsInProgress?.length &&
-              currentInStreamQuery === undefined,
-            })}
-            onClick={() => {
-              sendMsgWithFile()
-            }}>
-            <IconFont type="icon-ios-send" />
+            </div>
           </div>
-          {/* 停止输出按钮 */}
-          {currentAgent?.chatAppConfig?.SMALL_TALK?.enable && showPauseButton && <div
-            className={classNames(styles.sendBtn, {
-              [styles.sendBtnActive]: !!currentInStreamQuery
-            })}
-            onClick={onStopStream}>
-            <PauseCircleFilled />
-          </div>}
-          {/* 上传组件 */}
-          <div className={styles.uploadContainer}>
-            {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}
-            <Upload
-              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
-              method={'get' as any }
-              maxCount={10}
-              // listType="picture"
-              fileList={fileList}
-              itemRender={itemRender}
-              onChange = {onRemoveFile}
-              onPreview={handlePreview}
-            >
-            </Upload>
-            {previewImage && (
-              <Image
-                wrapperStyle={{ display: 'none' }}
-                preview={{
-                  visible: previewOpen,
-                  onVisibleChange: (visible) => setPreviewOpen(visible),
-                  afterOpenChange: (visible) => !visible && setPreviewImage(''),
-                }}
-                src={previewImage}
-              />
-            )}
+          <div className={styles.row2}>
+            <div className={styles.title}>
+              <span style={{color: '#16adb3'}}>指标</span>
+            </div>
+            <div>
+              { 
+                metricList.map((item:any, index:number) => {
+                  return <Tag key={item.id} style={{color: '#16adb3'}} color='#e1faf5' className={styles.tag} bordered={false}>{ item.name }</Tag>
+                }) 
+              }
+            </div>
           </div>
-          {/* 上传组件按钮 */}
-          <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
-            <Upload
-              // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
-              method={'get' as any }
-              maxCount={10}
-              fileList={fileList}
-              showUploadList={false}
-              onChange = {onAddFile}
-            >
-              <Button 
-                type="primary" 
-                className={styles.uploadHandlerBtn}
-                icon={<UploadOutlined />}>
-              </Button>
-            </Upload>
+        </div>}
+        <div className={styles.composer}>
+          <div className={styles.composerInputWrapper}>
+            <AutoComplete
+              className={styles.composerInput}
+              placeholder={
+                currentAgent
+                  ? `【${currentAgent.name}】将与您对话，点击${!isMobile ? '左侧' : ''}【智能助理】${
+                      !isMobile ? '列表' : ''
+                    }可切换`
+                  : '请输入您的问题'
+              }
+              value={inputMsg}
+              onChange={(value: string) => {
+                onInputMsgChange(value);
+              }}
+              onSelect={onSelect}
+              autoFocus={!isMobile}
+              ref={inputRef}
+              id="chatInput"
+              onKeyDown={e => {
+                if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+                  const chatInputEl: any = document.getElementById('chatInput');
+                  const agent = agentList.find(
+                    item => chatInputEl.value[0] === '/' && chatInputEl.value.includes(item.name)
+                  );
+                  if (agent) {
+                    if (agent.id !== currentAgent?.id) {
+                      onSelectAgent(agent);
+                    }
+                    onInputMsgChange('');
+                    return;
+                  }
+                  if (!isSelect && !isComposing) {
+                    sendMsgWithFile()
+                    setOpen(false);
+                  }
+                }
+              }}
+              onFocus={() => {
+                setFocused(true);
+              }}
+              onBlur={() => {
+                setFocused(false);
+              }}
+              popupClassName={autoCompleteDropdownClass}
+              listHeight={500}
+              allowClear
+              open={open}
+              defaultActiveFirstOption={false}
+              getPopupContainer={triggerNode => triggerNode.parentNode}>
+              {modelOptions.length > 0 ? modelOptionNodes : associateOptionNodes}
+            </AutoComplete>
+            {
+              // #region 文件上传相关功能
+            }
+            {/* 发送按钮 */}
+            <div
+              className={classNames(styles.sendBtn, {
+                [styles.sendBtnActive]: 
+                (inputMsg?.length > 0 || fileResults?.length > 0) && 
+                !fileUidsInProgress?.length &&
+                currentInStreamQuery === undefined,
+              })}
+              onClick={() => {
+                sendMsgWithFile()
+              }}>
+              <IconFont type="icon-ios-send" />
+            </div>
+            {/* 停止输出按钮 */}
+            {currentAgent?.chatAppConfig?.SMALL_TALK?.enable && showPauseButton && <div
+              className={classNames(styles.sendBtn, {
+                [styles.sendBtnActive]: !!currentInStreamQuery
+              })}
+              onClick={onStopStream}>
+              <PauseCircleFilled />
+            </div>}
+            {/* 上传组件 */}
+            <div className={styles.uploadContainer}>
+              {fileList.length>0 ? <div className={styles.uploadTip}>只识别文件中的文字</div> : ''}
+              <Upload
+                // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+                method={'get' as any }
+                maxCount={10}
+                // listType="picture"
+                fileList={fileList}
+                itemRender={itemRender}
+                onChange = {onRemoveFile}
+                onPreview={handlePreview}
+              >
+              </Upload>
+              {previewImage && (
+                <Image
+                  wrapperStyle={{ display: 'none' }}
+                  preview={{
+                    visible: previewOpen,
+                    onVisibleChange: (visible) => setPreviewOpen(visible),
+                    afterOpenChange: (visible) => !visible && setPreviewImage(''),
+                  }}
+                  src={previewImage}
+                />
+              )}
+            </div>
+            {/* 上传组件按钮 */}
+            <div className={styles.uploadHandler} style={{display:currentAgent?.chatAppConfig?.SMALL_TALK?.enable ? 'block' : 'none'}}>
+              <Upload
+                // 因为并没有真正上传没有action，但有默认行为所以这里method要设置为get
+                method={'get' as any }
+                maxCount={10}
+                fileList={fileList}
+                showUploadList={false}
+                onChange = {onAddFile}
+              >
+                <Button 
+                  type="primary" 
+                  className={styles.uploadHandlerBtn}
+                  icon={<UploadOutlined />}>
+                </Button>
+              </Upload>
+            </div>
+            {
+              // #endregion 文件上传相关功能
+            }
           </div>
-          {
-            // #endregion 文件上传相关功能
-          }
         </div>
       </div>
     </div>

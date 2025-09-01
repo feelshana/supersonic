@@ -245,7 +245,7 @@ const Chat: ForwardRefRenderFunction<any, Props> = (
   };
 
   const updateHistoryMsg = async (page: number) => {
-    const res = await getHistoryMsg(page, currentConversation!.chatId, 3);
+    const res = await getHistoryMsg(page, currentAgent?.id as number, currentConversation!.chatId, 3);
     const { hasNextPage, list } = res?.data || { hasNextPage: false, list: [] };
     const msgList = [...convertHistoryMsg(list), ...(page === 1 ? [] : messageList)];
     /* 需求：无论是否有聊天记录都要有招呼消消息————start */

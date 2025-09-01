@@ -106,10 +106,11 @@ export function queryData(chatContext: Partial<ChatContextType>) {
 
 export function getHistoryMsg(
   current: number,
+  agentId: number,
   chatId: number = DEFAULT_CHAT_ID,
-  pageSize: number = 10
+  pageSize: number = 10,
 ) {
-  return axios.post<HistoryType>(`${prefix}/chat/manage/pageQueryInfo?chatId=${chatId}`, {
+  return axios.post<HistoryType>(`${prefix}/chat/manage/pageQueryInfo?chatId=${chatId}&agentId=${agentId}`, {
     current,
     pageSize,
   });

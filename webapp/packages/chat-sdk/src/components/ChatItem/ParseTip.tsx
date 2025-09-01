@@ -66,6 +66,8 @@ const ParseTip: React.FC<Props> = ({
   isGoRefresh,
   setIsGoRefresh
 }) => {
+  const params = new URLSearchParams(window.location.search);
+  const onlyChatWindow = params.get('onlyChatWindow') === 'true'
   useEffect(() => {
     if (isGoRefresh) {
       onRefresh()
@@ -215,10 +217,10 @@ const ParseTip: React.FC<Props> = ({
             </div>
           </div>
         )}
-        <Button className={`${prefixCls}-reload`} size="small" onClick={onRefresh}>
+        {!onlyChatWindow && <Button className={`${prefixCls}-reload`} size="small" onClick={onRefresh}>
           <ReloadOutlined />
           重新查询
-        </Button>
+        </Button>}
       </>
     );
   };

@@ -34,6 +34,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
   dimensionValueSettingList,
   onSubmit,
 }) => {
+  const isAgentFormForLink = window.location.pathname.includes('AgentFormForLink')
   const [tableDataSource, setTableDataSource] = useState<TableDataSource[]>([]);
   const [dimValueMaps, setDimValueMaps] = useState<ISemantic.IDimensionValueSettingItem[]>([]);
   const [form] = Form.useForm();
@@ -324,7 +325,8 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
       onCancel={onCancel}
     >
       <div>
-        <DimensionValueSettingForm
+
+        {!isAgentFormForLink && <DimensionValueSettingForm
           dataItem={dimensionItem}
           knowledgeConfig={knowledgeConfig}
           onVisibleChange={(state) => {
@@ -336,7 +338,8 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
           onDictChange={() => {
             refreshTableData();
           }}
-        />
+        />}
+
         {dimensionVisibleState === KnowledgeConfigStatusEnum.ONLINE && (
           <>
             <Divider style={{ margin: 10 }} />
