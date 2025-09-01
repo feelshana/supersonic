@@ -25,6 +25,7 @@ import com.tencent.supersonic.headless.core.pojo.StructQuery;
 import com.tencent.supersonic.headless.core.translator.SemanticTranslator;
 import com.tencent.supersonic.headless.core.translator.TranslatorConfig;
 import com.tencent.supersonic.headless.core.utils.ComponentFactory;
+import com.tencent.supersonic.headless.server.annotation.DefaultDimValueCheck;
 import com.tencent.supersonic.headless.server.annotation.S2DataPermission;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.manager.SemanticSchemaManager;
@@ -88,6 +89,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
     @Autowired
     private DimensionValuesMatchHelper dimensionValuesMatchHelper;
 
+    @DefaultDimValueCheck
     @S2DataPermission
     @Override
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {

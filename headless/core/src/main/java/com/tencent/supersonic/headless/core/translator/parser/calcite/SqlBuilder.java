@@ -347,7 +347,9 @@ public class SqlBuilder {
             tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope));
         } catch (Exception e) {
-            log.error("Failed to create sqlNode for data model {}", dataModel);
+            log.error("Failed to create sqlNode for table,tableQuery:{},SqlQuery:{}",
+                    dataModel.getModelDetail().getTableQuery(),
+                    dataModel.getModelDetail().getSqlQuery(), e);
         }
 
         return tableView;

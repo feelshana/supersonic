@@ -115,6 +115,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public User getUserByName(String userName) {
+        return ComponentFactory.getUserAdaptor().getUserByName(userName);
+    }
+
+    @Override
     public UserToken getUserToken(Long id) {
         return ComponentFactory.getUserAdaptor().getUserToken(id);
     }

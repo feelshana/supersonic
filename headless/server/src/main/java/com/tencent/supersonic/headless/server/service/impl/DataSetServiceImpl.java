@@ -125,11 +125,13 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
 
     @Override
     public void delete(Long id, User user) {
-        DataSetDO dataSetDO = getById(id);
-        dataSetDO.setStatus(StatusEnum.DELETED.getCode());
-        dataSetDO.setUpdatedBy(user.getName());
-        dataSetDO.setUpdatedAt(new Date());
-        updateById(dataSetDO);
+        // DataSetDO dataSetDO = getById(id);
+        // dataSetDO.setStatus(StatusEnum.DELETED.getCode());
+        // dataSetDO.setUpdatedBy(user.getName());
+        // dataSetDO.setUpdatedAt(new Date());
+        // updateById(dataSetDO);
+        // 物理删除
+        removeById(id);
     }
 
     @Override

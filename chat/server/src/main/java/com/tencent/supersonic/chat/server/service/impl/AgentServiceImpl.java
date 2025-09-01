@@ -2,6 +2,7 @@ package com.tencent.supersonic.chat.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.github.pagehelper.PageInfo;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
@@ -24,6 +25,12 @@ import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
+import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
+import com.tencent.supersonic.headless.api.pojo.request.PageMetricReq;
+import com.tencent.supersonic.headless.api.pojo.request.PageSchemaItemReq;
+import com.tencent.supersonic.headless.api.pojo.response.*;
+import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
+import com.tencent.supersonic.headless.server.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +66,16 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     @Autowired
     @Qualifier("chatExecutor")
     private ThreadPoolExecutor executor;
+    @Autowired
+    private DataSetService dataSetService;
+    @Autowired
+    private DomainService domainService;
+    @Autowired
+    private ModelService modelService;
+    @Autowired
+    private DimensionService dimensionService;
+    @Autowired
+    private MetricService metricService;
 
     @Override
     public List<Agent> getAgents(User user, AuthType authType) {
@@ -133,6 +150,42 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     @Override
     public void deleteAgent(Integer id) {
         removeById(id);
+    }
+
+    @Override
+    public Agent getAgentDetail(Integer agentId, User user) {
+        if (agentId == null) {
+            return null;
+        }
+        Agent agent = convert(getById(agentId));
+        Set<Long> dataSetIds = agent.getDataSetIds();
+        List<DimensionResp> dimensionNames = new ArrayList<>();
+        List<MetricResp> metricNames = new ArrayList<>();
+        for (Long dataSetId : dataSetIds) {
+            DataSetResp dataSet = dataSetService.getDataSet(dataSetId);
+            Long domainId = dataSet.getDomainId();
+            List<ModelResp> allModelByDomainIds =
+                    modelService.getAllModelByDomainIds(Lists.newArrayList(domainId));
+            List<Long> modelIds =
+                    allModelByDomainIds.stream().map(ModelResp::getId).collect(Collectors.toList());
+            PageDimensionReq pageDimensionReq = new PageDimensionReq();
+            pageDimensionReq.setModelIds(modelIds);
+            pageDimensionReq.setPageSize(20);
+            pageDimensionReq.setCurrent(1);
+            PageInfo<DimensionResp> dimensionPageInfo =
+                    dimensionService.queryDimension(pageDimensionReq);
+            dimensionNames.addAll(dimensionPageInfo.getList());
+            PageMetricReq pageMetricReq = new PageMetricReq();
+            pageMetricReq.setModelIds(modelIds);
+            pageMetricReq.setPageSize(20);
+            pageMetricReq.setCurrent(1);
+            PageInfo<MetricResp> metricRespPageInfo =
+                    metricService.queryMetric(pageMetricReq, user);
+            metricNames.addAll(metricRespPageInfo.getList());
+        }
+        agent.setDimensionList(dimensionNames);
+        agent.setMetricList(metricNames);
+        return agent;
     }
 
     /**

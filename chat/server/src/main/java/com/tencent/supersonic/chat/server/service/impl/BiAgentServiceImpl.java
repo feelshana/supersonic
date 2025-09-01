@@ -3,6 +3,8 @@ package com.tencent.supersonic.chat.server.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.tencent.supersonic.auth.api.authentication.request.UserReq;
+import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
@@ -25,6 +27,7 @@ import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.common.util.ChatAppManager;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.HttpUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
@@ -74,10 +77,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -112,6 +114,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     private DictConfService dictConfService;
     @Autowired
     private DictTaskService dictTaskService;
+    @Autowired
+    private UserService userService;
 
     @Override
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
@@ -131,26 +135,34 @@ public class BiAgentServiceImpl implements BiAgentService {
         String domainName = "BI-" + modelConfig.getModelName();
         String domainBizName = "bi-" + modelConfig.getModelId();
         List<DomainDO> domains = domainService.getDomainByBizName(domainName, domainBizName);
+        log.info("查询主题域信息, domainName: {}, domainBizName: {}, 结果数量: {}", domainName, domainBizName,
+                domains.size());
         // 找该模型名称对应的agent
         List<Agent> agents = agentService.getAgentByName(domainName);
         Agent uniqueAgent = findUniqueAgent(agents, domains);
+        log.info("查询智能助手信息, agentName: {}, 结果数量: {}", domainName, agents.size());
         // 删除旧的模型和主题域
         if (config.getAgentId() != null || !CollectionUtils.isEmpty(domains)) {
+            log.info("清理旧配置, agentId: {}, domain是否为空: {}", config.getAgentId(), domains.isEmpty());
             dimAliasMap = clearOldConfig(config.getAgentId(), domains, agents, user);
         } else {
             dimAliasMap = Collections.emptyMap();
         }
         // 创建数据源
+        log.info("开始创建数据源");
         DatabaseResp databaseResp = createDataSource(config.getDataSource(), user);
         // 创建主题域
+        log.info("开始创建主题域");
         DomainReq domainReq = new DomainReq();
         domainReq.setName(domainName);
         domainReq.setBizName(domainBizName);
         DomainResp domainResp = domainService.createDomain(domainReq, user);
         // 创建模型
+        log.info("开始创建模型");
         List<ModelResp> modelResps =
                 createModel(modelConfig, pageConfig, dimAliasMap, user, databaseResp, domainResp);
         // 创建数据集
+        log.info("开始创建数据集");
         DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps);
         // 工具配置
         ToolConfig toolConfig = new ToolConfig();
@@ -159,24 +171,135 @@ public class BiAgentServiceImpl implements BiAgentService {
         datasetTool.setType(AgentToolType.DATASET);
         datasetTool.setDataSetIds(Lists.newArrayList(dataSetResp.getId()));
         toolConfig.getTools().add(datasetTool);
-        // 更新助理
+        // 检查BI的用户名，没有就创建
+        checkBIUsers(config.getAdmins(), config.getViewers());
+        // 创建或者更新助理
+        Agent agent = createOrUpdateAgent(config, uniqueAgent, toolConfig, user, domainName);
+        log.info("智能助手创建完成, id: {}", agent.getId());
+        return agent;
+    }
+
+    private Agent createOrUpdateAgent(BiAgentConfig config, Agent uniqueAgent,
+            ToolConfig toolConfig, User user, String domainName) {
+        BiPageConfig pageConfig = config.getPageConfig();
+
+        // 构建新的规则内容
+        String newRulesContent = buildNewRulesContent(pageConfig, config.getModel());
+
+        // 更新智能助理
         if (config.getAgentId() != null) {
+            log.info("更新已有智能助手, id: {}", config.getAgentId());
             Agent agent = agentService.getAgent(config.getAgentId());
-            agent.setToolConfig(JSONObject.toJSONString(toolConfig));
-            agent = agentService.updateAgent(agent, user);
-            return agent;
+            return updateExistingAgent(agent, toolConfig, config, newRulesContent, user);
         } else if (uniqueAgent != null) {
-            uniqueAgent.setToolConfig(JSONObject.toJSONString(toolConfig));
-            uniqueAgent = agentService.updateAgent(uniqueAgent, user);
-            return uniqueAgent;
+            log.info("更新主题域对应的智能助手, id: {}", uniqueAgent.getId());
+            return updateExistingAgent(uniqueAgent, toolConfig, config, newRulesContent, user);
         }
+
         // 创建智能助理
+        log.info("创建新智能助手");
+        return createNewAgent(config, toolConfig, user, domainName, newRulesContent);
+    }
+
+    /**
+     * 构建新的规则内容
+     */
+    private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
+        StringBuilder newRules = new StringBuilder("#其它规则：\n");
+
+        if (!"1".equals(pageConfig.getIsGroupBy())) {
+            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
+        }
+
+        if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
+
+            List<String> dimensionNames = new ArrayList<>();
+            model.getDimensions().stream().filter(BiModelItem::isSelected)
+                    .forEach(item -> dimensionNames.add(item.getName()));
+            if (!dimensionNames.isEmpty()) {
+                newRules.append("\n查询的维度字段固定为:");
+                newRules.append(String.join(",", dimensionNames) + ".");
+            }
+            newRules.append("指标字段根据语义理解后进行筛选");
+        }
+        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+            newRules.append("\n-维度值处理：");
+            for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
+                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+                    String itemValues =
+                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
+                                    : "[" + String.join(",", item.getDefaultValues()) + "]";
+                    newRules.append("\n√ 未提及的维度 → ").append(item.getName()).append("赋值：")
+                            .append(itemValues);
+                }
+            }
+            newRules.append(
+                    "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'");
+        }
+
+        return newRules.toString();
+    }
+
+    /**
+     * 更新现有助理
+     */
+    private Agent updateExistingAgent(Agent agent, ToolConfig toolConfig, BiAgentConfig config,
+            String newRulesContent, User user) {
+        agent.setToolConfig(JSONObject.toJSONString(toolConfig));
+        agent.setAdmins(config.getAdmins());
+        agent.setViewers(config.getViewers());
+
+        Map<String, ChatApp> chatAppConfig = agent.getChatAppConfig();
+        ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
+
+        if (chatApp != null) {
+            updatePromptWithNewRules(chatApp, newRulesContent);
+        }
+
+        return agentService.updateAgent(agent, user);
+    }
+
+    /**
+     * 更新提示词中的规则内容
+     */
+    private void updatePromptWithNewRules(ChatApp chatApp, String newRulesContent) {
+        String prompt = chatApp.getPrompt();
+        if (StringUtils.isBlank(prompt)) {
+            return;
+        }
+
+        String startMarker = "#其它规则：";
+        String endMarker = "比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
+
+        int startIndex = prompt.indexOf(startMarker);
+        int endIndex = prompt.indexOf(endMarker, startIndex);
+
+        String newPrompt;
+        if (startIndex != -1 && endIndex != -1) {
+            // 替换现有规则
+            endIndex += endMarker.length();
+            newPrompt =
+                    prompt.substring(0, startIndex) + newRulesContent + prompt.substring(endIndex);
+        } else {
+            // 追加新规则
+            newPrompt = prompt + "\n" + newRulesContent;
+        }
+
+        chatApp.setPrompt(newPrompt);
+    }
+
+    /**
+     * 创建新助理
+     */
+    private Agent createNewAgent(BiAgentConfig config, ToolConfig toolConfig, User user,
+            String domainName, String newRulesContent) {
         Agent agent = new Agent();
         agent.setIsBi(1);
         agent.setAdmins(config.getAdmins());
         agent.setViewers(config.getViewers());
         agent.setToolConfig(JSONObject.toJSONString(toolConfig));
-        agent.setName("BI-" + modelConfig.getModelName());
+        agent.setName(domainName);
+
         // 模型配置
         Map<String, ChatApp> allApps = ChatAppManager.getAllApps(AppModule.CHAT);
         Map<String, ChatApp> chatAppConfig = Maps.newHashMap();
@@ -187,35 +310,49 @@ public class BiAgentServiceImpl implements BiAgentService {
             chatAppConfig.put(key, chatAppNew);
         }
         chatAppConfig.values().forEach(app -> app.setChatModelId(this.chatModelId));
-        // 多轮对话
-        // chatAppConfig.get(NL2SQLParser.APP_KEY_MULTI_TURN).setEnable(true);
+
+        // 处理提示词
         ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
-        String prompt = chatApp.getPrompt();
-        prompt = prompt + "\n#其它规则：";
-        if (!"1".equals(pageConfig.getIsGroupBy())) {
-            prompt = prompt
-                    + "\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT，并展示所有维度，其他例外的情况：计算均值、环比、维度分组统计等则可以聚合";
+        if (chatApp != null && chatApp.getPrompt() != null) {
+            String newPrompt = chatApp.getPrompt() + "\n" + newRulesContent;
+            chatApp.setPrompt(newPrompt);
         }
-        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-            prompt = prompt + "\n-维度值处理：";
-            for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
-                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
-                    String itemValues =
-                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().get(0)
-                                    : item.getDefaultValues().stream()
-                                            .collect(Collectors.joining(",", "[", "]"));
-                    prompt = prompt + "\n√ 未提及的维度 → " + item.getName() + "赋值：" + itemValues;
-                }
-            }
-            prompt = prompt
-                    + "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
-        }
-        chatApp.setPrompt(prompt);
+
         agent.enableSearch();
         agent.enableFeedback();
         agent.setChatAppConfig(chatAppConfig);
-        agent = agentService.createAgent(agent, user);
-        return agent;
+        return agentService.createAgent(agent, user);
+    }
+
+    private void checkBIUsers(List<String> admins, List<String> viewers) {
+        if (CollectionUtils.isEmpty(admins) && CollectionUtils.isEmpty(viewers)) {
+            return;
+        }
+        if (!CollectionUtils.isEmpty(admins)) {
+            for (String admin : admins) {
+                User user = userService.getUserByName(admin);
+                if (user == null) {
+                    UserReq userReq = new UserReq();
+                    userReq.setName(admin);
+                    userReq.setPassword("123456");
+                    userReq.setNewPassword("123456");
+                    userService.register(userReq);
+                }
+            }
+        }
+        if (!CollectionUtils.isEmpty(viewers)) {
+            for (String viewer : viewers) {
+                User user = userService.getUserByName(viewer);
+                if (user == null) {
+                    UserReq userReq = new UserReq();
+                    userReq.setName(viewer);
+                    userReq.setPassword("123456");
+                    userReq.setNewPassword("123456");
+                    userService.register(userReq);
+                }
+            }
+        }
+
     }
 
     private Agent findUniqueAgent(List<Agent> agents, List<DomainDO> domains) {
@@ -262,7 +399,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
             Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
             // 清理没有助理，只有主题域，模型和数据集的情况，清空所有的主题域与模型与数据集
-            if (agents == null) {
+            if (agents == null || agents.isEmpty()) {
                 for (DomainDO domain : domains) {
                     MetaFilter filterDataSet = new MetaFilter();
                     filterDataSet.setDomainId(domain.getId());
@@ -415,8 +552,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     }
                     Dimension dimension = new Dimension();
                     dimension.setName(modelDimension.getName());
-                    Integer columnType = modelDimension.getColumnType();
-                    if (columnType != null && columnType == 2) {
+                    if (StringUtils.isNotBlank(modelDimension.getFormat())) {
                         dimension.setType(DimensionType.time);
                         dimension.setDateFormat(modelDimension.getFormat());
                     } else {
@@ -467,7 +603,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         } else {
                             dimension.setType(DimensionType.categorical);
                         }
-                        dimension.setBizName(custom.getColumnName());
+                        dimension.setBizName(custom.getName());
+                        dimension.setExpr(custom.getColumnName());
                         dimension.setDescription(custom.getDescription());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
@@ -479,7 +616,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                     } else if (custom.getType() == 1) {
                         Measure measure = new Measure();
                         measure.setName(custom.getName());
-                        measure.setBizName(custom.getColumnName());
+                        measure.setExpr(custom.getColumnName());
+                        measure.setBizName(custom.getName());
                         measure.setAgg(AggOperatorEnum.NONE.getOperator());
                         if (custom.getAggregationType() != null) {
                             AggOperatorEnum aggOperator =
@@ -524,7 +662,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setDimensions(dimensions);
                 for (BiModelItem modelDimension : modelDimensions) {
                     Dimension dimension = new Dimension();
-                    dimension.setName(modelDimension.getName());
+                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1");
+                    dimension.setName(name);
                     Integer columnType = modelDimension.getColumnType();
                     if (columnType != null && columnType == 2) {
                         dimension.setType(DimensionType.time);
@@ -532,7 +672,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     } else {
                         dimension.setType(DimensionType.categorical);
                     }
-                    dimension.setBizName(modelDimension.getName());
+                    dimension.setBizName(name);
                     dimension.setIsCreateDimension(1);
                     dimension.setDescription(modelDimension.getDescription());
                     dimensions.add(dimension);
@@ -543,8 +683,10 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setMeasures(measures);;
                 for (BiModelItem modelMeasure : modelMeasures) {
                     Measure measure = new Measure();
-                    measure.setName(modelMeasure.getName());
-                    measure.setBizName(modelMeasure.getName());
+                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1");
+                    measure.setName(name);
+                    measure.setBizName(name);
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
                     if (modelMeasure.getAggregationType() != null) {
                         AggOperatorEnum aggOperator =
@@ -577,9 +719,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                 List<SelectItem<?>> items = select.getSelectItems();
                 items.forEach(item -> {
                     Alias alias = item.getAlias();
+                    log.info("BI传递的sql alias name: {}", alias.getName());
                     if (alias != null && alias.getName() != null) {
-                        String name = alias.getName().replace("\"", "").replace("'", "");
+                        String name =
+                                alias.getName().replace("\"", "`").replaceAll("\\（([^)]*)\\）", "$1")
+                                        .replaceAll("\\(([^)]*)\\)", "$1");
                         alias.setName(name);
+                        log.info("替换后的sql alias name: {}", name);
                     }
                 });
                 return select.toString();
