@@ -205,25 +205,29 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 构建新的规则内容
      */
     private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
-        StringBuilder newRules = new StringBuilder("#其它规则：");
+        StringBuilder newRules = new StringBuilder("#其它规则：\n");
 
         if (!"1".equals(pageConfig.getIsGroupBy())) {
-            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.查询的维度字段固定为:");
+            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
         }
 
         if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
+
             List<String> dimensionNames = new ArrayList<>();
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
-            newRules.append(String.join(",", dimensionNames));
-            newRules.append("，指标字段根据语义理解后进行筛选");
+            if (!dimensionNames.isEmpty()) {
+                newRules.append("\n查询的维度字段固定为:");
+                newRules.append(String.join(",", dimensionNames) + ".");
+            }
+            newRules.append("指标字段根据语义理解后进行筛选");
         }
         if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
             newRules.append("\n-维度值处理：");
             for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
                 if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
                     String itemValues =
-                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().get(0)
+                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
                                     : "[" + String.join(",", item.getDefaultValues()) + "]";
                     newRules.append("\n√ 未提及的维度 → ").append(item.getName()).append("赋值：")
                             .append(itemValues);
@@ -321,24 +325,31 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private void checkBIUsers(List<String> admins, List<String> viewers) {
-        for (String admin : admins) {
-            User user = userService.getUserByName(admin);
-            if (user == null) {
-                UserReq userReq = new UserReq();
-                userReq.setName(admin);
-                userReq.setPassword("123456");
-                userReq.setNewPassword("123456");
-                userService.register(userReq);
+        if (CollectionUtils.isEmpty(admins) && CollectionUtils.isEmpty(viewers)) {
+            return;
+        }
+        if (!CollectionUtils.isEmpty(admins)) {
+            for (String admin : admins) {
+                User user = userService.getUserByName(admin);
+                if (user == null) {
+                    UserReq userReq = new UserReq();
+                    userReq.setName(admin);
+                    userReq.setPassword("123456");
+                    userReq.setNewPassword("123456");
+                    userService.register(userReq);
+                }
             }
         }
-        for (String viewer : viewers) {
-            User user = userService.getUserByName(viewer);
-            if (user == null) {
-                UserReq userReq = new UserReq();
-                userReq.setName(viewer);
-                userReq.setPassword("123456");
-                userReq.setNewPassword("123456");
-                userService.register(userReq);
+        if (!CollectionUtils.isEmpty(viewers)) {
+            for (String viewer : viewers) {
+                User user = userService.getUserByName(viewer);
+                if (user == null) {
+                    UserReq userReq = new UserReq();
+                    userReq.setName(viewer);
+                    userReq.setPassword("123456");
+                    userReq.setNewPassword("123456");
+                    userService.register(userReq);
+                }
             }
         }
 
@@ -388,7 +399,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
             Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
             // 清理没有助理，只有主题域，模型和数据集的情况，清空所有的主题域与模型与数据集
-            if (agents == null) {
+            if (agents == null || agents.isEmpty()) {
                 for (DomainDO domain : domains) {
                     MetaFilter filterDataSet = new MetaFilter();
                     filterDataSet.setDomainId(domain.getId());
@@ -592,7 +603,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         } else {
                             dimension.setType(DimensionType.categorical);
                         }
-                        dimension.setBizName(custom.getColumnName());
+                        dimension.setBizName(custom.getName());
+                        dimension.setExpr(custom.getColumnName());
                         dimension.setDescription(custom.getDescription());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
@@ -604,7 +616,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                     } else if (custom.getType() == 1) {
                         Measure measure = new Measure();
                         measure.setName(custom.getName());
-                        measure.setBizName(custom.getColumnName());
+                        measure.setExpr(custom.getColumnName());
+                        measure.setBizName(custom.getName());
                         measure.setAgg(AggOperatorEnum.NONE.getOperator());
                         if (custom.getAggregationType() != null) {
                             AggOperatorEnum aggOperator =
@@ -649,7 +662,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setDimensions(dimensions);
                 for (BiModelItem modelDimension : modelDimensions) {
                     Dimension dimension = new Dimension();
-                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1").replaceAll("\\(([^)]*)\\)", "$1");
+                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1");
                     dimension.setName(name);
                     Integer columnType = modelDimension.getColumnType();
                     if (columnType != null && columnType == 2) {
@@ -669,7 +683,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setMeasures(measures);;
                 for (BiModelItem modelMeasure : modelMeasures) {
                     Measure measure = new Measure();
-                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1").replaceAll("\\(([^)]*)\\)", "$1");
+                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1");
                     measure.setName(name);
                     measure.setBizName(name);
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
