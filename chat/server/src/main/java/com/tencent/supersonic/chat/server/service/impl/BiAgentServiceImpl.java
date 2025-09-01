@@ -134,13 +134,17 @@ public class BiAgentServiceImpl implements BiAgentService {
         Map<String, List<DimValueMap>> dimAliasMap = null;
         String domainName = "BI-" + modelConfig.getModelName();
         String domainBizName = "bi-" + modelConfig.getModelId();
+
+        // 查询重复的主题域
         List<DomainDO> domains = domainService.getDomainByBizName(domainName, domainBizName);
         log.info("查询主题域信息, domainName: {}, domainBizName: {}, 结果数量: {}", domainName, domainBizName,
                 domains.size());
-        // 找该模型名称对应的agent
+        // 查询重复名称的智能助手
         List<Agent> agents = agentService.getAgentByName(domainName);
-        Agent uniqueAgent = findUniqueAgent(agents, domains);
         log.info("查询智能助手信息, agentName: {}, 结果数量: {}", domainName, agents.size());
+
+        // 判断是否唯一,如果存在多个同样的助理，清除多余的只保留一个agent
+        Agent uniqueAgent = findUniqueAgent(agents, domains);
         // 删除旧的模型和主题域
         if (config.getAgentId() != null || !CollectionUtils.isEmpty(domains)) {
             log.info("清理旧配置, agentId: {}, domain是否为空: {}", config.getAgentId(), domains.isEmpty());
@@ -355,26 +359,40 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     }
 
+    // 判断是否唯一,如果存在多个同样的助理，清除多余的只保留一个agent
     private Agent findUniqueAgent(List<Agent> agents, List<DomainDO> domains) {
         if (CollectionUtils.isEmpty(domains)) {
             return null;
         }
         Long domainId = domains.getFirst().getId();
-
-        for (Agent agent : agents) {
+        List<Agent> uniqueAgents = new ArrayList<>();
+        Iterator<Agent> iterator = agents.iterator();
+        while (iterator.hasNext()) {
+            Agent agent = iterator.next();
             List<DatasetTool> tools = agent.getParserTools(AgentToolType.DATASET);
             for (DatasetTool tool : tools) {
                 List<Long> dataSetIds = tool.getDataSetIds();
                 for (Long dataSetId : dataSetIds) {
                     DataSetResp dataSet = dataSetService.getDataSet(dataSetId);
                     if (dataSet == null) {
+                        agentService.deleteAgent(agent.getId());
+                        iterator.remove();
                         continue;
                     }
                     if (dataSet.getDomainId().equals(domainId)) {
-                        return agent;
+                        uniqueAgents.add(agent);
                     }
                 }
             }
+        }
+        if (!uniqueAgents.isEmpty()) {
+            log.info("存在{}个同名智能助手", uniqueAgents.size());
+            Agent uniqueAgent = uniqueAgents.getFirst();
+            for (int i = 1; i < uniqueAgents.size(); i++) {
+                Agent agent = uniqueAgents.get(i);
+                agentService.deleteAgent(agent.getId());
+            }
+            return uniqueAgent;
         }
         return null;
     }
@@ -392,6 +410,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
     }
 
+    // 清理旧的配置---传参指定了助理id，或者存在同名的主题域
     private Map<String, List<DimValueMap>> clearOldConfig(Integer agentId, List<DomainDO> domains,
             List<Agent> agents, User user) {
         // 没有智能助手id,但是有主题域

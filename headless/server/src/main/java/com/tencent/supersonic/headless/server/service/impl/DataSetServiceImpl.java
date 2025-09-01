@@ -84,6 +84,9 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
     @Override
     public DataSetResp getDataSet(Long id) {
         DataSetDO dataSetDO = getById(id);
+        if (dataSetDO == null) {
+            return null;
+        }
         return convert(dataSetDO);
     }
 

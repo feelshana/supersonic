@@ -50,10 +50,14 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
     private ShowCaseCustomMapper showCaseCustomMapper;
 
     @Override
-    public PageInfo<QueryResp> getChatQuery(PageQueryInfoReq pageQueryInfoReq, Long chatId) {
+    public PageInfo<QueryResp> getChatQuery(PageQueryInfoReq pageQueryInfoReq, Long chatId,
+            Long agentId) {
         QueryWrapper<ChatQueryDO> queryWrapper = new QueryWrapper<>();
         if (chatId != null) {
             queryWrapper.lambda().eq(ChatQueryDO::getChatId, chatId);
+        }
+        if (agentId != null) {
+            queryWrapper.lambda().eq(ChatQueryDO::getAgentId, agentId);
         }
         if (StringUtils.isNotBlank(pageQueryInfoReq.getUserName())) {
             queryWrapper.lambda().eq(ChatQueryDO::getUserName, pageQueryInfoReq.getUserName());

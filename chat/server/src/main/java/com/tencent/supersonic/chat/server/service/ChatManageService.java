@@ -29,7 +29,7 @@ public interface ChatManageService {
 
     Boolean deleteChat(Long chatId, String userName);
 
-    PageInfo<QueryResp> queryInfo(PageQueryInfoReq pageQueryInfoReq, long chatId);
+    PageInfo<QueryResp> queryInfo(PageQueryInfoReq pageQueryInfoReq, long chatId, long agentId);
 
     Long createChatQuery(ChatParseReq chatParseReq);
 

@@ -117,9 +117,10 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public PageInfo<QueryResp> queryInfo(PageQueryInfoReq pageQueryInfoReq, long chatId) {
+    public PageInfo<QueryResp> queryInfo(PageQueryInfoReq pageQueryInfoReq, long chatId,
+            long agentId) {
         PageInfo<QueryResp> queryRespPageInfo =
-                chatQueryRepository.getChatQuery(pageQueryInfoReq, chatId);
+                chatQueryRepository.getChatQuery(pageQueryInfoReq, chatId, agentId);
         if (CollectionUtils.isEmpty(queryRespPageInfo.getList())) {
             return queryRespPageInfo;
         }

@@ -66,10 +66,11 @@ public class ChatController {
 
     @PostMapping("/pageQueryInfo")
     public PageInfo<QueryResp> pageQueryInfo(@RequestBody PageQueryInfoReq pageQueryInfoCommand,
-            @RequestParam(value = "chatId") long chatId, HttpServletRequest request,
+            @RequestParam(value = "chatId") long chatId,
+            @RequestParam(value = "agentId") long agentId, HttpServletRequest request,
             HttpServletResponse response) {
         pageQueryInfoCommand.setUserName(UserHolder.findUser(request, response).getName());
-        return chatService.queryInfo(pageQueryInfoCommand, chatId);
+        return chatService.queryInfo(pageQueryInfoCommand, chatId, agentId);
     }
 
     @GetMapping("/getChatQuery/{queryId}")
