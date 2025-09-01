@@ -23,8 +23,8 @@ const LoginPage: React.FC = () => {
   console.log(location)
   if (location.pathname === '/login') {
     // #region 登录页不要了，直接跳转到4A登录(如想恢复登录页功能，比如开发环境需要登录，注释这两句即可)
-    window.parent.location.href = 'https://dc.migu.cn'
-    return
+    // window.parent.location.href = 'https://dc.migu.cn'
+    // return
     // #endregion 登录页不要了，直接跳转到4A登录(如想恢复登录页功能，比如开发环境需要登录，注释这两句即可)
   }else if(location.pathname === '/loginForDev'){
     console.log('你已进入开发登录页')

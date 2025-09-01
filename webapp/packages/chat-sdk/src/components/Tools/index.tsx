@@ -33,6 +33,8 @@ const Tools: React.FC<Props> = ({
   onExportData,
   onReExecute,
 }) => {
+  const params = new URLSearchParams(window.location.search);
+  const onlyChatWindow = params.get('onlyChatWindow') === 'true'
   const [score, setScore] = useState(scoreValue || 0);
   const [exportLoading, setExportLoading] = useState<boolean>(false);
   const prefixCls = `${CLS_PREFIX}-tools`;
@@ -65,7 +67,7 @@ const Tools: React.FC<Props> = ({
           <div className={`${prefixCls}-feedback-left`}>
             {!isParserError && (
               <>
-                <Button
+                {!onlyChatWindow && <Button
                   size="small"
                   onClick={() => {
                     setExportLoading(true);
@@ -79,8 +81,8 @@ const Tools: React.FC<Props> = ({
                 >
                   <DownloadOutlined />
                   <span className={`${prefixCls}-font-style`}>导出数据</span>
-                </Button>
-                {!isSimpleMode && (
+                </Button>}
+                {!isSimpleMode && !onlyChatWindow && (
                   <Button
                     size="small"
                     onClick={() => {

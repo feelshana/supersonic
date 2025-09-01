@@ -47,3 +47,7 @@ export function queryRecommendQuestions() {
 export function queryAgentList() {
   return axios.get<AgentType[]>(`${prefix}/chat/agent/getAgentList`);
 }
+
+export function getAgentDetail(agentId: number) {
+  return axios.get<any>(`${prefix}/chat/agent/getAgentDetail?agentId=${agentId}`);
+}
