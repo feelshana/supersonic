@@ -107,6 +107,7 @@ public class ModelConverter {
             dimensionReq.setSemanticType(SemanticType.CATEGORY.name());
         }
         dimensionReq.setModelId(modelDO.getId());
+        dimensionReq.setDefaultValues(dim.getDefaultValues() != null ? dim.getDefaultValues() : null);
         dimensionReq.setExpr(dim.getExpr());
         dimensionReq.setType(dim.getType().name());
         dimensionReq

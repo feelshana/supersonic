@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -28,6 +30,8 @@ public class Dimension {
     private String bizName;
 
     private String description;
+
+    private List<String> defaultValues;
 
     public Dimension(String name, String bizName, DimensionType type, Integer isCreateDimension) {
         this.name = name;

@@ -75,6 +75,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
@@ -118,6 +119,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     private UserService userService;
 
     @Override
+    @Transactional
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
         BiModelConfig modelConfig = config.getModel();
         BiPageConfig pageConfig = config.getPageConfig();
@@ -132,8 +134,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         User user = User.getDefaultUser();
         Map<String, List<DimValueMap>> dimAliasMap = null;
-        String domainName = "BI-" + modelConfig.getModelName();
-        String domainBizName = "bi-" + modelConfig.getModelId();
+        String domainName = "BI-" + config.getReportName();
+        String domainBizName = "bi-" + config.getReportId();
 
         // 查询重复的主题域
         List<DomainDO> domains = domainService.getDomainByBizName(domainName, domainBizName);
@@ -547,6 +549,16 @@ public class BiAgentServiceImpl implements BiAgentService {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
         List<BiModelItem> biMeasures = config.getMeasures();
+        List<BiDimensionCofig> dimensionConfigs = pageConfig.getDimensionConfigs();
+        //将维度的维度名作为key，默认值作为 value
+        Map<String, List<String>> defaultValuesMap = dimensionConfigs.stream()
+                .filter(biDimensionCofig ->
+                        biDimensionCofig.getDefaultValues() != null &&
+                                !biDimensionCofig.getDefaultValues().isEmpty())
+                .collect(Collectors.toMap(
+                        BiDimensionCofig::getName,
+                        BiDimensionCofig::getDefaultValues
+                ));
         // 拖拽建模
         if (config.getCreateModelType() == 1) {
             List<BiModelItem> customs = processCustom(config.getCustoms());
@@ -578,6 +590,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setType(DimensionType.categorical);
                     }
                     dimension.setBizName(modelDimension.getColumnName());
+                    dimension.setDefaultValues(defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setDescription(modelDimension.getDescription());
                     dimension.setIsCreateDimension(1);
                     dimensions.add(dimension);
@@ -624,6 +637,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         }
                         dimension.setBizName(custom.getName());
                         dimension.setExpr(custom.getColumnName());
+                        dimension.setDefaultValues(defaultValuesMap.getOrDefault(custom.getName(), null));
                         dimension.setDescription(custom.getDescription());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
@@ -658,8 +672,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             ModelResp modelResp = modelService.createModel(modelReq, user);
             modelResps.add(modelResp);
             // 处理维度字典导入
-            if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-                importDimension(user, pageConfig.getDimensionConfigs(), modelResp.getId(),
+            if (!CollectionUtils.isEmpty(dimensionConfigs)) {
+                importDimension(user, dimensionConfigs, modelResp.getId(),
                         dimAliasMap);
             }
         } else if (config.getCreateModelType() == 2) {
@@ -692,6 +706,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setType(DimensionType.categorical);
                     }
                     dimension.setBizName(name);
+                    dimension.setDefaultValues(defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setIsCreateDimension(1);
                     dimension.setDescription(modelDimension.getDescription());
                     dimensions.add(dimension);
@@ -721,8 +736,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             ModelResp modelResp = modelService.createModel(modelReq, user);
             modelResps.add(modelResp);
             // 处理维度字典导入
-            if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-                importDimension(user, pageConfig.getDimensionConfigs(), modelResp.getId(),
+            if (!CollectionUtils.isEmpty(dimensionConfigs)) {
+                importDimension(user, dimensionConfigs, modelResp.getId(),
                         dimAliasMap);
             }
         } else {

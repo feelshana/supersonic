@@ -11,6 +11,8 @@ public class BiAgentConfig {
 
     private String reportId;
 
+    private String reportName;
+
     private BiModelConfig model;
 
     private BiDataSource dataSource;
