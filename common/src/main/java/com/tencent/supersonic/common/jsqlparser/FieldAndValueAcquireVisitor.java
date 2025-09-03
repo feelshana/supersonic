@@ -101,6 +101,11 @@ public class FieldAndValueAcquireVisitor extends ExpressionVisitorAdapter {
         fieldExpressions.add(fieldExpression);
     }
 
+    public void visit(NotEqualsTo expr) {
+        FieldExpression fieldExpression = getFilterExpression(expr);
+        fieldExpressions.add(fieldExpression);
+    }
+
     @Override
     public void visit(MinorThanEquals expr) {
         FieldExpression fieldExpression = getFilterExpression(expr);
