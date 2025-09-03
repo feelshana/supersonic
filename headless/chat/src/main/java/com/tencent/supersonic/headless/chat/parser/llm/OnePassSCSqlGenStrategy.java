@@ -64,7 +64,11 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             + "    - 若Dimensions中包含format为'yyyyMMdd'格式的**日期字段**时，（如 `创建日期`），根据提示词中声明的当前日期，自动根据日期格式添加：创建日期 = '20251001'\n"
             + "     - 若Dimensions中包含format为'yyyyMM'格式的**日期字段**时，（如 `订单月份`），根据提示词中声明的当前日期，自动根据日期格式添加：订单月份 = 202509\n"
             + "     - **例外情况**：问题中已包含明确日期条件（如“查询昨天的场景”）时，不再额外添加.\n" + "#Exemplars: {{exemplar}}\n"
-            + "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
+            + "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}\n"
+            + "#排序规则\n" + "   - 当问题涉及排序要求时（如'最高'、'最低'、'top10'、'前10'等），\n"
+            + "   - 必须根据问题要求添加ORDER BY子句\n" + "   - 对于'最高'、'最大'等要求，使用DESC降序排列\n"
+            + "   - 对于'最低'、'最小'等要求，使用ASC升序排列\n"
+            + "   - 当问题明确要求前N条记录时（如'top10'、'前10'），必须同时添加ORDER BY和LIMIT N\n";
 
     @Autowired
     private ParserConfig parserConfig;

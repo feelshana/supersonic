@@ -38,7 +38,7 @@ import static com.hankcs.hanlp.utility.Predefine.logger;
 
 public class MultiCustomDictionary extends DynamicCustomDictionary {
 
-    public static int MAX_SIZE = 10;
+    public static int MAX_SIZE = 50;
     public static Boolean removeDuplicates = true;
     public static ConcurrentHashMap<String, PriorityQueue<Term>> NATURE_TO_VALUES =
             new ConcurrentHashMap<>();

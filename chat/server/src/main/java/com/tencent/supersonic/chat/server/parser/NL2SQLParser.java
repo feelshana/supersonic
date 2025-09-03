@@ -133,11 +133,19 @@ public class NL2SQLParser implements ChatQueryParser {
                                     .toList();
                     parseResp.getSelectedParses().clear();
                 }
-                logger.info("适中模式映射到了value类型的keyWordsValues数量: {}", keyWordsValues.size());
+
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
                 if (!CollectionUtils.isEmpty(keyWordsValues)) {
-                    logger.info("适中模式映射到的keyWordsValues为: {}", keyWordsValues);
+                    StringBuilder keyWordsValuesInfo = new StringBuilder();
+                    for (SchemaElementMatch keyWordsValue : keyWordsValues) {
+                        keyWordsValuesInfo
+                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
+                                        keyWordsValue.getDetectWord(), keyWordsValue.getWord(),
+                                        keyWordsValue.getSimilarity()));
+                    }
+                    logger.info("严格模式映射到的keyWordsValues数量有 {} 个，分别是：{}", keyWordsValues.size(),
+                            keyWordsValuesInfo);
                     List<SchemaElementMatch> looseElementMatches =
                             parseResp.getSelectedParses().getFirst().getElementMatches();
                     Set<SchemaElementMatch> uniqueElements = new LinkedHashSet<>();

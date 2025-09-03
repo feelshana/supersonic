@@ -66,8 +66,7 @@ public class DimensionDefaultValueAspect {
         QuerySqlReq sqlReq = (QuerySqlReq) objects[0];
         if (sqlReq.getDataSetName() != null) {
             String escapedTable = SqlReplaceHelper.escapeTableName(sqlReq.getDataSetName());
-            sqlReq.setSql(sqlReq.getSql().replaceAll(
-                    String.format(" %s ", sqlReq.getDataSetName()),
+            sqlReq.setSql(sqlReq.getSql().replaceAll(String.format(" %s ", sqlReq.getDataSetName()),
                     String.format(" %s ", escapedTable)));
         }
         if (sqlReq == null) {
@@ -75,34 +74,33 @@ public class DimensionDefaultValueAspect {
         }
 
         SemanticSchemaResp semanticSchemaResp = getSemanticSchemaResp(sqlReq);
-        Map<String,String> defaultDimNameMap=semanticSchemaResp.getDimensions().stream()
+        Map<String, String> defaultDimNameMap = semanticSchemaResp.getDimensions().stream()
                 .filter(dimSchemaResp -> !CollectionUtils.isEmpty(dimSchemaResp.getDefaultValues()))
                 .collect(Collectors.toMap(dimSchemaResp -> dimSchemaResp.getName(),
                         dimSchemaResp -> dimSchemaResp.getDefaultValues().get(0)));
-        if(CollectionUtils.isEmpty(defaultDimNameMap)){
+        if (CollectionUtils.isEmpty(defaultDimNameMap)) {
             return joinPoint.proceed();
         }
 
 
         String querySQL = sqlReq.getSql();
-        Set<String> filterNameList= SqlSelectHelper.getFilterExpression(querySQL).stream()
+        Set<String> filterNameList = SqlSelectHelper.getFilterExpression(querySQL).stream()
                 .map(FieldExpression::getFieldName).collect(Collectors.toSet());
-        Set<String> orderByNameList= SqlSelectHelper.getOrderByExpressions(querySQL).stream()
+        Set<String> orderByNameList = SqlSelectHelper.getOrderByExpressions(querySQL).stream()
                 .map(FieldExpression::getFieldName).collect(Collectors.toSet());
-      String correctedSql= querySQL;
+        String correctedSql = querySQL;
 
-        for(Map.Entry<String,String> entry:defaultDimNameMap.entrySet()){
+        for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String dimensionName = entry.getKey();
-            if(!filterNameList.contains(dimensionName)&&!orderByNameList.contains(dimensionName)){
-                correctedSql=SqlAddHelper.addWhere(correctedSql, dimensionName, entry.getValue());
+            if (!filterNameList.contains(dimensionName)
+                    && !orderByNameList.contains(dimensionName)) {
+                correctedSql = SqlAddHelper.addWhere(correctedSql, dimensionName, entry.getValue());
 
             }
         }
         sqlReq.setSql(correctedSql);
         return joinPoint.proceed();
     }
-
-
 
 
 

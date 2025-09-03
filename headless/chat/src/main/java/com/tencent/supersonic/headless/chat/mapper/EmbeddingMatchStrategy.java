@@ -241,6 +241,26 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
         if (CollectionUtils.isEmpty(retrieveQueryResults)) {
             return Collections.emptyList();
         }
+        log.info("分词结果：");
+        for (RetrieveQueryResult result : retrieveQueryResults) {
+            String query = result.getQuery();
+            List<Retrieval> retrievals = result.getRetrieval();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(query).append(": ");
+
+            for (int i = 0; i < retrievals.size(); i++) {
+                Retrieval retrieval = retrievals.get(i);
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                sb.append(retrieval.getQuery()).append(", ")
+                        .append(String.format("%.2f", retrieval.getSimilarity())).append(", top")
+                        .append(i + 1);
+            }
+
+            log.info(sb.toString());
+        }
 
         // Process results
         List<EmbeddingResult> collect = retrieveQueryResults.stream().peek(result -> {

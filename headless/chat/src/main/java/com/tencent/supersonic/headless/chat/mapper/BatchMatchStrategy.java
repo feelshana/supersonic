@@ -75,6 +75,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
             List<String> words = Arrays.stream(response.split(",")).toList();
+            log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(words));
             detectSegments.addAll(words);
 
         }

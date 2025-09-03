@@ -124,14 +124,9 @@ public class BiAgentServiceImpl implements BiAgentService {
         BiModelConfig modelConfig = config.getModel();
         BiPageConfig pageConfig = config.getPageConfig();
         // 参数检查
-        if (modelConfig.getSqlConditionParams() != null
-                && !modelConfig.getSqlConditionParams().isEmpty()) {
-            throw new IllegalArgumentException("暂不支持带参数的模型创建智能助手");
-        }
-        // 不支持多表模型
-        if (modelConfig.getTables() != null && modelConfig.getTables().size() > 1) {
-            throw new IllegalArgumentException("暂不支持含多张表的模型创建智能助手");
-        }
+        validateConfig(modelConfig);
+        // 检查BI的用户名，没有就创建
+        checkBIUsers(config.getAdmins(), config.getViewers());
         User user = User.getDefaultUser();
         Map<String, List<DimValueMap>> dimAliasMap = null;
         String domainName = "BI-" + config.getReportName();
@@ -156,33 +151,61 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         // 创建数据源
         log.info("开始创建数据源");
-        DatabaseResp databaseResp = createDataSource(config.getDataSource(), user);
+        DatabaseResp databaseResp = createDataSource(config, user);
         // 创建主题域
         log.info("开始创建主题域");
-        DomainReq domainReq = new DomainReq();
-        domainReq.setName(domainName);
-        domainReq.setBizName(domainBizName);
-        DomainResp domainResp = domainService.createDomain(domainReq, user);
+        DomainResp domainResp = createDomain(domainName, domainBizName, config.getAdmins(),
+                config.getViewers(), user);
         // 创建模型
         log.info("开始创建模型");
-        List<ModelResp> modelResps =
-                createModel(modelConfig, pageConfig, dimAliasMap, user, databaseResp, domainResp);
+        List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, user,
+                databaseResp, domainResp, config.getAdmins(), config.getViewers());
         // 创建数据集
         log.info("开始创建数据集");
-        DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps);
+        DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps,
+                config.getAdmins(), config.getViewers());
         // 工具配置
+        ToolConfig toolConfig = createToolConfig(dataSetResp);
+
+        // 创建或者更新助理
+        Agent agent = createOrUpdateAgent(config, uniqueAgent, toolConfig, user, domainName);
+        log.info("智能助手创建完成, id: {}", agent.getId());
+        return agent;
+    }
+
+    private ToolConfig createToolConfig(DataSetResp dataSetResp) {
         ToolConfig toolConfig = new ToolConfig();
         DatasetTool datasetTool = new DatasetTool();
         datasetTool.setId(RandomStringUtils.randomAlphanumeric(8));
         datasetTool.setType(AgentToolType.DATASET);
         datasetTool.setDataSetIds(Lists.newArrayList(dataSetResp.getId()));
         toolConfig.getTools().add(datasetTool);
-        // 检查BI的用户名，没有就创建
-        checkBIUsers(config.getAdmins(), config.getViewers());
-        // 创建或者更新助理
-        Agent agent = createOrUpdateAgent(config, uniqueAgent, toolConfig, user, domainName);
-        log.info("智能助手创建完成, id: {}", agent.getId());
-        return agent;
+        return toolConfig;
+    }
+
+    private DomainResp createDomain(String domainName, String domainBizName, List<String> admins,
+            List<String> viewers, User user) {
+        DomainReq domainReq = new DomainReq();
+        domainReq.setName(domainName);
+        domainReq.setBizName(domainBizName);
+        domainReq.setAdmins(admins);
+        domainReq.setViewers(viewers);
+        DomainResp domainResp = domainService.createDomain(domainReq, user);
+        return domainResp;
+    }
+
+    /**
+     * 验证配置参数
+     */
+    private void validateConfig(BiModelConfig modelConfig) {
+        if (modelConfig.getSqlConditionParams() != null
+                && !modelConfig.getSqlConditionParams().isEmpty()) {
+            throw new IllegalArgumentException("暂不支持带参数的模型创建智能助手");
+        }
+        // 不支持多表模型
+        if (modelConfig.getTables() != null && modelConfig.getTables().size() > 1) {
+            throw new IllegalArgumentException("暂不支持含多张表的模型创建智能助手");
+        }
     }
 
     private Agent createOrUpdateAgent(BiAgentConfig config, Agent uniqueAgent,
@@ -214,7 +237,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         StringBuilder newRules = new StringBuilder("#其它规则：\n");
 
         if (!"1".equals(pageConfig.getIsGroupBy())) {
-            newRules.append("\n-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
+            newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
         }
 
         if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
@@ -223,25 +246,27 @@ public class BiAgentServiceImpl implements BiAgentService {
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
             if (!dimensionNames.isEmpty()) {
-                newRules.append("\n查询的维度字段固定为:");
+                newRules.append("\n查询的字段处理:");
+                newRules.append("\n维度固定为:");
                 newRules.append(String.join(",", dimensionNames) + ".");
             }
-            newRules.append("指标字段根据语义理解后进行筛选");
+            newRules.append("\n指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
         }
-        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-            newRules.append("\n-维度值处理：");
-            for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
-                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
-                    String itemValues =
-                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
-                                    : "[" + String.join(",", item.getDefaultValues()) + "]";
-                    newRules.append("\n√ 未提及的维度 → ").append(item.getName()).append("赋值：")
-                            .append(itemValues);
-                }
-            }
-            newRules.append(
-                    "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'");
-        }
+        // if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+        // newRules.append("\n过滤的维度值处理：");
+        // for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
+        // if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+        // String itemValues =
+        // item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
+        // : "[" + String.join(",", item.getDefaultValues()) + "]";
+        // newRules.append("\n√ 未提及的维度 → ").append(item.getName()).append("赋值：")
+        // .append(itemValues);
+        // }
+        // }
+        // newRules.append(
+        // "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询
+        // 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'");
+        // }
 
         return newRules.toString();
     }
@@ -275,7 +300,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
 
         String startMarker = "#其它规则：";
-        String endMarker = "比如查询 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'";
+        String endMarker = "指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标";
 
         int startIndex = prompt.indexOf(startMarker);
         int endIndex = prompt.indexOf(endMarker, startIndex);
@@ -420,7 +445,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
             Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
             // 清理没有助理，只有主题域，模型和数据集的情况，清空所有的主题域与模型与数据集
-            if (agents == null || agents.isEmpty()) {
+            if (CollectionUtils.isEmpty(agents)) {
                 for (DomainDO domain : domains) {
                     MetaFilter filterDataSet = new MetaFilter();
                     filterDataSet.setDomainId(domain.getId());
@@ -514,11 +539,12 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private DataSetResp createDataSet(BiModelConfig config, User user, DomainResp domainResp,
-            List<ModelResp> modelResps) {
+            List<ModelResp> modelResps, List<String> admins, List<String> viewers) {
         DataSetReq dataSetReq = new DataSetReq();
         dataSetReq.setDomainId(domainResp.getId());
         dataSetReq.setName(config.getModelName());
         dataSetReq.setBizName(config.getModelId());
+        dataSetReq.setAdmins(admins);
         DataSetDetail dataSetDetail = new DataSetDetail();
         dataSetReq.setDataSetDetail(dataSetDetail);
         List<DataSetModelConfig> dataSetModelConfigs = Lists.newArrayList();
@@ -545,20 +571,17 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig,
             Map<String, List<DimValueMap>> dimAliasMap, User user, DatabaseResp databaseResp,
-            DomainResp domainResp) throws Exception {
+            DomainResp domainResp, List<String> admins, List<String> viewers) throws Exception {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
         List<BiModelItem> biMeasures = config.getMeasures();
         List<BiDimensionCofig> dimensionConfigs = pageConfig.getDimensionConfigs();
-        //将维度的维度名作为key，默认值作为 value
+        // 将维度的维度名作为key，默认值作为 value
         Map<String, List<String>> defaultValuesMap = dimensionConfigs.stream()
-                .filter(biDimensionCofig ->
-                        biDimensionCofig.getDefaultValues() != null &&
-                                !biDimensionCofig.getDefaultValues().isEmpty())
-                .collect(Collectors.toMap(
-                        BiDimensionCofig::getName,
-                        BiDimensionCofig::getDefaultValues
-                ));
+                .filter(biDimensionCofig -> biDimensionCofig.getDefaultValues() != null
+                        && !biDimensionCofig.getDefaultValues().isEmpty())
+                .collect(Collectors.toMap(BiDimensionCofig::getName,
+                        BiDimensionCofig::getDefaultValues));
         // 拖拽建模
         if (config.getCreateModelType() == 1) {
             List<BiModelItem> customs = processCustom(config.getCustoms());
@@ -569,6 +592,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             modelReq.setDomainId(domainResp.getId());
             modelReq.setName(config.getModelName());
             modelReq.setBizName(table.getTableName());
+            modelReq.setAdmins(admins);
+            modelReq.setViewers(viewers);
             ModelDetail modelDetail = new ModelDetail();
             modelDetail.setQueryType(ModelDefineType.TABLE_QUERY.getName());
             modelDetail.setTableQuery(tableName);
@@ -590,7 +615,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setType(DimensionType.categorical);
                     }
                     dimension.setBizName(modelDimension.getColumnName());
-                    dimension.setDefaultValues(defaultValuesMap.getOrDefault(modelDimension.getName(), null));
+                    dimension.setDefaultValues(
+                            defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setDescription(modelDimension.getDescription());
                     dimension.setIsCreateDimension(1);
                     dimensions.add(dimension);
@@ -598,7 +624,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             if (biMeasures != null) {
                 List<Measure> measures = Lists.newArrayList();
-                modelDetail.setMeasures(measures);;
+                modelDetail.setMeasures(measures);
                 for (BiModelItem modelMeasure : biMeasures) {
                     // 非可见的维度或指标跳过
                     if (!"YES".equals(modelMeasure.getIsLook())) {
@@ -637,7 +663,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         }
                         dimension.setBizName(custom.getName());
                         dimension.setExpr(custom.getColumnName());
-                        dimension.setDefaultValues(defaultValuesMap.getOrDefault(custom.getName(), null));
+                        dimension.setDefaultValues(
+                                defaultValuesMap.getOrDefault(custom.getName(), null));
                         dimension.setDescription(custom.getDescription());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
@@ -673,8 +700,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             modelResps.add(modelResp);
             // 处理维度字典导入
             if (!CollectionUtils.isEmpty(dimensionConfigs)) {
-                importDimension(user, dimensionConfigs, modelResp.getId(),
-                        dimAliasMap);
+                importDimension(user, dimensionConfigs, modelResp.getId(), dimAliasMap);
             }
         } else if (config.getCreateModelType() == 2) {
             // 使用JsqlPareser解析sql，替换掉别名的引号，避免supersonic解析时报错
@@ -686,6 +712,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             modelReq.setDomainId(domainResp.getId());
             modelReq.setName(config.getModelName());
             modelReq.setBizName(config.getModelId());
+            modelReq.setAdmins(admins);
+            modelReq.setViewers(viewers);
             ModelDetail modelDetail = new ModelDetail();
             modelDetail.setQueryType(ModelDefineType.SQL_QUERY.getName());
             modelDetail.setSqlQuery(querySql);
@@ -706,7 +734,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setType(DimensionType.categorical);
                     }
                     dimension.setBizName(name);
-                    dimension.setDefaultValues(defaultValuesMap.getOrDefault(modelDimension.getName(), null));
+                    dimension.setDefaultValues(
+                            defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setIsCreateDimension(1);
                     dimension.setDescription(modelDimension.getDescription());
                     dimensions.add(dimension);
@@ -737,8 +766,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             modelResps.add(modelResp);
             // 处理维度字典导入
             if (!CollectionUtils.isEmpty(dimensionConfigs)) {
-                importDimension(user, dimensionConfigs, modelResp.getId(),
-                        dimAliasMap);
+                importDimension(user, dimensionConfigs, modelResp.getId(), dimAliasMap);
             }
         } else {
             throw new IllegalArgumentException("不支持的建模类型 : " + config.getCreateModelType());
@@ -829,7 +857,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         return customs;
     }
 
-    private DatabaseResp createDataSource(BiDataSource dataSource, User user) {
+    private DatabaseResp createDataSource(BiAgentConfig config, User user) {
+        BiDataSource dataSource = config.getDataSource();
         DatabaseReq databaseReq = new DatabaseReq();
         databaseReq.setName("BI-" + dataSource.getName());
         switch (dataSource.getType()) {
@@ -856,6 +885,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         databaseReq.setUsername(dataSource.getUserName());
         databaseReq.setPassword(AESEncryptionUtil.aesEncryptECB(dataSource.getPassword()));
         databaseReq.setSchema(dataSource.getDefaultDatabase());
+        databaseReq.setAdmins(config.getAdmins());
+        databaseReq.setViewers(config.getViewers());
         DatabaseResp databaseResp = databaseService.createOrUpdateDatabase(databaseReq, user);
         return databaseResp;
     }

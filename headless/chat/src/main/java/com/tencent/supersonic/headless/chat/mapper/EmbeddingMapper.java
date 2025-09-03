@@ -77,11 +77,11 @@ public class EmbeddingMapper extends BaseMapper {
         if (CollectionUtils.isEmpty(matchResults)) {
             log.info("embedding mapper no match");
         } else {
-            for (EmbeddingResult matchResult : matchResults) {
-                log.info("embedding match name=[{}],detectWord=[{}],similarity=[{}],metadata=[{}]",
-                        matchResult.getName(), matchResult.getDetectWord(),
-                        matchResult.getSimilarity(), JsonUtil.toString(matchResult.getMetadata()));
-            }
+            // for (EmbeddingResult matchResult : matchResults) {
+            // log.info("embedding match name=[{}],detectWord=[{}],similarity=[{}],metadata=[{}]",
+            // matchResult.getName(), matchResult.getDetectWord(),
+            // matchResult.getSimilarity(), JsonUtil.toString(matchResult.getMetadata()));
+            // }
         }
     }
 
