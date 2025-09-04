@@ -93,8 +93,8 @@ public class DimensionDefaultValueAspect {
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String dimensionName = entry.getKey();
 
-            if ((!filterNameList.contains(dimensionName))&&!hasProvinceCityRelation(dimensionName,filterNameList)
-                    ) {
+            if ((!filterNameList.contains(dimensionName))
+                    && !hasProvinceCityRelation(dimensionName, filterNameList)) {
 
                 correctedSql = SqlAddHelper.addWhere(correctedSql, dimensionName, entry.getValue());
 
@@ -104,14 +104,17 @@ public class DimensionDefaultValueAspect {
         return joinPoint.proceed();
     }
 
-//  问题的条件中包含城市，即使条件不包含省份，也不能添加不能加省份='全国'的默认条件,为ture代表是 问城市&&检查省份的情况
+    // 问题的条件中包含城市，即使条件不包含省份，也不能添加不能加省份='全国'的默认条件,为ture代表是 问城市&&检查省份的情况
     private boolean hasProvinceCityRelation(String dimensionName, Set<String> filterNameList) {
-        if(!(StringUtils.equals(dimensionName,"省份")||StringUtils.equals(dimensionName,"省份名称")||StringUtils.equals(dimensionName,"省份名"))){
+        if (!(StringUtils.equals(dimensionName, "省份") || StringUtils.equals(dimensionName, "省份名称")
+                || StringUtils.equals(dimensionName, "省份名"))) {
             return false;
         }
-       return filterNameList.stream().filter(
-                name->StringUtils.equals(name,"地市")||StringUtils.equals(name,"地市名称")||StringUtils.equals(name,"地市名")
-    ||StringUtils.equals(name,"城市")||StringUtils.equals(name,"城市名称")||StringUtils.equals(name,"城市名")).count()>0;
+        return filterNameList.stream()
+                .filter(name -> StringUtils.equals(name, "地市") || StringUtils.equals(name, "地市名称")
+                        || StringUtils.equals(name, "地市名") || StringUtils.equals(name, "城市")
+                        || StringUtils.equals(name, "城市名称") || StringUtils.equals(name, "城市名"))
+                .count() > 0;
     }
 
 

@@ -21,19 +21,31 @@ public class DomainReq extends SchemaItem {
 
     private List<String> adminOrgs = new ArrayList<>();
 
-    public String getViewer() {
+    public String getViewers() {
+        if (viewers == null) {
+            return null;
+        }
         return String.join(",", viewers);
     }
 
-    public String getViewOrg() {
+    public String getViewOrgs() {
+        if (viewOrgs == null) {
+            return null;
+        }
         return String.join(",", viewOrgs);
     }
 
-    public String getAdmin() {
+    public String getAdmins() {
+        if (admins == null) {
+            return null;
+        }
         return String.join(",", admins);
     }
 
-    public String getAdminOrg() {
+    public String getAdminOrgs() {
+        if (adminOrgs == null) {
+            return null;
+        }
         return String.join(",", adminOrgs);
     }
 }
