@@ -9,7 +9,6 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.VisualConfig;
-import com.tencent.supersonic.chat.server.config.NL2SQLParserConfig;
 import com.tencent.supersonic.chat.server.persistence.dataobject.AgentDO;
 import com.tencent.supersonic.chat.server.persistence.mapper.AgentDOMapper;
 import com.tencent.supersonic.chat.server.pojo.ChatMemory;
@@ -18,19 +17,24 @@ import com.tencent.supersonic.chat.server.service.ChatQueryService;
 import com.tencent.supersonic.chat.server.service.MemoryService;
 import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.config.GeneralManageConfig;
-import com.tencent.supersonic.common.config.ThreadPoolConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
+import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageMetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageSchemaItemReq;
 import com.tencent.supersonic.headless.api.pojo.response.*;
+import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
+import com.tencent.supersonic.headless.chat.parser.llm.SimpleStrategy;
+import com.tencent.supersonic.headless.chat.parser.llm.SqlGenStrategyFactory;
+import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
 import com.tencent.supersonic.headless.server.service.*;
+import dev.langchain4j.model.input.Prompt;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +46,8 @@ import org.springframework.util.CollectionUtils;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
+
+import static com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq.SqlGenType.ONE_PASS_SELF_CONSISTENCY;
 
 @Slf4j
 @Service
@@ -59,7 +65,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
     @Autowired
     private GeneralManageConfig generalManageConfig;
-
+    @Autowired
+    private SchemaService schemaService;
     @Autowired
     private UserService userService;
 
@@ -186,6 +193,21 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         agent.setDimensionList(dimensionNames);
         agent.setMetricList(metricNames);
         return agent;
+    }
+
+
+    @Override
+    public String getAgentPrompt(Integer agentId, String queryText, User user) {
+        Agent agent = convert(getById(agentId));
+        Set<Long> dataSetIds = agent.getDataSetIds();
+        SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
+        LLMReq llmReq = new LLMReq();
+        llmReq.setQueryText(queryText);
+        llmReq.setChatAppConfig(agent.getChatAppConfig());
+        SimpleStrategy simpleStrategy = new SimpleStrategy();
+        Prompt promptText = simpleStrategy.generateStreamPrompt(llmReq, semanticSchema);
+        return promptText.text().replaceAll("\\n", "");
+
     }
 
     /**

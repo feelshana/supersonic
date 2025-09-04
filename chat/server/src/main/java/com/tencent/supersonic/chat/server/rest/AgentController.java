@@ -3,7 +3,6 @@ package com.tencent.supersonic.chat.server.rest;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatDO;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.common.config.SystemConfig;
 import com.tencent.supersonic.common.pojo.ResultData;
@@ -61,7 +60,13 @@ public class AgentController {
         User user = UserHolder.findUser(request, response);
         return agentService.getAgentDetail(agentId, user);
     }
-
+    @GetMapping("/getAgentPrompt")
+    public String getAgentPrompt(@RequestParam(value = "agentId", required = false) Integer agentId,
+                                              @RequestParam(value = "queryText", required = false) String queryText,
+                                              HttpServletRequest request, HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        return agentService.getAgentPrompt(agentId, queryText, user);
+    }
     @RequestMapping("/getToolTypes")
     public Map<AgentToolType, String> getToolTypes() {
         return AgentToolType.getToolTypes();

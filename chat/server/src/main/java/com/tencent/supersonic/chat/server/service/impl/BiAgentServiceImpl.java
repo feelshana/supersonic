@@ -234,11 +234,11 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 构建新的规则内容
      */
     private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
-        StringBuilder newRules = new StringBuilder("#其它规则：\n");
+        StringBuilder newRules = new StringBuilder("#其它规则：");
 
-        if (!"1".equals(pageConfig.getIsGroupBy())) {
-            newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
-        }
+//        if (!"1".equals(pageConfig.getIsGroupBy())) {
+//            newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
+//        }
 
         if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
 
