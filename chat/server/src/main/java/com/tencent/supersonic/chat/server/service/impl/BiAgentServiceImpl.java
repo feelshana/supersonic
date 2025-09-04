@@ -184,7 +184,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private DomainResp createDomain(String domainName, String domainBizName, List<String> admins,
-            List<String> viewers, User user) {
+                                    List<String> viewers, User user) {
         DomainReq domainReq = new DomainReq();
         domainReq.setName(domainName);
         domainReq.setBizName(domainBizName);
@@ -209,7 +209,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private Agent createOrUpdateAgent(BiAgentConfig config, Agent uniqueAgent,
-            ToolConfig toolConfig, User user, String domainName) {
+                                      ToolConfig toolConfig, User user, String domainName) {
         BiPageConfig pageConfig = config.getPageConfig();
 
         // 构建新的规则内容
@@ -234,39 +234,42 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 构建新的规则内容
      */
     private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
-        StringBuilder newRules = new StringBuilder("#其它规则：\n");
+        StringBuilder newRules = new StringBuilder("Sql查询注意点：\n");
+        newRules.append("1.如果查询的问题是收入/销量相关的销售指标，需要通过sum进行累加聚合，比如对日表查询12月的订购收入，需要sum(订购收入)，group by 日期\n");
+        newRules.append("2.如果查询的问题是用户/活跃用户/新增活跃相关的用户指标，禁止使用聚合，与分组，只进行select，同时要将日期查出来");
+//        if (!"1".equals(pageConfig.getIsGroupBy())) {
+//            newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
+//        }
 
-        if (!"1".equals(pageConfig.getIsGroupBy())) {
-            newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
-        }
+//        if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
+//
+//            List<String> dimensionNames = new ArrayList<>();
+//            model.getDimensions().stream().filter(BiModelItem::isSelected)
+//                    .forEach(item -> dimensionNames.add(item.getName()));
+//            if (!dimensionNames.isEmpty()) {
+//                newRules.append("\n查询的字段处理:");
+//                newRules.append("\n维度固定为:");
+//                newRules.append(String.join(",", dimensionNames) + ".");
+//            }
+//            newRules.append("\n指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
+//        }
 
-        if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
-
-            List<String> dimensionNames = new ArrayList<>();
-            model.getDimensions().stream().filter(BiModelItem::isSelected)
-                    .forEach(item -> dimensionNames.add(item.getName()));
-            if (!dimensionNames.isEmpty()) {
-                newRules.append("\n查询的字段处理:");
-                newRules.append("\n维度固定为:");
-                newRules.append(String.join(",", dimensionNames) + ".");
+        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+            for (int i = 0; i < pageConfig.getDimensionConfigs().size(); i++) {
+                BiDimensionCofig item = pageConfig.getDimensionConfigs().get(i);
+                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+                    String itemValues =
+                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
+                                    : "[" + String.join(",", item.getDefaultValues()) + "]";
+                    newRules.append("\n").append(i + 2).append(".当查询的问题不涉及").append(item.getName())
+                            .append("时，应加上条件").append(item.getName()).append("='")
+                            .append(itemValues).append("'，当查询的问题需要具体")
+                            .append(item.getName()).append("这类情况时，应该加上条件").append(item.getName())
+                            .append("!='").append(itemValues).append("'");
+                }
             }
-            newRules.append("\n指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
+            newRules.append("\n").append(pageConfig.getDimensionConfigs().size()+2).append(". 提及维度的具体值 → 精准赋值该维度");
         }
-        // if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-        // newRules.append("\n过滤的维度值处理：");
-        // for (BiDimensionCofig item : pageConfig.getDimensionConfigs()) {
-        // if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
-        // String itemValues =
-        // item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
-        // : "[" + String.join(",", item.getDefaultValues()) + "]";
-        // newRules.append("\n√ 未提及的维度 → ").append(item.getName()).append("赋值：")
-        // .append(itemValues);
-        // }
-        // }
-        // newRules.append(
-        // "\n√ 提及维度的具体值 → 精准赋值该维度\n比如查询
-        // 产品\"咪咕音乐\"的活跃用户->提及维度具体值，产品='咪咕音乐'，未提及的渠道/场景='全部'，省份='全国'");
-        // }
 
         return newRules.toString();
     }
@@ -275,7 +278,7 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 更新现有助理
      */
     private Agent updateExistingAgent(Agent agent, ToolConfig toolConfig, BiAgentConfig config,
-            String newRulesContent, User user) {
+                                      String newRulesContent, User user) {
         agent.setToolConfig(JSONObject.toJSONString(toolConfig));
         agent.setAdmins(config.getAdmins());
         agent.setViewers(config.getViewers());
@@ -299,8 +302,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             return;
         }
 
-        String startMarker = "#其它规则：";
-        String endMarker = "指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标";
+        String startMarker = "Sql查询注意点：";
+        String endMarker = "提及维度的具体值 → 精准赋值该维度";
 
         int startIndex = prompt.indexOf(startMarker);
         int endIndex = prompt.indexOf(endMarker, startIndex);
@@ -323,7 +326,7 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 创建新助理
      */
     private Agent createNewAgent(BiAgentConfig config, ToolConfig toolConfig, User user,
-            String domainName, String newRulesContent) {
+                                 String domainName, String newRulesContent) {
         Agent agent = new Agent();
         agent.setIsBi(1);
         agent.setAdmins(config.getAdmins());
@@ -439,7 +442,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     // 清理旧的配置---传参指定了助理id，或者存在同名的主题域
     private Map<String, List<DimValueMap>> clearOldConfig(Integer agentId, List<DomainDO> domains,
-            List<Agent> agents, User user) {
+                                                          List<Agent> agents, User user) {
         // 没有智能助手id,但是有主题域
         if (agentId == null && domains != null) {
 
@@ -539,7 +542,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private DataSetResp createDataSet(BiModelConfig config, User user, DomainResp domainResp,
-            List<ModelResp> modelResps, List<String> admins, List<String> viewers) {
+                                      List<ModelResp> modelResps, List<String> admins, List<String> viewers) {
         DataSetReq dataSetReq = new DataSetReq();
         dataSetReq.setDomainId(domainResp.getId());
         dataSetReq.setName(config.getModelName());
@@ -570,8 +573,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig,
-            Map<String, List<DimValueMap>> dimAliasMap, User user, DatabaseResp databaseResp,
-            DomainResp domainResp, List<String> admins, List<String> viewers) throws Exception {
+                                        Map<String, List<DimValueMap>> dimAliasMap, User user, DatabaseResp databaseResp,
+                                        DomainResp domainResp, List<String> admins, List<String> viewers) throws Exception {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
         List<BiModelItem> biMeasures = config.getMeasures();
@@ -743,7 +746,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             if (modelMeasures != null) {
                 List<Measure> measures = Lists.newArrayList();
-                modelDetail.setMeasures(measures);;
+                modelDetail.setMeasures(measures);
+                ;
                 for (BiModelItem modelMeasure : modelMeasures) {
                     Measure measure = new Measure();
                     String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
@@ -799,7 +803,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private void importDimension(User user, List<BiDimensionCofig> dimensionConfigs, Long modelId,
-            Map<String, List<DimValueMap>> dimAliasMap) {
+                                 Map<String, List<DimValueMap>> dimAliasMap) {
         MetaFilter filter = new MetaFilter();
         filter.setModelIds(Collections.singletonList(modelId));
         for (BiDimensionCofig dimensionConfig : dimensionConfigs) {

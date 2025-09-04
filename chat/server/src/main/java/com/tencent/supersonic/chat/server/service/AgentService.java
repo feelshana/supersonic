@@ -22,4 +22,6 @@ public interface AgentService {
     void deleteAgent(Integer id);
 
     Agent getAgentDetail(Integer agentId, User user);
+
+    String getAgentPrompt(Integer agentId, String queryText, User user);
 }
