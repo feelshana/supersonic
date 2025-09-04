@@ -55,7 +55,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
     public static final String APP_KEY = "S2SQL_PARSER";
     public static final String INSTRUCTION = "#角色：你是一位精通SQL语言的数据分析师\n"
             + "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" + "#规则：\n"
-            + "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表系统通过向量匹配到的可选维度值列表，供参考，请根据问题内容，选择其中的一个或者多个值作为查询条件\n"
+            + "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表问题分词后，通过向量召回到的可选维度值列表，供参考，请进行重排序，根据Values中列出的维度，每个维度最多选择一个值作为查询条件\n"
             + "2.SQL语句中查询的列名必须严格引用Schema中的Dimensions和Metrics中字段名，禁止任意改造字段\n"
             + "3.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n"
             + "4. 为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题限制最多返回100条数据，根据情况在sql添加limit，保证没有语法错误。\n"
