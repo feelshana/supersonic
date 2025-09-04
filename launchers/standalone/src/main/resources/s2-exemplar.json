@@ -1,0 +1,24 @@
+[
+    {
+        "question": "1-5月的总收入最多的产品",
+        "sideInfo": "CurrentDate=[2025-02-19],DomainTerms=[]",
+        "dbSchema": "DatabaseType=[mysql], Table=[收入数据],  Dimensions=[<省份名称 COMMENT '省份名称'>,<日期 FORMAT 'yyyyMM' COMMENT '日期'>,<城市名称 COMMENT '城市名称'>,<产品名称 COMMENT '产品名称'>], Metrics=[<总收入 COMMENT '总收入'>,<新增会员数 COMMENT '新增会员数'>,<在订会员数 COMMENT '在订会员数'>], Values=[<指标名称]",
+
+        "sql": "SELECT 产品名称,SUM(总收入) as 总收入求和 FROM 收入数据 WHERE 日期 >= '202501' AND 日期 <= '202505' group by 产品名称 order by SUM(总收入) "
+    },
+
+    {
+        "question": "上个月哪个产品的付费活跃最高",
+        "sideInfo": "CurrentDate=[2025-02-19],DomainTerms=[]",
+        "dbSchema": "DatabaseType=[mysql], Table=[量质构效指标统计日报],  Dimensions=[<省份 COMMENT '省份'>,<日期 FORMAT 'yyyyMM' COMMENT '日期'>,<地市 COMMENT '地市'>,<指标名称 COMMENT '指标名称'>,<产品名称 COMMENT '产品名称'>], Metrics=[<当日值 COMMENT '当日值'>,<月累计值 COMMENT '月累计值'>=],  Values=[<指标名称='咪咕视频手机APP三方付费活跃用户数'>,<指标名称='咪咕音乐手机APP付费活跃用户'>,<指标名称='咪咕音乐付费会员数'>]",
+        "sql": "SELECT 产品名称,月累计值 as 月累计值付费活跃 FROM 量质构效指标统计日报 WHERE 日期 >= '20250101' AND 日期 <= '20250131' and 指标名称='咪咕视频手机APP三方付费活跃用户数' order by 月累计值 desc "
+    },
+
+
+    {
+        "question": "4月咪咕视频的活跃用户数",
+        "sideInfo": "CurrentDate=[2025-02-19],DomainTerms=[]",
+        "dbSchema": "DatabaseType=[mysql], Table=[用户数据],  Dimensions=[<省份名称 COMMENT '省份名称'>,<日期 FORMAT 'yyyyMMdd' COMMENT '日期'>,<渠道 COMMENT '渠道名称'>,<城市名称 COMMENT '城市名称'>], Metrics=[<活跃用户数 ALIAS '访问用户数' COMMENT '一段时间内用户数去重'], Values=[<产品名称='咪咕视频'>,<产品名称='咪咕音乐'>]",
+        "sql": "SELECT 活跃用户数 FROM 用户数据 WHERE 日期 >= '202501' AND 日期 <= '202512' and 产品名称='咪咕视频'"
+    }
+]
