@@ -116,6 +116,7 @@ public class ChatWorkflowEngine {
                     break;
                 case TRANSLATING:
                     long start = System.currentTimeMillis();
+                    log.info("---【大模型生成的sql】--为\\n{}",parseResult.getSelectedParses().get(0).getSqlInfo().getParsedS2SQL());
                     performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
