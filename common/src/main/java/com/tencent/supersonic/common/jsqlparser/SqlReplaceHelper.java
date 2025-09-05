@@ -28,6 +28,8 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -147,8 +149,8 @@ public class SqlReplaceHelper {
             boolean exactReplace) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         // alias field should not be replaced
-        Set<String> aliases = SqlSelectHelper.getAliasFields(sql);
-        aliases.forEach(alias -> fieldNameMap.put(alias, alias));
+//        Set<String> aliases = SqlSelectHelper.getAliasFields(sql);
+//        aliases.forEach(alias -> fieldNameMap.put(alias, alias));
 
         Set<Select> plainSelectList = SqlSelectHelper.getAllSelect(selectStatement);
         for (Select plainSelect : plainSelectList) {
@@ -871,4 +873,24 @@ public class SqlReplaceHelper {
         return beforeValue;
     }
 
+    public static String simpleReplaceTable(String sql, String originalTableName, String tableName) {
+
+        return  sql.replaceAll("\\s+"+originalTableName+"\\s+", " "+tableName+" ");
+
+
+
+
+    }
+
+    public static String simpleReplaceFields(String sql, Map<String, String> fieldNameToBizNameMap) {
+        for(Map.Entry<String, String> entry : fieldNameToBizNameMap.entrySet()) {
+            String originalFieldName = entry.getKey();
+            String fieldName = entry.getValue();
+            sql=StringUtils.replace(sql, originalFieldName, fieldName);
+
+        }
+        return sql;
+
+
+    }
 }

@@ -25,17 +25,18 @@ public class TableView {
     private String alias;
     private List<String> primary;
     private ModelResp dataModel;
+    private SqlNode where;
 
     public SqlNode build() {
         List<SqlNode> selectNodeList = new ArrayList<>();
         if (select.isEmpty()) {
             return new SqlSelect(SqlParserPos.ZERO, null,
-                    new SqlNodeList(SqlNodeList.SINGLETON_STAR, SqlParserPos.ZERO), table, null,
+                    new SqlNodeList(SqlNodeList.SINGLETON_STAR, SqlParserPos.ZERO), table, where,
                     null, null, null, null, order, offset, fetch, null);
         } else {
             selectNodeList.addAll(select);
             return new SqlSelect(SqlParserPos.ZERO, null,
-                    new SqlNodeList(selectNodeList, SqlParserPos.ZERO), table, null, null, null,
+                    new SqlNodeList(selectNodeList, SqlParserPos.ZERO), table, where, null, null,
                     null, null, order, offset, fetch, null);
         }
     }

@@ -49,7 +49,7 @@ public class SqlQueryParser implements QueryParser {
         Set<String> queryAliases = SqlSelectHelper.getAliasFields(sqlQuery.getSql());
         Set<String> ontologyMetricsDimensions = Collections.synchronizedSet(new HashSet<String>());
         Set<String> ontologyBizNameMetricsDimensions = Collections.synchronizedSet(new HashSet<>());
-        queryFields.removeAll(queryAliases);
+//        queryFields.removeAll(queryAliases);
         Ontology ontology = queryStatement.getOntology();
         OntologyQuery ontologyQuery = buildOntologyQuery(ontology, queryFields);
         Set<String> queryFieldsSet = new HashSet<>(queryFields);
@@ -86,10 +86,10 @@ public class SqlQueryParser implements QueryParser {
         rewriteOrderBy(queryStatement);
 
         // fill sqlQuery
-        String tableName = SqlSelectHelper.getTableName(sqlQuery.getSql());
-        if (StringUtils.isEmpty(tableName)) {
-            return;
-        }
+//        String tableName = SqlSelectHelper.getTableName(sqlQuery.getSql());
+//        if (StringUtils.isEmpty(tableName)) {
+//            return;
+//        }
         sqlQuery.setTable(Constants.TABLE_PREFIX + queryStatement.getDataSetId());
         SqlGenerateUtils sqlGenerateUtils = ContextUtils.getBean(SqlGenerateUtils.class);
         SemanticSchemaResp semanticSchema = queryStatement.getSemanticSchema();
@@ -175,11 +175,16 @@ public class SqlQueryParser implements QueryParser {
         String sql = queryStatement.getSqlQuery().getSql();
         log.debug("dataSetId:{},convert name to bizName before:{}", queryStatement.getDataSetId(),
                 sql);
-        sql = SqlReplaceHelper.replaceFields(sql, fieldNameToBizNameMap, true);
+//        sql = SqlReplaceHelper.replaceFields(sql, fieldNameToBizNameMap, true);
+        sql = SqlReplaceHelper.simpleReplaceFields(sql, fieldNameToBizNameMap);
         log.debug("dataSetId:{},convert name to bizName after:{}", queryStatement.getDataSetId(),
                 sql);
-        sql = SqlReplaceHelper.replaceTable(sql,
-                Constants.TABLE_PREFIX + queryStatement.getDataSetId());
+//        sql = SqlReplaceHelper.replaceTable(sql,
+//                Constants.TABLE_PREFIX + queryStatement.getDataSetId());
+        sql=SqlReplaceHelper.simpleReplaceTable(sql
+                ,queryStatement.getSemanticSchema().getModelResps().get(0).getName()
+                ,Constants.TABLE_PREFIX + queryStatement.getDataSetId());
+
         log.debug("replaceTableName after:{}", sql);
         queryStatement.getSqlQuery().setSql(sql);
     }
