@@ -262,19 +262,18 @@ public class BiAgentServiceImpl implements BiAgentService {
         // .append(". 提及维度的具体值 → 精准赋值该维度");
         // }
         if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
-
             List<String> dimensionNames = new ArrayList<>();
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
             if (!dimensionNames.isEmpty()) {
-                newRules.append("\n").append(pageConfig.getDimensionConfigs().size() + 3)
-                        .append("\n查询的字段处理:");
-                newRules.append("\n维度固定为:");
-                newRules.append(String.join(",", dimensionNames) + ".");
+                newRules.append("\n3. 查询字段处理规则：");
+                newRules.append("\n- 维度字段：固定选择以下维度（");
+                newRules.append(String.join(",", dimensionNames) + "）");
+                newRules.append("\n- 指标字段：根据语义理解自动筛选，除维度值查询外都应包含指标");
+                newRules.append("\n\n特殊情况处理：");
+                newRules.append("\n当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。");
             }
-            newRules.append("\n指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
         }
-
         return newRules.toString();
     }
 
@@ -307,7 +306,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
 
         String startMarker = "Sql查询注意点：";
-        String endMarker = "指标字段根据语义理解后进行筛选,除开维度值的查询，都应该包含指标";
+        String endMarker = "当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。";
 
         int startIndex = prompt.indexOf(startMarker);
         int endIndex = prompt.indexOf(endMarker, startIndex);
