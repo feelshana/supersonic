@@ -36,6 +36,8 @@ public class DimensionResp extends SchemaItem {
 
     private List<String> defaultValues;
 
+    private boolean hasDimValues = false;
+
     private List<DimValueMap> dimValueMaps;
 
     private DataTypeEnums dataType;

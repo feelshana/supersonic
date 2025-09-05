@@ -588,6 +588,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                         && !biDimensionCofig.getDefaultValues().isEmpty())
                 .collect(Collectors.toMap(BiDimensionCofig::getName,
                         BiDimensionCofig::getDefaultValues));
+        //取出有value的维度名称
+        List<String> dimensionNamesList = dimensionConfigs.stream().filter(biDimensionCofig -> biDimensionCofig.getValues() != null
+                && !biDimensionCofig.getValues().isEmpty()).map(BiDimensionCofig::getName).toList();
         // 拖拽建模
         if (config.getCreateModelType() == 1) {
             List<BiModelItem> customs = processCustom(config.getCustoms());
@@ -614,12 +617,17 @@ public class BiAgentServiceImpl implements BiAgentService {
                     }
                     Dimension dimension = new Dimension();
                     dimension.setName(modelDimension.getName());
+                    if (dimensionNamesList.contains(modelDimension.getName())) {
+                        dimension.setHasDimValues(true);
+                    }
                     if (StringUtils.isNotBlank(modelDimension.getFormat())) {
                         dimension.setType(DimensionType.time);
+                        dimension.setHasDimValues(false);
                         dimension.setDateFormat(modelDimension.getFormat());
                     } else {
                         dimension.setType(DimensionType.categorical);
                     }
+
                     dimension.setBizName(modelDimension.getColumnName());
                     dimension.setDefaultValues(
                             defaultValuesMap.getOrDefault(modelDimension.getName(), null));
@@ -660,9 +668,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                     if (custom.getType() == 2) {
                         Dimension dimension = new Dimension();
                         dimension.setName(custom.getName());
+                        if (dimensionNamesList.contains(custom.getName())) {
+                            dimension.setHasDimValues(true);
+                        }
                         Integer columnType = custom.getColumnType();
                         if (columnType != null && columnType == 2) {
                             dimension.setType(DimensionType.time);
+                            dimension.setHasDimValues(false);
                             dimension.setDateFormat(custom.getFormat());
                         } else {
                             dimension.setType(DimensionType.categorical);
@@ -732,9 +744,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                     String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
                             .replaceAll("\\(([^)]*)\\)", "$1");
                     dimension.setName(name);
+                    if (dimensionNamesList.contains(modelDimension.getName())) {
+                        dimension.setHasDimValues(true);
+                    }
                     Integer columnType = modelDimension.getColumnType();
                     if (columnType != null && columnType == 2) {
                         dimension.setType(DimensionType.time);
+                        dimension.setHasDimValues(false);
                         dimension.setDateFormat(modelDimension.getFormat());
                     } else {
                         dimension.setType(DimensionType.categorical);
@@ -787,13 +803,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                 List<SelectItem<?>> items = select.getSelectItems();
                 items.forEach(item -> {
                     Alias alias = item.getAlias();
-                    log.info("BI传递的sql alias name: {}", alias.getName());
+//                    log.info("BI传递的sql alias name: {}", alias.getName());
                     if (alias != null && alias.getName() != null) {
                         String name =
                                 alias.getName().replace("\"", "`").replaceAll("\\（([^)]*)\\）", "$1")
                                         .replaceAll("\\(([^)]*)\\)", "$1");
                         alias.setName(name);
-                        log.info("替换后的sql alias name: {}", name);
+//                        log.info("替换后的sql alias name: {}", name);
                     }
                 });
                 return select.toString();
