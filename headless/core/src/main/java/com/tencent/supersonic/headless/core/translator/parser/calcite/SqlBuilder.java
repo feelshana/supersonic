@@ -373,9 +373,12 @@ public class SqlBuilder {
         SqlParserPos pos = SqlParserPos.ZERO;
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
-
-
-            if ((!filterNameList.contains(defaultDimensionFiledName))&&!hasProvinceCityRelation(defaultDimensionFiledName,filterNameList)
+            if(filterNameList.contains(defaultDimensionFiledName)){
+                SqlIdentifier column = new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
+                SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);
+                SqlNode notEqualsCall = SqlStdOperatorTable.NOT_EQUALS.createCall(pos, column, value);
+                andConditions.add(notEqualsCall);
+            }else if ((!filterNameList.contains(defaultDimensionFiledName))&&!hasProvinceCityRelation(defaultDimensionFiledName,filterNameList)
             ) {
 
                 SqlIdentifier column = new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
