@@ -39,8 +39,8 @@ public class PromptHelper {
                 Integer.parseInt(parserConfig.getParameterValue(PARSER_EXEMPLAR_RECALL_NUMBER));
         int fewShotNumber =
                 Integer.parseInt(parserConfig.getParameterValue(PARSER_FEW_SHOT_NUMBER));
-        int selfConsistencyNumber =1;
-//                Integer.parseInt(parserConfig.getParameterValue(PARSER_SELF_CONSISTENCY_NUMBER));
+        int selfConsistencyNumber = 1;
+        // Integer.parseInt(parserConfig.getParameterValue(PARSER_SELF_CONSISTENCY_NUMBER));
 
         List<Text2SQLExemplar> exemplars = Lists.newArrayList();
         exemplars.addAll(llmReq.getDynamicExemplars());

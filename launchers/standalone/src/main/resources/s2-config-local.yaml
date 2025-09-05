@@ -46,11 +46,11 @@ s2:
       min:
         threshold: 0.3
     embedding:
+      number: 10
       use-llm-words-segement: true
       threshold: 0.7
-      number: 10
       round:
-        number: 1
+        number: 2
 
   #这个是测试环境通用管理配置，针对助理，模型，数据库，主题域，对非管理员用户展示通用数据。
   manage:

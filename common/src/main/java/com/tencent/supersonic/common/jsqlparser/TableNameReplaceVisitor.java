@@ -18,7 +18,8 @@ public class TableNameReplaceVisitor extends FromItemVisitorAdapter {
 
     @Override
     public void visit(Table table) {
-        if (notReplaceTables.contains(table.getName())|| StringUtils.endsWithIgnoreCase(table.getName(),"dual")) {
+        if (notReplaceTables.contains(table.getName())
+                || StringUtils.endsWithIgnoreCase(table.getName(), "dual")) {
             return;
         }
         table.setName(tableName);

@@ -89,7 +89,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
     @Autowired
     private DimensionValuesMatchHelper dimensionValuesMatchHelper;
 
-//    @DefaultDimValueCheck
+    // @DefaultDimValueCheck
     @S2DataPermission
     @Override
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {

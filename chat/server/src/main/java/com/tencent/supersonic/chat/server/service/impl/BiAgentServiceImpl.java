@@ -244,23 +244,23 @@ public class BiAgentServiceImpl implements BiAgentService {
 
 
 
-        if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
-            for (int i = 0; i < pageConfig.getDimensionConfigs().size(); i++) {
-                BiDimensionCofig item = pageConfig.getDimensionConfigs().get(i);
-                if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
-                    String itemValues =
-                            item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
-                                    : "[" + String.join(",", item.getDefaultValues()) + "]";
-                    newRules.append("\n").append(i + 2).append(".当查询的问题不涉及").append(item.getName())
-                            .append("时，应加上条件").append(item.getName()).append("='")
-                            .append(itemValues).append("'，当查询的问题需要具体").append(item.getName())
-                            .append("这类情况时，应该加上条件").append(item.getName()).append("!='")
-                            .append(itemValues).append("'");
-                }
-            }
-            newRules.append("\n").append(pageConfig.getDimensionConfigs().size() + 2)
-                    .append(". 提及维度的具体值 → 精准赋值该维度");
-        }
+        // if (!CollectionUtils.isEmpty(pageConfig.getDimensionConfigs())) {
+        // for (int i = 0; i < pageConfig.getDimensionConfigs().size(); i++) {
+        // BiDimensionCofig item = pageConfig.getDimensionConfigs().get(i);
+        // if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+        // String itemValues =
+        // item.getDefaultValues().size() == 1 ? item.getDefaultValues().getFirst()
+        // : "[" + String.join(",", item.getDefaultValues()) + "]";
+        // newRules.append("\n").append(i + 2).append(".当查询的问题不涉及").append(item.getName())
+        // .append("时，应加上条件").append(item.getName()).append("='")
+        // .append(itemValues).append("'，当查询的问题需要具体").append(item.getName())
+        // .append("这类情况时，应该加上条件").append(item.getName()).append("!='")
+        // .append(itemValues).append("'");
+        // }
+        // }
+        // newRules.append("\n").append(pageConfig.getDimensionConfigs().size() + 2)
+        // .append(". 提及维度的具体值 → 精准赋值该维度");
+        // }
         if (model.getDimensions() != null && !model.getDimensions().isEmpty()) {
 
             List<String> dimensionNames = new ArrayList<>();
