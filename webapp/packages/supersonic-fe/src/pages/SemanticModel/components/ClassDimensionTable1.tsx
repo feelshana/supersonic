@@ -153,19 +153,19 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
   });
 
   const columns: ProColumns[] = [
-    {
-      dataIndex: 'id',
-      title: 'ID',
-      fixed: 'left',
-      width: 80,
-      order: 100,
-      search: false,
-    },
-    {
-      dataIndex: 'key',
-      title: '维度搜索',
-      hideInTable: true,
-    },
+    // {
+    //   dataIndex: 'id',
+    //   title: 'ID',
+    //   fixed: 'left',
+    //   width: 80,
+    //   order: 100,
+    //   search: false,
+    // },
+    // {
+    //   dataIndex: 'key',
+    //   title: '维度搜索',
+    //   hideInTable: true,
+    // },
     {
       dataIndex: 'name',
       title: '维度',
@@ -174,58 +174,58 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
       render: columnsConfig.dimensionInfo.render,
       search: false,
     },
-    {
-      dataIndex: 'sensitiveLevel',
-      title: '敏感度',
-      // width: 100,
-      valueEnum: SENSITIVE_LEVEL_ENUM,
-      render: columnsConfig.sensitiveLevel.render,
-    },
-    {
-      dataIndex: 'isTag',
-      title: '是否标签',
-      // width: 90,
-      hideInTable: !!!process.env.SHOW_TAG,
-      render: (isTag) => {
-        switch (isTag) {
-          case 0:
-            return '否';
-          case 1:
-            return <span style={{ color: '#1677ff' }}>是</span>;
-          default:
-            return <Tag color="default">未知</Tag>;
-        }
-      },
-    },
-    {
-      dataIndex: 'status',
-      title: '状态',
-      // width: 100,
-      search: false,
-      render: columnsConfig.state.render,
-    },
+    // {
+    //   dataIndex: 'sensitiveLevel',
+    //   title: '敏感度',
+    //   // width: 100,
+    //   valueEnum: SENSITIVE_LEVEL_ENUM,
+    //   render: columnsConfig.sensitiveLevel.render,
+    // },
+    // {
+    //   dataIndex: 'isTag',
+    //   title: '是否标签',
+    //   // width: 90,
+    //   hideInTable: !!!process.env.SHOW_TAG,
+    //   render: (isTag) => {
+    //     switch (isTag) {
+    //       case 0:
+    //         return '否';
+    //       case 1:
+    //         return <span style={{ color: '#1677ff' }}>是</span>;
+    //       default:
+    //         return <Tag color="default">未知</Tag>;
+    //     }
+    //   },
+    // },
+    // {
+    //   dataIndex: 'status',
+    //   title: '状态',
+    //   // width: 100,
+    //   search: false,
+    //   render: columnsConfig.state.render,
+    // },
 
     {
       dataIndex: 'description',
       title: '描述',
-      width: 300,
+      // width: 300,
       search: false,
       render: columnsConfig.description.render,
     },
 
-    {
-      ...columnsConfig.createInfo as any,
-    },
+    // {
+    //   ...columnsConfig.createInfo as any,
+    // },
     {
       title: '操作',
       dataIndex: 'x',
       valueType: 'option',
       fixed: 'right',
-      width: 250,
+      // width: 250,
       render: (_, record) => {
         return (
           <Space className={styles.ctrlBtnContainer}>
-            <Button
+            {/* <Button
               key="dimensionEditBtn"
               type="link"
               onClick={() => {
@@ -236,10 +236,11 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
               }}
             >
               编辑
-            </Button>
+            </Button> */}
             <Button
               key="dimensionValueEditBtn"
               type="link"
+              disabled={!record.hasDimValues}
               onClick={() => {
                 setDimensionItem(record);
                 setDimensionValueSettingModalVisible(true);
@@ -252,7 +253,7 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
             >
               维度值设置
             </Button>
-            {record.status === StatusEnum.ONLINE ? (
+            {/* {record.status === StatusEnum.ONLINE ? (
               <Button
                 type="link"
                 key="editStatusOfflineBtn"
@@ -297,7 +298,7 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
               >
                 删除
               </Button>
-            </Popconfirm>
+            </Popconfirm> */}
           </Space>
         );
       },
@@ -337,92 +338,92 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
         rowKey="id"
         columns={columns}
         loading={loading}
-        headerTitle={
-          <div style={{ marginLeft: 15 }}>
-            <TableHeaderFilter
-              components={
-                [
-                  {
-                    label: '维度搜索',
-                    component: (
-                      <Input.Search
-                        style={{ width: 280 }}
-                        placeholder="请输入ID/维度名称/英文名称"
-                        onSearch={(value) => {
-                          setFilterParams((preState) => {
-                            return {
-                              ...preState,
-                              key: value,
-                            };
-                          });
-                        }}
-                      />
-                    ),
-                  },
-                  {
-                    label: '敏感度',
-                    component: (
-                      <Select
-                        style={{ width: 140 }}
-                        options={SENSITIVE_LEVEL_OPTIONS}
-                        placeholder="请选择敏感度"
-                        allowClear
-                        onChange={(value) => {
-                          setFilterParams((preState) => {
-                            return {
-                              ...preState,
-                              sensitiveLevel: value,
-                            };
-                          });
-                        }}
-                      />
-                    ),
-                  },
-                  {
-                    label: '是否为标签',
-                    hidden: !!!process.env.SHOW_TAG,
-                    component: (
-                      <Select
-                        style={{ width: 145 }}
-                        placeholder="请选择标签状态"
-                        allowClear
-                        onChange={(value) => {
-                          setFilterParams((preState) => {
-                            return {
-                              ...preState,
-                              isTag: value,
-                            };
-                          });
-                        }}
-                        options={[
-                          { value: 1, label: '是' },
-                          { value: 0, label: '否' },
-                        ]}
-                      />
-                    ),
-                  },
-                ].filter((item) => !!!item.hidden) as any
-              }
-            />
-          </div>
-        }
+        // headerTitle={
+        //   <div style={{ marginLeft: 15 }}>
+        //     <TableHeaderFilter
+        //       components={
+        //         [
+        //           {
+        //             label: '维度搜索',
+        //             component: (
+        //               <Input.Search
+        //                 style={{ width: 280 }}
+        //                 placeholder="请输入ID/维度名称/英文名称"
+        //                 onSearch={(value) => {
+        //                   setFilterParams((preState) => {
+        //                     return {
+        //                       ...preState,
+        //                       key: value,
+        //                     };
+        //                   });
+        //                 }}
+        //               />
+        //             ),
+        //           },
+        //           {
+        //             label: '敏感度',
+        //             component: (
+        //               <Select
+        //                 style={{ width: 140 }}
+        //                 options={SENSITIVE_LEVEL_OPTIONS}
+        //                 placeholder="请选择敏感度"
+        //                 allowClear
+        //                 onChange={(value) => {
+        //                   setFilterParams((preState) => {
+        //                     return {
+        //                       ...preState,
+        //                       sensitiveLevel: value,
+        //                     };
+        //                   });
+        //                 }}
+        //               />
+        //             ),
+        //           },
+        //           {
+        //             label: '是否为标签',
+        //             hidden: !!!process.env.SHOW_TAG,
+        //             component: (
+        //               <Select
+        //                 style={{ width: 145 }}
+        //                 placeholder="请选择标签状态"
+        //                 allowClear
+        //                 onChange={(value) => {
+        //                   setFilterParams((preState) => {
+        //                     return {
+        //                       ...preState,
+        //                       isTag: value,
+        //                     };
+        //                   });
+        //                 }}
+        //                 options={[
+        //                   { value: 1, label: '是' },
+        //                   { value: 0, label: '否' },
+        //                 ]}
+        //               />
+        //             ),
+        //           },
+        //         ].filter((item) => !!!item.hidden) as any
+        //       }
+        //     />
+        //   </div>
+        // }
         search={false}
         // search={{
         //   optionRender: false,
         //   collapsed: false,
         // }}
-        rowSelection={{
-          type: 'checkbox',
-          ...rowSelection,
-        }}
+        // rowSelection={{
+        //   type: 'checkbox',
+        //   ...rowSelection,
+        // }}
         dataSource={tableData}
         pagination={pagination}
         tableAlertRender={() => {
           return false;
         }}
         size="large"
-        scroll={{ x: 1500 }}
-        options={{ reload: false, density: false, fullScreen: false }}
+        // scroll={{ x: 1500 }}
+        options={{ reload: false, density: false, fullScreen: false, setting: false }}
         onChange={(data: any) => {
           const { current, pageSize, total } = data;
           const currentPagin = {
@@ -433,28 +434,28 @@ const ClassDimensionTable1: React.FC<Props> = ({domainId, modelId}) => {
           setPagination(currentPagin);
           queryDimensionList({ ...filterParams, ...currentPagin });
         }}
-        toolBarRender={() => [
-          // <Button
-          //   key="create"
-          //   type="primary"
-          //   onClick={() => {
-          //     toDimensionEditPage(domainId, modelId!, 0);
-          //     // setDimensionItem(undefined);
-          //     // setCreateModalVisible(true);
-          //   }}
-          // >
-          //   创建维度
-          // </Button>,
-          <BatchCtrlDropDownButton
-            key="ctrlBtnList"
-            extenderList={['batchSensitiveLevel', 'exportTagButton']}
-            onDeleteConfirm={() => {
-              queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
-            }}
-            hiddenList={['batchDownload']}
-            onMenuClick={onMenuClick}
-          />,
-        ]}
+        // toolBarRender={() => [
+        //   <Button
+        //     key="create"
+        //     type="primary"
+        //     onClick={() => {
+        //       toDimensionEditPage(domainId, modelId!, 0);
+        //       // setDimensionItem(undefined);
+        //       // setCreateModalVisible(true);
+        //     }}
+        //   >
+        //     创建维度
+        //   </Button>,
+        //   <BatchCtrlDropDownButton
+        //     key="ctrlBtnList"
+        //     extenderList={['batchSensitiveLevel', 'exportTagButton']}
+        //     onDeleteConfirm={() => {
+        //       queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
+        //     }}
+        //     hiddenList={['batchDownload']}
+        //     onMenuClick={onMenuClick}
+        //   />,
+        // ]}
       />
 
       {createModalVisible && (
