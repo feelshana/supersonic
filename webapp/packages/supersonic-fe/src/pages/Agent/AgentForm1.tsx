@@ -394,7 +394,11 @@ const AgentForm1: React.FC<Props> = ({ editAgent, onSaveAgent, onCreateToolBtnCl
       <Tabs
         tabBarExtraContent={
           <Space>
-            {activeKey !== 'memory' && activeKey !== 'permissonSetting' && (
+            {
+              activeKey !== 'memory' && 
+              activeKey !== 'permissonSetting' &&
+              activeKey !== 'termManage' &&
+              activeKey !== 'dimension' && (
               <Button
                 type="primary"
                 loading={saveLoading}

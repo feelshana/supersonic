@@ -201,8 +201,8 @@ const ROUTES = [
     component: './Login',
   },
   {
-    path: '/AgentFormForLink',
-    name: 'AgentFormForLink',
+    path: '/agentFormForLink',
+    name: 'agentFormForLink',
     hideInMenu: true,
     component: './Agent/AgentFormForLink',
   },

@@ -34,7 +34,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
   dimensionValueSettingList,
   onSubmit,
 }) => {
-  const isAgentFormForLink = window.location.pathname.includes('AgentFormForLink')
+  const isAgentFormForLink = window.location.pathname.includes('agentFormForLink')
   const [tableDataSource, setTableDataSource] = useState<TableDataSource[]>([]);
   const [dimValueMaps, setDimValueMaps] = useState<ISemantic.IDimensionValueSettingItem[]>([]);
   const [form] = Form.useForm();
