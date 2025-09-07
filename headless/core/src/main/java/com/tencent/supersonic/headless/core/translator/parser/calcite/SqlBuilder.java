@@ -48,7 +48,7 @@ public class SqlBuilder {
     public String buildOntologySql(QueryStatement queryStatement) throws Exception {
         OntologyQuery ontologyQuery = queryStatement.getOntologyQuery();
         Ontology ontology = queryStatement.getOntology();
-        SemanticSchemaResp semanticSchema=queryStatement.getSemanticSchema();
+        SemanticSchemaResp semanticSchema = queryStatement.getSemanticSchema();
 
         if (ontologyQuery.getLimit() == null) {
             ontologyQuery.setLimit(0L);
@@ -62,16 +62,16 @@ public class SqlBuilder {
         TableView tableView;
         if (!CollectionUtils.isEmpty(ontology.getJoinRelations()) && dataModels.size() > 1) {
             Set<ModelResp> models = probeRelatedModels(dataModels, queryStatement.getOntology());
-            tableView = render(ontologyQuery, models, scope, schema,semanticSchema);
+            tableView = render(ontologyQuery, models, scope, schema, semanticSchema);
         } else {
-            tableView = render(ontologyQuery, dataModels, scope, schema,semanticSchema);
+            tableView = render(ontologyQuery, dataModels, scope, schema, semanticSchema);
         }
 
         SqlNode parserNode = tableView.build();
         DatabaseResp database = queryStatement.getOntology().getDatabase();
         EngineType engineType = EngineType.fromString(database.getType());
         try {
-//            parserNode = optimizeParseNode(parserNode, engineType);
+            // parserNode = optimizeParseNode(parserNode, engineType);
         } catch (Exception e) {
             // failure in optimization phase doesn't affect the query result,
             // just ignore it
@@ -156,7 +156,8 @@ public class SqlBuilder {
     }
 
     private TableView render(OntologyQuery ontologyQuery, Set<ModelResp> dataModels,
-            SqlValidatorScope scope, S2CalciteSchema schema,SemanticSchemaResp semanticSchema) throws Exception {
+            SqlValidatorScope scope, S2CalciteSchema schema, SemanticSchemaResp semanticSchema)
+            throws Exception {
         SqlNode left = null;
         TableView leftTable = null;
         TableView outerTable = new TableView();
@@ -176,8 +177,8 @@ public class SqlBuilder {
                 primary.add(identify.getName());
             }
 
-            TableView tableView =
-                    renderOne(queryMetrics, queryDimensions, dataModel, scope, schema,semanticSchema);
+            TableView tableView = renderOne(queryMetrics, queryDimensions, dataModel, scope, schema,
+                    semanticSchema);
             log.info("tableView {}", StringUtils.normalizeSpace(tableView.getTable().toString()));
             String alias = Constants.JOIN_TABLE_PREFIX + dataModel.getName();
             tableView.setAlias(alias);
@@ -330,7 +331,7 @@ public class SqlBuilder {
 
     public static TableView renderOne(Set<MetricSchemaResp> queryMetrics,
             Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
-            S2CalciteSchema schema,SemanticSchemaResp semanticSchema) {
+            S2CalciteSchema schema, SemanticSchemaResp semanticSchema) {
         TableView tableView = new TableView();
         // EngineType engineType =
         // EngineType.fromString(schema.getOntology().getDatabase().getType());
@@ -348,7 +349,7 @@ public class SqlBuilder {
             // }
             tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope));
-            tableView.setWhere(extractDefaultDimValue(semanticSchema,queryDimensions));
+            tableView.setWhere(extractDefaultDimValue(semanticSchema, queryDimensions));
         } catch (Exception e) {
             log.error("Failed to create sqlNode for table,tableQuery:{},SqlQuery:{}",
                     dataModel.getModelDetail().getTableQuery(),
@@ -358,61 +359,70 @@ public class SqlBuilder {
         return tableView;
     }
 
-    private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema
-            ,Set<DimSchemaResp> dimSchemaRespSet) {
+    private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema,
+            Set<DimSchemaResp> dimSchemaRespSet) {
         Map<String, String> defaultDimNameMap = semanticSchema.getDimensions().stream()
-                .filter(dimSchemaResp -> !org.springframework.util.CollectionUtils.isEmpty(dimSchemaResp.getDefaultValues()))
+                .filter(dimSchemaResp -> !org.springframework.util.CollectionUtils
+                        .isEmpty(dimSchemaResp.getDefaultValues()))
                 .collect(Collectors.toMap(dimSchemaResp -> dimSchemaResp.getBizName(),
                         dimSchemaResp -> dimSchemaResp.getDefaultValues().get(0)));
-        if(null==defaultDimNameMap||defaultDimNameMap.isEmpty()){
+        if (null == defaultDimNameMap || defaultDimNameMap.isEmpty()) {
             return null;
         }
-        Set<String> filterNameList = dimSchemaRespSet.stream()
-                .map(DimSchemaResp::getBizName).collect(Collectors.toSet());
+        Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
+                .collect(Collectors.toSet());
         List<SqlNode> andConditions = new ArrayList<>();
         SqlParserPos pos = SqlParserPos.ZERO;
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
-            if(filterNameList.contains(defaultDimensionFiledName)){
-                SqlIdentifier column = new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
+            if (filterNameList.contains(defaultDimensionFiledName)) {
+                SqlIdentifier column =
+                        new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
                 SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);
-                SqlNode notEqualsCall = SqlStdOperatorTable.NOT_EQUALS.createCall(pos, column, value);
+                SqlNode notEqualsCall =
+                        SqlStdOperatorTable.NOT_EQUALS.createCall(pos, column, value);
                 andConditions.add(notEqualsCall);
-            }else if ((!filterNameList.contains(defaultDimensionFiledName))&&!hasProvinceCityRelation(defaultDimensionFiledName,filterNameList)
-            ) {
+            } else if ((!filterNameList.contains(defaultDimensionFiledName))
+                    && !hasProvinceCityRelation(defaultDimensionFiledName, filterNameList)) {
 
-                SqlIdentifier column = new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
+                SqlIdentifier column =
+                        new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
                 SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);
                 SqlNode columnCondition = SqlStdOperatorTable.EQUALS.createCall(pos, column, value);
                 andConditions.add(columnCondition);
             }
         }
-        if (CollectionUtils.isEmpty(andConditions)){
+        if (CollectionUtils.isEmpty(andConditions)) {
             return null;
         }
-         return  produceAndConditions(andConditions);
+        return produceAndConditions(andConditions);
 
     }
 
     private static SqlNode produceAndConditions(List<SqlNode> andConditions) {
         SqlNode left = andConditions.get(0);
-        for(int i=1;i<=andConditions.size()-1;i++){
+        for (int i = 1; i <= andConditions.size() - 1; i++) {
             SqlNode right = andConditions.get(i);
-            SqlNode and=SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO,left,right);
-            left=and;
+            SqlNode and = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, left, right);
+            left = and;
         }
         return left;
 
     }
 
-    //  问题的条件中包含城市，即使条件不包含省份，也不能添加不能加省份='全国'的默认条件,为ture代表是 问城市&&检查省份的情况
-    public static boolean hasProvinceCityRelation(String dimensionName, Set<String> filterNameList) {
-        if(!(StringUtils.equalsIgnoreCase(dimensionName,"provinceName")||StringUtils.equalsIgnoreCase(dimensionName,"province_name")||StringUtils.equalsIgnoreCase(dimensionName,"province"))){
+    // 问题的条件中包含城市，即使条件不包含省份，也不能添加不能加省份='全国'的默认条件,为ture代表是 问城市&&检查省份的情况
+    public static boolean hasProvinceCityRelation(String dimensionName,
+            Set<String> filterNameList) {
+        if (!(StringUtils.equalsIgnoreCase(dimensionName, "provinceName")
+                || StringUtils.equalsIgnoreCase(dimensionName, "province_name")
+                || StringUtils.equalsIgnoreCase(dimensionName, "province"))) {
             return false;
         }
-        return filterNameList.stream().filter(
-                name->StringUtils.equalsIgnoreCase(name,"city_name")||StringUtils.equalsIgnoreCase(name,"cityName")||StringUtils.equalsIgnoreCase(name,"city")
-                        ).count()>0;
+        return filterNameList.stream()
+                .filter(name -> StringUtils.equalsIgnoreCase(name, "city_name")
+                        || StringUtils.equalsIgnoreCase(name, "cityName")
+                        || StringUtils.equalsIgnoreCase(name, "city"))
+                .count() > 0;
     }
 
     private static boolean isDimension(String name, ModelResp dataModel, S2CalciteSchema schema) {

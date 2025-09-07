@@ -26,6 +26,8 @@ public class DimensionReq extends SchemaItem {
 
     private String alias;
 
+    private boolean hasDimValues = false;
+
     private List<String> defaultValues;
 
     private List<DimValueMap> dimValueMaps;

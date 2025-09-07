@@ -31,6 +31,8 @@ public class Dimension {
 
     private String description;
 
+    private boolean hasDimValues = false;
+
     private List<String> defaultValues;
 
     public Dimension(String name, String bizName, DimensionType type, Integer isCreateDimension) {

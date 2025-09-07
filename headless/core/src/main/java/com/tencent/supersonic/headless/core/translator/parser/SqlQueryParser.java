@@ -172,11 +172,15 @@ public class SqlQueryParser implements QueryParser {
     private void convertNameToBizName(QueryStatement queryStatement) {
         Map<String, String> fieldNameToBizNameMap =
                 getNameToBizNameMap(queryStatement.getOntologyQuery());
+        Map<String, String> fieldNameToBizNameAllMap =
+                getNameToBizNameAllMap(queryStatement.getSemanticSchema());
+
+
         String sql = queryStatement.getSqlQuery().getSql();
         log.debug("dataSetId:{},convert name to bizName before:{}", queryStatement.getDataSetId(),
                 sql);
 //        sql = SqlReplaceHelper.replaceFields(sql, fieldNameToBizNameMap, true);
-        sql = SqlReplaceHelper.simpleReplaceFields(sql, fieldNameToBizNameMap);
+        sql = SqlReplaceHelper.simpleReplaceFields(sql, fieldNameToBizNameAllMap);
         log.debug("dataSetId:{},convert name to bizName after:{}", queryStatement.getDataSetId(),
                 sql);
 //        sql = SqlReplaceHelper.replaceTable(sql,
@@ -187,6 +191,13 @@ public class SqlQueryParser implements QueryParser {
 
         log.debug("replaceTableName after:{}", sql);
         queryStatement.getSqlQuery().setSql(sql);
+    }
+
+    private Map<String, String> getNameToBizNameAllMap(SemanticSchemaResp semanticSchema) {
+        Map<String, String> fieldNameToBizNameMap = new HashMap<>();
+        semanticSchema.getDimensions().stream().forEach(dimension->fieldNameToBizNameMap.put(dimension.getName(),dimension.getBizName()));
+        semanticSchema.getMetrics().stream().forEach(metric->fieldNameToBizNameMap.put(metric.getName(),metric.getBizName()));
+        return fieldNameToBizNameMap;
     }
 
     private void rewriteOrderBy(QueryStatement queryStatement) {
