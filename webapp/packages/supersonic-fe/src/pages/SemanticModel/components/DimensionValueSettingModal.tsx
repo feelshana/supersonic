@@ -34,7 +34,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
   dimensionValueSettingList,
   onSubmit,
 }) => {
-  const isAgentFormForLink = window.location.pathname.includes('agentFormForLink')
+  const isAgentFormForLink = window.location.pathname.toLowerCase().includes('agentFormForLink'.toLowerCase())
   const [tableDataSource, setTableDataSource] = useState<TableDataSource[]>([]);
   const [dimValueMaps, setDimValueMaps] = useState<ISemantic.IDimensionValueSettingItem[]>([]);
   const [form] = Form.useForm();
@@ -186,7 +186,9 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
       dataIndex: 'value',
       width: 200,
       editable: false,
-      tooltip: '数据库中存储的维度值数据。 比如数据库中维度平台的维度值有kw、qy等',
+      tooltip: isAgentFormForLink ? 
+      '对应维度的维度枚举值':
+      '数据库中存储的维度值数据。 比如数据库中维度平台的维度值有kw、qy等',
       formItemProps: {
         fieldProps: {
           placeholder: '请填写维度值',
@@ -206,6 +208,8 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
       valueType: 'select',
       width: 480,
       tooltip:
+        isAgentFormForLink ? 
+        '解析用户查询意图时，支持别名到维度值的转换。比如用户在别名处输入：咪咕视讯，完成设置后，可以将其转换成维度值咪咕视频。':
         '解析用户查询意图时,支持别名到技术名称的转换。比如用户输入kw、kuwo、酷我,完成设置后,都可以将其转换成技术名称kw',
       fieldProps: {
         placeholder: '输入别名后回车确认，多别名输入、复制粘贴支持英文逗号自动分隔',
