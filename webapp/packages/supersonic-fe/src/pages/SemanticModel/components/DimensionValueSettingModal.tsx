@@ -218,7 +218,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
         tokenSeparators: [','],
       },
     },
-    {
+    isAgentFormForLink ? {} : {
       title: '黑名单',
       dataIndex: 'black',
       width: 80,
@@ -231,7 +231,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
         return '-';
       },
     },
-    {
+    isAgentFormForLink ? {} :{
       title: '白名单',
       dataIndex: 'white',
       width: 80,
@@ -369,7 +369,8 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
               }}
               hideCtrlBtn={['deleteBtn']}
               editableProTableProps={{
-                toolBarRender: () => [
+                toolBarRender: isAgentFormForLink ? () => {}: 
+                () => [
                   <Button
                     key="3"
                     type="primary"
@@ -394,7 +395,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
                   />,
                 ],
 
-                rowSelection: {
+                rowSelection: isAgentFormForLink ? false : {
                   type: 'checkbox',
                   ...rowSelection,
                 },
@@ -402,7 +403,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
                 pagination: pagination,
                 headerTitle: (
                   <TableHeaderFilter
-                    components={[
+                    components={isAgentFormForLink ? [] : [
                       {
                         label: '维度值搜索',
                         component: (
