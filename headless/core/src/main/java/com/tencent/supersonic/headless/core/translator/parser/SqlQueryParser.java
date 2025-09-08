@@ -183,11 +183,11 @@ public class SqlQueryParser implements QueryParser {
         sql = SqlReplaceHelper.simpleReplaceFields(sql, fieldNameToBizNameAllMap);
         log.debug("dataSetId:{},convert name to bizName after:{}", queryStatement.getDataSetId(),
                 sql);
-//        sql = SqlReplaceHelper.replaceTable(sql,
-//                Constants.TABLE_PREFIX + queryStatement.getDataSetId());
-        sql=SqlReplaceHelper.simpleReplaceTable(sql
-                ,queryStatement.getSemanticSchema().getModelResps().get(0).getName()
-                ,Constants.TABLE_PREFIX + queryStatement.getDataSetId());
+        sql = SqlReplaceHelper.replaceTable(sql,
+                Constants.TABLE_PREFIX + queryStatement.getDataSetId(),queryStatement.getSqlQuery().getTableWithAlias());
+//        sql=SqlReplaceHelper.simpleReplaceTable(sql
+//                ,queryStatement.getSemanticSchema().getModelResps().get(0).getName()
+//                ,Constants.TABLE_PREFIX + queryStatement.getDataSetId());
 
         log.debug("replaceTableName after:{}", sql);
         queryStatement.getSqlQuery().setSql(sql);
