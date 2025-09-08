@@ -180,7 +180,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
     );
   };
 
-  const columns = [
+  let columns_ = [
     {
       title: '维度值',
       dataIndex: 'value',
@@ -218,7 +218,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
         tokenSeparators: [','],
       },
     },
-    isAgentFormForLink ? {} : {
+    isAgentFormForLink ? null as any : {
       title: '黑名单',
       dataIndex: 'black',
       width: 80,
@@ -231,7 +231,7 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
         return '-';
       },
     },
-    isAgentFormForLink ? {} :{
+    isAgentFormForLink ? null as any :{
       title: '白名单',
       dataIndex: 'white',
       width: 80,
@@ -245,6 +245,8 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
       },
     },
   ];
+
+  const columns = columns_.filter((item) => item);
 
   const rowSelection = {
     onChange: (selectedRowKeys: React.Key[]) => {
