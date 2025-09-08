@@ -2,6 +2,9 @@ package com.tencent.supersonic.headless.core.pojo;
 
 import lombok.Data;
 
+import java.util.HashSet;
+import java.util.Set;
+
 @Data
 public class SqlQuery {
     private String sql;
@@ -9,4 +12,6 @@ public class SqlQuery {
     private boolean supportWith = true;
     private boolean withAlias = true;
     private String simplifiedSql;
+    private Set<String> tableWithAlias=new HashSet<>();
+
 }

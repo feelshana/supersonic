@@ -88,9 +88,10 @@ public class DefaultSemanticTranslator implements SemanticTranslator {
             }
         } else {
             for (Pair<String, String> tb : tables) {
+                String replacement = "(" + tb.getRight() + ") "
+                        + (sqlQuery.isWithAlias() ||queryStatement.getSqlQuery().getTableWithAlias().contains(tb.getLeft())? "" : tb.getLeft());
                 finalSql = StringUtils.replace(ontologyOuterSql, tb.getLeft(),
-                        "(" + tb.getRight() + ") "
-                                + (sqlQuery.isWithAlias() ? "" : tb.getLeft())
+                        replacement
                         ,
                         -1);
             }

@@ -10,10 +10,12 @@ public class TableNameReplaceVisitor extends FromItemVisitorAdapter {
 
     private Set<String> notReplaceTables;
     private String tableName;
+    private Set<String> tableWithAlias;
 
-    public TableNameReplaceVisitor(String tableName, Set<String> notReplaceTables) {
+    public TableNameReplaceVisitor(String tableName, Set<String> notReplaceTables, Set<String> tableWithAlias) {
         this.tableName = tableName;
         this.notReplaceTables = notReplaceTables;
+        this.tableWithAlias=tableWithAlias;
     }
 
     @Override
@@ -23,5 +25,8 @@ public class TableNameReplaceVisitor extends FromItemVisitorAdapter {
             return;
         }
         table.setName(tableName);
+        if(null!=table.getAlias()){
+            tableWithAlias.add(tableName);
+        }
     }
 }

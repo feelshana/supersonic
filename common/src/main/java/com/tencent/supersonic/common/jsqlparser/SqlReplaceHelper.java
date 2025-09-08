@@ -385,7 +385,7 @@ public class SqlReplaceHelper {
         }
     }
 
-    public static String replaceTable(String sql, String tableName) {
+    public static String replaceTable(String sql, String tableName,Set<String> tableWithAlias) {
         if (StringUtils.isEmpty(tableName)) {
             return sql;
         }
@@ -395,16 +395,16 @@ public class SqlReplaceHelper {
 
         if (!CollectionUtils.isEmpty(plainSelectList)) {
             plainSelectList.forEach(
-                    plainSelect -> processPlainSelect(plainSelect, tableName, withNameList));
+                    plainSelect -> processPlainSelect(plainSelect, tableName, withNameList,tableWithAlias));
         }
         if (selectStatement instanceof PlainSelect) {
-            processPlainSelect((PlainSelect) selectStatement, tableName, withNameList);
+            processPlainSelect((PlainSelect) selectStatement, tableName, withNameList,tableWithAlias);
         } else if (selectStatement instanceof SetOperationList) {
             SetOperationList setOperationList = (SetOperationList) selectStatement;
             if (!CollectionUtils.isEmpty(setOperationList.getSelects())) {
                 setOperationList.getSelects()
                         .forEach(subSelectBody -> processPlainSelect((PlainSelect) subSelectBody,
-                                tableName, withNameList));
+                                tableName, withNameList,tableWithAlias));
             }
         }
 
@@ -412,19 +412,19 @@ public class SqlReplaceHelper {
     }
 
     private static void processPlainSelect(PlainSelect plainSelect, String tableName,
-            List<String> withNameList) {
+            List<String> withNameList,Set<String> tableWithAlias) {
         if (plainSelect.getFromItem() instanceof Table) {
-            replaceSingleTable(plainSelect, tableName, withNameList);
+            replaceSingleTable(plainSelect, tableName, withNameList,tableWithAlias);
         } else if (plainSelect.getFromItem() instanceof ParenthesedSelect) {
             ParenthesedSelect parenthesedSelect = (ParenthesedSelect) plainSelect.getFromItem();
             PlainSelect subPlainSelect = parenthesedSelect.getPlainSelect();
-            replaceSingleTable(subPlainSelect, tableName, withNameList);
+            replaceSingleTable(subPlainSelect, tableName, withNameList,tableWithAlias);
         }
-        replaceSubTable(plainSelect, tableName, withNameList);
+        replaceSubTable(plainSelect, tableName, withNameList,tableWithAlias);
     }
 
     public static void replaceSingleTable(PlainSelect plainSelect, String tableName,
-            List<String> withNameList) {
+            List<String> withNameList,Set<String> tableWithAlias) {
         List<PlainSelect> plainSelects =
                 SqlSelectHelper.getPlainSelects(Collections.singletonList(plainSelect));
         plainSelects.forEach(painSelect -> {
@@ -433,19 +433,19 @@ public class SqlReplaceHelper {
                 public void visit(PlainSelect plainSelect) {
                     if (Objects.nonNull(plainSelect.getFromItem())) {
                         plainSelect.getFromItem().accept(new TableNameReplaceVisitor(tableName,
-                                new HashSet<>(withNameList)));
+                                new HashSet<>(withNameList),tableWithAlias));
                     }
                 }
             });
-            replaceJoins(painSelect, tableName, withNameList);
+            replaceJoins(painSelect, tableName, withNameList,tableWithAlias);
         });
     }
 
     private static void replaceJoins(PlainSelect plainSelect, String tableName,
-            List<String> withNameList) {
+            List<String> withNameList,Set<String> tableWithAlias) {
         List<Join> joins = plainSelect.getJoins();
         TableNameReplaceVisitor fromItemVisitor =
-                new TableNameReplaceVisitor(tableName, new HashSet<>(withNameList));
+                new TableNameReplaceVisitor(tableName, new HashSet<>(withNameList),tableWithAlias);
         if (!CollectionUtils.isEmpty(joins)) {
             for (Join join : joins) {
                 if (join.getRightItem() instanceof ParenthesedFromItem) {
@@ -462,10 +462,10 @@ public class SqlReplaceHelper {
     }
 
     public static void replaceSubTable(PlainSelect plainSelect, String tableName,
-            List<String> withNameList) {
+            List<String> withNameList,Set<String> tableWithAlias) {
         if (plainSelect.getFromItem() instanceof ParenthesedSelect) {
             ParenthesedSelect parenthesedSelect = (ParenthesedSelect) plainSelect.getFromItem();
-            replaceSingleTable(parenthesedSelect.getPlainSelect(), tableName, withNameList);
+            replaceSingleTable(parenthesedSelect.getPlainSelect(), tableName, withNameList,tableWithAlias);
         }
 
         List<Join> joinList = plainSelect.getJoins();
@@ -473,7 +473,7 @@ public class SqlReplaceHelper {
             joinList.forEach(join -> {
                 if (join.getFromItem() instanceof ParenthesedSelect) {
                     ParenthesedSelect parenthesedSelect = (ParenthesedSelect) join.getFromItem();
-                    replaceSingleTable(parenthesedSelect.getPlainSelect(), tableName, withNameList);
+                    replaceSingleTable(parenthesedSelect.getPlainSelect(), tableName, withNameList,tableWithAlias);
                 }
             });
         }
