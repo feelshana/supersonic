@@ -48,6 +48,7 @@ s2:
     embedding:
       number: 10
       use-llm-words-segement: true
+      use-llm-enhance: false
       threshold: 0.7
       round:
         number: 2

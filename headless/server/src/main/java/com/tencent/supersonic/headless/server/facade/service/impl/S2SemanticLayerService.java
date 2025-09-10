@@ -5,6 +5,7 @@ import com.google.common.collect.Sets;
 import com.tencent.supersonic.common.pojo.*;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
@@ -97,8 +98,9 @@ public class S2SemanticLayerService implements SemanticLayerService {
     @Override
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
-        List<String> dimensionRelationlist=biReportConfigService.getDimRelations("s123");
-        if(CollectionUtils.isNotEmpty(dimensionRelationlist)){
+        List<String> dimensionRelationlist =
+                biReportConfigService.getDimRelations(queryReq.getRequestId());
+        if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
             queryStatement.setDimensionRelations(dimensionRelationlist);
         }
 

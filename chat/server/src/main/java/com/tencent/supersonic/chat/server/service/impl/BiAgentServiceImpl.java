@@ -234,10 +234,11 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 构建新的规则内容
      */
     private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
-        StringBuilder newRules = new StringBuilder("Sql查询注意点：\n");
+        StringBuilder newRules = new StringBuilder("Sql生成的限制条件：\n");
         newRules.append(
-                "1.如果查询的问题是收入/销量相关的销售指标，需要通过sum进行累加聚合，比如对日表查询12月的订购收入，需要sum(订购收入)，group by 日期\n");
-        newRules.append("2.如果查询的问题是用户/活跃用户/新增活跃相关的用户指标，禁止使用聚合，与分组，只进行select，同时要将日期查出来");
+                "1.如果查询的问题是收入/销量相关的销售指标，需要通过sum进行累加聚合，比如对日表提问12月的订购收入，需要将12月的每一天的订购收入进行求和，形成一条值\n");
+        newRules.append(
+                "2.当查询的问题是用户/用户数相关指标时，禁止使用求和，比如对日表提问12月的活跃用户数，需要将12月每一天的活跃用户数查询出来，不进行求和，形成多条值");
         // if (!"1".equals(pageConfig.getIsGroupBy())) {
         // newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
         // }
@@ -266,12 +267,11 @@ public class BiAgentServiceImpl implements BiAgentService {
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
             if (!dimensionNames.isEmpty()) {
-                newRules.append("\n3. 查询字段处理规则：");
-                newRules.append("\n- 维度字段：固定选择以下维度（");
+                newRules.append("\n3. select的维度必须固定为:");
                 newRules.append(String.join(",", dimensionNames) + "）");
-                newRules.append("\n- 指标字段：根据语义理解自动筛选，除维度值查询外都应包含指标");
-                newRules.append("\n\n特殊情况处理：");
-                newRules.append("\n当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。");
+                newRules.append("\n4.select的指标字段：根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
+                // newRules.append("\n\n特殊情况处理：");
+                // newRules.append("\n当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。");
             }
         }
         return newRules.toString();
@@ -305,8 +305,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             return;
         }
 
-        String startMarker = "Sql查询注意点：";
-        String endMarker = "当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。";
+        String startMarker = "Sql生成的限制条件：";
+        String endMarker = "根据语义理解后进行筛选,除开维度值的查询，都应该包含指标";
 
         int startIndex = prompt.indexOf(startMarker);
         int endIndex = prompt.indexOf(endMarker, startIndex);
@@ -336,6 +336,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         agent.setViewers(config.getViewers());
         agent.setToolConfig(JSONObject.toJSONString(toolConfig));
         agent.setName(domainName);
+        agent.setReportId(config.getReportId());
 
         // 模型配置
         Map<String, ChatApp> allApps = ChatAppManager.getAllApps(AppModule.CHAT);
@@ -588,9 +589,11 @@ public class BiAgentServiceImpl implements BiAgentService {
                         && !biDimensionCofig.getDefaultValues().isEmpty())
                 .collect(Collectors.toMap(BiDimensionCofig::getName,
                         BiDimensionCofig::getDefaultValues));
-        //取出有value的维度名称
-        List<String> dimensionNamesList = dimensionConfigs.stream().filter(biDimensionCofig -> biDimensionCofig.getValues() != null
-                && !biDimensionCofig.getValues().isEmpty()).map(BiDimensionCofig::getName).toList();
+        // 取出有value的维度名称
+        List<String> dimensionNamesList = dimensionConfigs.stream()
+                .filter(biDimensionCofig -> biDimensionCofig.getValues() != null
+                        && !biDimensionCofig.getValues().isEmpty())
+                .map(BiDimensionCofig::getName).toList();
         // 拖拽建模
         if (config.getCreateModelType() == 1) {
             List<BiModelItem> customs = processCustom(config.getCustoms());
@@ -803,13 +806,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                 List<SelectItem<?>> items = select.getSelectItems();
                 items.forEach(item -> {
                     Alias alias = item.getAlias();
-//                    log.info("BI传递的sql alias name: {}", alias.getName());
+                    // log.info("BI传递的sql alias name: {}", alias.getName());
                     if (alias != null && alias.getName() != null) {
                         String name =
                                 alias.getName().replace("\"", "`").replaceAll("\\（([^)]*)\\）", "$1")
                                         .replaceAll("\\(([^)]*)\\)", "$1");
                         alias.setName(name);
-//                        log.info("替换后的sql alias name: {}", name);
+                        // log.info("替换后的sql alias name: {}", name);
                     }
                 });
                 return select.toString();

@@ -3,6 +3,8 @@ package com.tencent.supersonic.headless.chat.mapper;
 import com.alibaba.fastjson.JSON;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
+import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
@@ -18,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_USE_LLM;
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MATCH_USE_LLM_WORDS_SEGMENT;
@@ -27,9 +30,13 @@ import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
     public static final String LLM_WORDS_SEGMENT_PROMPT =
-            "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "，提取其中的维度/指标/维度值"
-                    + "每个词汇或短语能够作为指标/维度/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？"
-                    + "输出格式应为多个词语字符串，用英文逗号分隔，不要输出其他内容，输出格式示例：国色芳华,播放次数" + "输入问题为:{{text}}";
+            "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "，提取其中的维度/指标/维度值\n"
+                    + "每个词汇或短语能够作为指标/维度/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？\n" + "输出格式应为两部分，用分号分隔：\n"
+                    + "第一部分：不包括日期和维度指标列表，术语信息中的内容，返回其余的分词结果，多个词语用英文逗号分隔；\n"
+                    + "第二部分：只包括当前问题在维度指标列表中涉及到维度和指标，必须是列表中存在的维度指标，禁止返回列表中没有的维度指标，问题没有涉及到的维度指标返回为空即可，涉及多个维度指标用英文逗号分隔；\n"
+                    + "不要输出其他内容，输出格式示例：国色芳华;播放次数,日期\n" + "已知维度列表：{{dimensionNames}}\n"
+                    + "已知指标列表：{{metricNames}}\n" + "已知术语信息：{{termInfo}}\n" + "输入问题为:{{text}}";
+
 
     @Autowired
     protected MapperConfig mapperConfig;
@@ -45,7 +52,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
 
         if (useLLMWordsSegment) {
-            useLLMSplit(detectSegments, text, chatQueryContext.getRequest());
+            useLLMSplit(detectSegments, text, chatQueryContext);
         } else {
             int embeddingTextSize = Integer.valueOf(
                     mapperConfig.getParameterValue(MapperConfig.EMBEDDING_MAPPER_TEXT_SIZE));
@@ -63,21 +70,49 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
     }
 
     // 通过llm进行分词
-    private void useLLMSplit(Set<String> detectSegments, String text, QueryNLReq request) {
+    private void useLLMSplit(Set<String> detectSegments, String text,
+            ChatQueryContext chatQueryContext) {
         Map<String, Object> variable = new HashMap<>();
         variable.put("text", text);
-
-        ChatApp chatApp = request.getChatAppConfig().get(OnePassSCSqlGenStrategy.APP_KEY);
+        SemanticSchema semanticSchema = chatQueryContext.getSemanticSchema();
+        // 取出所有的维度名称
+        List<String> dimensionNames =
+                semanticSchema.getDimensions().stream().map(SchemaElement::getName).toList();
+        // 取出所有的指标名称
+        List<String> metricNames =
+                semanticSchema.getMetrics().stream().map(SchemaElement::getName).toList();
+        variable.put("dimensionNames", dimensionNames);
+        variable.put("metricNames", metricNames);
+        if (semanticSchema.getTerms() != null && !semanticSchema.getTerms().isEmpty()) {
+            // 取出所有的术语信息放入map集合中,key为术语名称,value为术语描述
+            Map<String, String> termInfo = semanticSchema.getTerms().stream().collect(
+                    Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
+            variable.put("termInfo", termInfo);
+        }
+        ChatApp chatApp = chatQueryContext.getRequest().getChatAppConfig()
+                .get(OnePassSCSqlGenStrategy.APP_KEY);
 
         Prompt prompt = PromptTemplate.from(LLM_WORDS_SEGMENT_PROMPT).apply(variable);
         ChatModelConfig chatModelConfig = chatApp.getChatModelConfig();
         ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
-            List<String> words = Arrays.stream(response.split(",")).toList();
-            log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(words));
-            detectSegments.addAll(words);
-
+            // List<String> words = Arrays.stream(response.split(",")).toList();
+            // log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(words));
+            // detectSegments.addAll(words);
+            String[] parts = response.split(";");
+            List<String> words = Arrays.stream(parts[0].split(",")).toList();
+            if (parts.length == 2) {
+                List<String> metricsAndDims = Arrays.stream(parts[1].split(",")).toList();
+                log.info("用户的问题是: {},使用大模型分词后的结果为: {}, 涉及维度和指标: {}", text, JSON.toJSONString(words),
+                        JSON.toJSONString(metricsAndDims));
+                detectSegments.addAll(words);
+                // 可以在这里添加对metricsAndDims的处理逻辑
+                chatQueryContext.setQueryFilters(metricsAndDims);
+            } else if (parts.length == 1) {
+                log.info("用户的问题是: {},使用大模型分词后的结果为: {}", text, JSON.toJSONString(words));
+                detectSegments.addAll(words);
+            }
         }
     }
 

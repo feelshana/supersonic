@@ -29,6 +29,7 @@ public class QueryStatement {
     private Boolean isTranslated = false;
     private User user;
     private List<String> DimensionRelations;
+
     public boolean isOk() {
         return StringUtils.isBlank(errMsg) && StringUtils.isNotBlank(sql);
     }

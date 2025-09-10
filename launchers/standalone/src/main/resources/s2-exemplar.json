@@ -20,5 +20,13 @@
         "sideInfo": "CurrentDate=[2025-02-19],DomainTerms=[]",
         "dbSchema": "DatabaseType=[mysql], Table=[用户数据],  Dimensions=[<省份名称 COMMENT '省份名称'>,<日期 FORMAT 'yyyyMMdd' COMMENT '日期'>,<渠道 COMMENT '渠道名称'>,<城市名称 COMMENT '城市名称'>], Metrics=[<活跃用户数 ALIAS '访问用户数' COMMENT '一段时间内用户数去重'], Values=[<产品名称='咪咕视频'>,<产品名称='咪咕音乐'>]",
         "sql": "SELECT 活跃用户数 FROM 用户数据 WHERE 日期 >= '202501' AND 日期 <= '202512' and 产品名称='咪咕视频'"
+    },
+
+
+    {
+        "question": "本月和上月同期的活跃用户数环比增速百分比",
+        "sideInfo": "CurrentDate=[2025-08-19],DomainTerms=[]",
+        "dbSchema": "DatabaseType=[mysql], Table=[体育赛事],  Dimensions=[<省份名称 COMMENT '省份名称'>,<日期 FORMAT 'yyyyMMdd' COMMENT '日期'>,<城市名称 COMMENT '城市名称'>], Metrics=[<活跃用户数  COMMENT '活跃用户数'], Values=[]",
+        "sql": "SELECT  t1.城市名称, t1.活跃用户数 AS 本月活跃用户数,t2.活跃用户数 AS 上月同期活跃用户数,CASE  WHEN t2.活跃用户数 = 0 THEN NULL  ELSE CONCAT(ROUND((t1.活跃用户数 - t2.活跃用户数) / t2.活跃用户数 * 100, 2), '%')    END AS 环比增速百分比FROM    体育赛事 t1LEFT JOIN 体育赛事 t2 ON t1.城市名称 = t2.城市名称    AND t2.日期 = '20250719'WHERE    t1.日期 = '20250819'    AND t1.活跃用户数 IS NOT NULL    AND t2.活跃用户数 IS NOT NULL    AND t2.活跃用户数 > 0ORDER BY    环比增速百分比 DESC;"
     }
 ]
