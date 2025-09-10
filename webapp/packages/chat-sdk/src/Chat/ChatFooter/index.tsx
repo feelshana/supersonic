@@ -721,7 +721,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
         {onlyChatWindow && (containerFocused || popShowState) && <div className={styles.extraArea}>
           <div className={styles.row1}>
             <div className={styles.title}>
-                <span style={{color: '#1677ff'}}>维度</span>
+                <span style={{color: '#1b4aef'}}>维度</span>
             </div>
             <div>
               { 
@@ -733,7 +733,7 @@ const ChatFooter: ForwardRefRenderFunction<any, Props> = (
                   )} 
                   onOpenChange={popChange}
                   title="维度值" trigger="hover">
-                     <Tag  color='processing' className={styles.tag} bordered={false}>{ item.name }</Tag>
+                     <Tag  style={{color: '#1b4aef'}} color='#e5f0fe' className={styles.tag} bordered={false}>{ item.name }</Tag>
                   </Popover>
                 }) 
               }
