@@ -12,6 +12,6 @@ public class SqlQuery {
     private boolean supportWith = true;
     private boolean withAlias = true;
     private String simplifiedSql;
-    private Set<String> tableWithAlias=new HashSet<>();
+    private Set<String> tableWithAlias = new HashSet<>();
 
 }

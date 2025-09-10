@@ -33,6 +33,7 @@ public class QueryNLReq extends SemanticQueryReq implements Serializable {
     private SemanticParseInfo selectedParseInfo;
     private boolean descriptionMapped;
     private Integer agentId;
+    private String requestId = "";
 
     @Override
     public String toCustomizedString() {

@@ -5,6 +5,7 @@ import com.google.common.collect.Sets;
 import com.tencent.supersonic.common.pojo.*;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
@@ -29,6 +30,7 @@ import com.tencent.supersonic.headless.server.annotation.DefaultDimValueCheck;
 import com.tencent.supersonic.headless.server.annotation.S2DataPermission;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.manager.SemanticSchemaManager;
+import com.tencent.supersonic.headless.server.persistence.dataobject.BiReportConfigDO;
 import com.tencent.supersonic.headless.server.service.*;
 import com.tencent.supersonic.headless.server.utils.*;
 import lombok.SneakyThrows;
@@ -60,6 +62,8 @@ public class S2SemanticLayerService implements SemanticLayerService {
     private final TranslatorConfig translatorConfig;
     private final QueryCache queryCache = ComponentFactory.getQueryCache();
     private final List<QueryExecutor> queryExecutors = ComponentFactory.getQueryExecutors();
+    @Autowired
+    private BiReportConfigService biReportConfigService;
 
     public S2SemanticLayerService(StatUtils statUtils, QueryUtils queryUtils,
             SemanticSchemaManager semanticSchemaManager, DataSetService dataSetService,
@@ -94,6 +98,12 @@ public class S2SemanticLayerService implements SemanticLayerService {
     @Override
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
+        List<String> dimensionRelationlist =
+                biReportConfigService.getDimRelations(queryReq.getRequestId());
+        if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
+            queryStatement.setDimensionRelations(dimensionRelationlist);
+        }
+
         semanticTranslator.translate(queryStatement);
         return SemanticTranslateResp.builder().querySQL(queryStatement.getSql())
                 .isOk(queryStatement.isOk()).errMsg(queryStatement.getErrMsg()).build();

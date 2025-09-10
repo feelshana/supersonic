@@ -33,6 +33,10 @@ public abstract class SemanticQueryReq {
 
     private Long queryId;
 
+    private Integer agentId;
+
+    private String requestId = "";
+
     public void addModelId(Long modelId) {
         modelIds.add(modelId);
     }

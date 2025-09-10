@@ -45,6 +45,7 @@ public class Agent extends RecordInfo {
     private List<String> viewOrgs = Lists.newArrayList();
     private Integer isOpen = 0;
     private Integer isBi = 0;
+    private String reportId;
     private List<DimensionResp> dimensionList;
     private List<MetricResp> metricList;
 

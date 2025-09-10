@@ -7,6 +7,8 @@ import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Triple;
 
+import java.util.List;
+
 @Data
 public class QueryStatement {
 
@@ -26,6 +28,7 @@ public class QueryStatement {
     private Integer limit = 1000;
     private Boolean isTranslated = false;
     private User user;
+    private List<String> DimensionRelations;
 
     public boolean isOk() {
         return StringUtils.isBlank(errMsg) && StringUtils.isNotBlank(sql);

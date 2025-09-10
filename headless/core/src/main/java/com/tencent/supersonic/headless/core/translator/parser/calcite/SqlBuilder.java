@@ -62,9 +62,11 @@ public class SqlBuilder {
         TableView tableView;
         if (!CollectionUtils.isEmpty(ontology.getJoinRelations()) && dataModels.size() > 1) {
             Set<ModelResp> models = probeRelatedModels(dataModels, queryStatement.getOntology());
-            tableView = render(ontologyQuery, models, scope, schema, semanticSchema);
+            tableView = render(ontologyQuery, models, scope, schema, semanticSchema,
+                    queryStatement.getDimensionRelations());
         } else {
-            tableView = render(ontologyQuery, dataModels, scope, schema, semanticSchema);
+            tableView = render(ontologyQuery, dataModels, scope, schema, semanticSchema,
+                    queryStatement.getDimensionRelations());
         }
 
         SqlNode parserNode = tableView.build();
@@ -156,8 +158,8 @@ public class SqlBuilder {
     }
 
     private TableView render(OntologyQuery ontologyQuery, Set<ModelResp> dataModels,
-            SqlValidatorScope scope, S2CalciteSchema schema, SemanticSchemaResp semanticSchema)
-            throws Exception {
+            SqlValidatorScope scope, S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
+            List<String> dimensionRelations) throws Exception {
         SqlNode left = null;
         TableView leftTable = null;
         TableView outerTable = new TableView();
@@ -178,7 +180,7 @@ public class SqlBuilder {
             }
 
             TableView tableView = renderOne(queryMetrics, queryDimensions, dataModel, scope, schema,
-                    semanticSchema);
+                    semanticSchema, dimensionRelations);
             log.info("tableView {}", StringUtils.normalizeSpace(tableView.getTable().toString()));
             String alias = Constants.JOIN_TABLE_PREFIX + dataModel.getName();
             tableView.setAlias(alias);
@@ -331,7 +333,8 @@ public class SqlBuilder {
 
     public static TableView renderOne(Set<MetricSchemaResp> queryMetrics,
             Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
-            S2CalciteSchema schema, SemanticSchemaResp semanticSchema) {
+            S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
+            List<String> dimensionRelations) {
         TableView tableView = new TableView();
         // EngineType engineType =
         // EngineType.fromString(schema.getOntology().getDatabase().getType());
@@ -349,7 +352,8 @@ public class SqlBuilder {
             // }
             tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope));
-            tableView.setWhere(extractDefaultDimValue(semanticSchema, queryDimensions));
+            tableView.setWhere(
+                    extractDefaultDimValue(semanticSchema, queryDimensions, dimensionRelations));
         } catch (Exception e) {
             log.error("Failed to create sqlNode for table,tableQuery:{},SqlQuery:{}",
                     dataModel.getModelDetail().getTableQuery(),
@@ -360,7 +364,7 @@ public class SqlBuilder {
     }
 
     private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema,
-            Set<DimSchemaResp> dimSchemaRespSet) {
+            Set<DimSchemaResp> dimSchemaRespSet, List<String> dimensionRelations) {
         Map<String, String> defaultDimNameMap = semanticSchema.getDimensions().stream()
                 .filter(dimSchemaResp -> !org.springframework.util.CollectionUtils
                         .isEmpty(dimSchemaResp.getDefaultValues()))
@@ -383,7 +387,9 @@ public class SqlBuilder {
                         SqlStdOperatorTable.NOT_EQUALS.createCall(pos, column, value);
                 andConditions.add(notEqualsCall);
             } else if ((!filterNameList.contains(defaultDimensionFiledName))
-                    && !hasProvinceCityRelation(defaultDimensionFiledName, filterNameList)) {
+                    && !hasProvinceCityRelation(defaultDimensionFiledName, filterNameList)
+                    && !hasChildCondtion(defaultDimensionFiledName, filterNameList,
+                            dimensionRelations)) {
 
                 SqlIdentifier column =
                         new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
@@ -396,6 +402,35 @@ public class SqlBuilder {
             return null;
         }
         return produceAndConditions(andConditions);
+
+    }
+
+    private static boolean hasChildCondtion(String defaultDimensionFiledName,
+            Set<String> filterNameList, List<String> dimRelations) {
+        if (CollectionUtils.isEmpty(dimRelations)) {
+            return false;
+        }
+
+        // 1.判断是否属于层级分类维度
+        String dimRelation = dimRelations.stream()
+                .filter(dr -> dr.contains(defaultDimensionFiledName)).findFirst().orElse(null);
+        if (null == dimRelation) {
+            return false;
+        }
+        if (!dimRelation.contains(defaultDimensionFiledName)) {
+            return false;
+        }
+        // 2.判断下级分类条件是否存在
+        List<String> dimRelationList = Arrays.asList(dimRelation.split("/"));
+
+        int levelIndex = dimRelationList.indexOf(defaultDimensionFiledName);
+        if (levelIndex == dimRelationList.size() - 1) {
+            return false;
+        }
+        List<String> childList = dimRelationList.subList(levelIndex + 1, dimRelationList.size());
+        // 3.判断子维度是否在查询条件中
+
+        return CollectionUtils.isNotEmpty(CollectionUtils.intersection(childList, filterNameList));
 
     }
 
