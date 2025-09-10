@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.aspectj.weaver.loadtime.Agent;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,8 @@ public class ChatWorkflowEngine {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
                     if (queryCtx.getMapInfo().isEmpty()
+                            && (queryCtx.getQueryFilters() == null
+                                    || queryCtx.getQueryFilters().isEmpty())
                             || !containsDateKeywords(queryCtx.getRequest().getQueryText())) {
                         errDefault(parseResult, queryCtx);
                     } else {
@@ -116,7 +119,8 @@ public class ChatWorkflowEngine {
                     break;
                 case TRANSLATING:
                     long start = System.currentTimeMillis();
-                    log.info("---【大模型生成的sql】--为\\n{}",parseResult.getSelectedParses().get(0).getSqlInfo().getParsedS2SQL());
+                    log.info("---【大模型生成的sql】--为\\n{}",
+                            parseResult.getSelectedParses().get(0).getSqlInfo().getParsedS2SQL());
                     performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
@@ -219,6 +223,7 @@ public class ChatWorkflowEngine {
                 SemanticQueryReq semanticQueryReq = semanticQuery.buildSemanticQueryReq();
                 SemanticLayerService queryService =
                         ContextUtils.getBean(SemanticLayerService.class);
+                semanticQueryReq.setRequestId(queryCtx.getRequestId());
                 SemanticTranslateResp explain =
                         queryService.translate(semanticQueryReq, queryCtx.getRequest().getUser());
                 if (explain.isOk()) {

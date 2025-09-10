@@ -1,9 +1,12 @@
 package com.tencent.supersonic.chat.server.util;
 
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
+import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.pojo.ParseContext;
+import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.BeanMapper;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import org.springframework.util.CollectionUtils;
 
@@ -22,6 +25,11 @@ public class QueryReqConverter {
         queryNLReq.setChatAppConfig(parseContext.getAgent().getChatAppConfig());
         queryNLReq.setSelectedParseInfo(parseContext.getRequest().getSelectedParse());
         queryNLReq.setAgentId(parseContext.getRequest().getAgentId());
+        AgentService agentService = ContextUtils.getBean(AgentService.class);
+        Agent agent = agentService.getAgent(parseContext.getRequest().getAgentId());
+        if (agent != null && agent.getIsBi() == 1) {
+            queryNLReq.setRequestId(agent.getReportId());
+        }
         if (parseContext.getResponse() != null) {
             queryNLReq.setQueryId(parseContext.getResponse().getQueryId());
         }

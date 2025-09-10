@@ -12,21 +12,23 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+
 @Service
-public class BiReportConfigServiceImpl extends ServiceImpl<BiReportConfigMapper, BiReportConfigDO> implements BiReportConfigService {
+public class BiReportConfigServiceImpl extends ServiceImpl<BiReportConfigMapper, BiReportConfigDO>
+        implements BiReportConfigService {
     @Override
     public List<BiReportConfigDO> getBiReportConfig(String reportId) {
         QueryWrapper<BiReportConfigDO> queryWrapper = new QueryWrapper<>();
-        queryWrapper.lambda().eq(BiReportConfigDO::getReportId,reportId);
+        queryWrapper.lambda().eq(BiReportConfigDO::getReportId, reportId);
         return this.list(queryWrapper);
 
     }
 
     @Override
     public List<String> getDimRelations(String reportId) {
-        List <BiReportConfigDO> reportConfigDOList=this.getBiReportConfig(reportId);
-        if(CollectionUtils.isNotEmpty(reportConfigDOList)){
-            BiReportConfigDO biReportConfigDO=reportConfigDOList.get(0);
+        List<BiReportConfigDO> reportConfigDOList = this.getBiReportConfig(reportId);
+        if (CollectionUtils.isNotEmpty(reportConfigDOList)) {
+            BiReportConfigDO biReportConfigDO = reportConfigDOList.get(0);
             return Arrays.asList(biReportConfigDO.getDimRelation().split(";"));
         }
         return null;

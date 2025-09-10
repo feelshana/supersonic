@@ -34,6 +34,8 @@ public class ChatQueryContext implements Serializable {
     private List<Map.Entry<String, String>> schemaValusByTerm;
     private Boolean isTip = false;
     private Integer agentId;
+    private String requestId;
+    private List<String> queryFilters;
 
     public ChatQueryContext() {
         this(new QueryNLReq());

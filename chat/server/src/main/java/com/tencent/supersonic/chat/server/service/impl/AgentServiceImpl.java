@@ -177,14 +177,14 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                     allModelByDomainIds.stream().map(ModelResp::getId).collect(Collectors.toList());
             PageDimensionReq pageDimensionReq = new PageDimensionReq();
             pageDimensionReq.setModelIds(modelIds);
-            pageDimensionReq.setPageSize(20);
+            pageDimensionReq.setPageSize(99);
             pageDimensionReq.setCurrent(1);
             PageInfo<DimensionResp> dimensionPageInfo =
                     dimensionService.queryDimension(pageDimensionReq);
             dimensionNames.addAll(dimensionPageInfo.getList());
             PageMetricReq pageMetricReq = new PageMetricReq();
             pageMetricReq.setModelIds(modelIds);
-            pageMetricReq.setPageSize(20);
+            pageMetricReq.setPageSize(99);
             pageMetricReq.setCurrent(1);
             PageInfo<MetricResp> metricRespPageInfo =
                     metricService.queryMetric(pageMetricReq, user);

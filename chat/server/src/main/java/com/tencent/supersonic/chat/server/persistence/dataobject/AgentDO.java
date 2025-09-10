@@ -54,4 +54,6 @@ public class AgentDO {
     private Integer isOpen;
 
     private Integer isBi;
+
+    private String reportId;
 }
