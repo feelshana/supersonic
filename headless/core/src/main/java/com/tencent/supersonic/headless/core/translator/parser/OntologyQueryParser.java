@@ -5,6 +5,7 @@ import com.tencent.supersonic.headless.core.pojo.QueryStatement;
 import com.tencent.supersonic.headless.core.translator.parser.calcite.S2CalciteSchema;
 import com.tencent.supersonic.headless.core.translator.parser.calcite.SqlBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
@@ -16,6 +17,7 @@ import java.util.Objects;
 @Component("OntologyQueryParser")
 @Slf4j
 public class OntologyQueryParser implements QueryParser {
+
 
     @Override
     public boolean accept(QueryStatement queryStatement) {

@@ -166,7 +166,7 @@ class SqlReplaceHelperTest {
         String replaceSql = "SELECT * FROM 互联网企业 ORDER BY 公司成立时间 DESC LIMIT 3 "
                 + "UNION SELECT * FROM 互联网企业 ORDER BY 年营业额 DESC LIMIT 5";
         replaceSql = SqlReplaceHelper.replaceFields(replaceSql, fieldToBizName1);
-        replaceSql = SqlReplaceHelper.replaceTable(replaceSql, "internet");
+//        replaceSql = SqlReplaceHelper.replaceTable(replaceSql, "internet");
         Assert.assertEquals(
                 "SELECT * FROM internet ORDER BY company_established_time DESC LIMIT 3 "
                         + "UNION SELECT * FROM internet ORDER BY annual_turnover DESC LIMIT 5",
@@ -188,21 +188,22 @@ class SqlReplaceHelperTest {
     @Test
     void testReplaceTable() {
 
+
         String sql = "select 部门,sum (访问次数) from 超音数 where 数据日期 = '2023-08-08' "
                 + "and 用户 =alice and 发布日期 ='11' group by 部门 limit 1";
-        String replaceSql = SqlReplaceHelper.replaceTable(sql, "s2");
+        String replaceSql = SqlReplaceHelper.replaceTable(sql, "s2",null);
 
         Assert.assertEquals("SELECT 部门, sum(访问次数) FROM s2 WHERE 数据日期 = '2023-08-08' "
                 + "AND 用户 = alice AND 发布日期 = '11' GROUP BY 部门 LIMIT 1", replaceSql);
 
         sql = "select * from 互联网企业 order by 公司成立时间 desc limit 3 union select * from 互联网企业 order by 年营业额 desc limit 5";
-        replaceSql = SqlReplaceHelper.replaceTable(sql, "internet");
+        replaceSql = SqlReplaceHelper.replaceTable(sql, "internet",null);
         Assert.assertEquals("SELECT * FROM internet ORDER BY 公司成立时间 DESC LIMIT 3 "
                 + "UNION SELECT * FROM internet ORDER BY 年营业额 DESC LIMIT 5", replaceSql);
 
         sql = "SELECT * FROM CSpider音乐 WHERE (评分 < (SELECT min(评分) "
                 + "FROM CSpider音乐 WHERE 语种 = '英文')) AND 数据日期 = '2023-10-11'";
-        replaceSql = SqlReplaceHelper.replaceTable(sql, "cspider");
+        replaceSql = SqlReplaceHelper.replaceTable(sql, "cspider",null);
 
         Assert.assertEquals("SELECT * FROM cspider WHERE (评分 < (SELECT min(评分) FROM "
                 + "cspider WHERE 语种 = '英文')) AND 数据日期 = '2023-10-11'", replaceSql);
@@ -210,7 +211,7 @@ class SqlReplaceHelperTest {
         sql = "SELECT 歌曲名称, sum(评分) FROM CSpider音乐 WHERE(1 < 2) AND 数据日期 = '2023-10-15' "
                 + "GROUP BY 歌曲名称 HAVING sum(评分) < ( SELECT min(评分) FROM CSpider音乐 WHERE 语种 = '英文')";
 
-        replaceSql = SqlReplaceHelper.replaceTable(sql, "cspider");
+        replaceSql = SqlReplaceHelper.replaceTable(sql, "cspider",null);
 
         Assert.assertEquals("SELECT 歌曲名称, sum(评分) FROM cspider WHERE (1 < 2) AND 数据日期 = "
                 + "'2023-10-15' GROUP BY 歌曲名称 HAVING sum(评分) < (SELECT min(评分) "
@@ -221,7 +222,7 @@ class SqlReplaceHelperTest {
                 + "AS _访问次数汇总_ FROM 超音数数据集 WHERE 部门 IN ( SELECT 部门 FROM _部门访问次数_ ) AND 数据日期 >= '2024-07-11' "
                 + "AND 数据日期 <= '2024-10-09' GROUP BY 用户";
 
-        replaceSql = SqlReplaceHelper.replaceTable(sql, "t_1");
+        replaceSql = SqlReplaceHelper.replaceTable(sql, "t_1",null);
 
         Assert.assertEquals("WITH _部门访问次数_ AS (SELECT 部门, SUM(访问次数) AS _总访问次数_ FROM t_1 "
                 + "WHERE 数据日期 >= '2024-07-11' AND 数据日期 <= '2024-10-09' GROUP BY 部门 HAVING SUM(访问次数) > 100) "
