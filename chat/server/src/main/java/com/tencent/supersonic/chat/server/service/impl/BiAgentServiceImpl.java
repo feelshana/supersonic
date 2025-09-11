@@ -267,10 +267,10 @@ public class BiAgentServiceImpl implements BiAgentService {
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
             if (!dimensionNames.isEmpty()) {
-                newRules.append("\n3. select的维度必须固定为:");
-                newRules.append(String.join(",", dimensionNames) + "）");
+                newRules.append("\n3. select的字段必须包含以下维度:");
+                newRules.append(String.join(",", dimensionNames));
                 newRules.append("\n4.select的指标字段：根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
-                // newRules.append("\n\n特殊情况处理：");
+                newRules.append("\n5.涉及两组数据计算同环比，差值等时，必须通过left join实现");
                 // newRules.append("\n当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。");
             }
         }
@@ -306,7 +306,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
 
         String startMarker = "Sql生成的限制条件：";
-        String endMarker = "根据语义理解后进行筛选,除开维度值的查询，都应该包含指标";
+        String endMarker = "必须通过left join实现";
 
         int startIndex = prompt.indexOf(startMarker);
         int endIndex = prompt.indexOf(endMarker, startIndex);
@@ -634,7 +634,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     dimension.setBizName(modelDimension.getColumnName());
                     dimension.setDefaultValues(
                             defaultValuesMap.getOrDefault(modelDimension.getName(), null));
-                    dimension.setDescription(modelDimension.getDescription());
+                    dimension.setDescription(modelDimension.getName());
                     dimension.setIsCreateDimension(1);
                     dimensions.add(dimension);
                 }
@@ -686,7 +686,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setExpr(custom.getColumnName());
                         dimension.setDefaultValues(
                                 defaultValuesMap.getOrDefault(custom.getName(), null));
-                        dimension.setDescription(custom.getDescription());
+                        dimension.setDescription(custom.getName());
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
                         if (dimensions == null) {
@@ -762,7 +762,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     dimension.setDefaultValues(
                             defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setIsCreateDimension(1);
-                    dimension.setDescription(modelDimension.getDescription());
+                    dimension.setDescription(modelDimension.getName());
                     dimensions.add(dimension);
                 }
             }

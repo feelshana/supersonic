@@ -38,9 +38,10 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             + "- 如果没有相关内容，保留空位\n" + "\n" + "## 处理规则\n"
             + "1. 日期相关词汇（如\"6月\"、\"最近一周\"、\"8月5日\"）不放入第一部分\n" + "2. 完全匹配维度列表和指标列表的词汇不放入第一部分\n"
             + "3. 术语映射表中的内容应按映射后的含义处理\n" + "4. 确保输出格式严格遵循：第一部分内容;第二部分内容\n" + "\n" + "## 示例\n"
-            + "问题：国色芳华最近一周的播放次数是多少？\n" + "回答：国色芳华;日期,播放次数\n" + "\n" + "问题：8月5日四川小屏的活跃用户数\n"
-            + "回答：四川,小屏;日期,活跃用户数\n" + "\n" + "问题：6月咪咕音乐极速版的活跃用户数\n" + "回答：咪咕音乐极速版;日期,活跃用户数\n" + "\n"
-            + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}";
+            + "国色芳华最近一周的播放次数是多少？\n" + "国色芳华;日期,播放次数\n" + "\n" + "8月5日四川小屏的活跃用户数\n"
+            + "四川,小屏;日期,活跃用户数\n" + "\n" + "6月咪咕音乐极速版的活跃用户数\n" + "咪咕音乐极速版;日期,活跃用户数\n" + "\n"
+            + "8月28日球队通的在订用户数\n" + "球队通;日期,在订用户数\n" + "\n" + "## 当前任务\n" + "请处理以下用户问题：\n"
+            + "输入问题为:{{text}}";
 
 
     @Autowired
@@ -109,15 +110,13 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             // detectSegments.addAll(words);
             String[] parts = response.split(";");
             List<String> words = Arrays.stream(parts[0].split(",")).toList();
+            log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(parts));
             if (parts.length == 2) {
                 List<String> metricsAndDims = Arrays.stream(parts[1].split(",")).toList();
-                log.info("用户的问题是: {},使用大模型分词后的结果为: {}, 涉及维度和指标: {}", text, JSON.toJSONString(words),
-                        JSON.toJSONString(metricsAndDims));
                 detectSegments.addAll(words);
                 // 可以在这里添加对metricsAndDims的处理逻辑
                 chatQueryContext.setQueryFilters(metricsAndDims);
             } else if (parts.length == 1) {
-                log.info("用户的问题是: {},使用大模型分词后的结果为: {}", text, JSON.toJSONString(words));
                 detectSegments.addAll(words);
             }
         }

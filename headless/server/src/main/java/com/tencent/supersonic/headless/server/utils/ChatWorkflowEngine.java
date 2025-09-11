@@ -59,7 +59,8 @@ public class ChatWorkflowEngine {
                     if (queryCtx.getMapInfo().isEmpty()
                             && (queryCtx.getQueryFilters() == null
                                     || queryCtx.getQueryFilters().isEmpty())
-                            || !containsDateKeywords(queryCtx.getRequest().getQueryText())) {
+                            || !containsDateKeywords(queryCtx.getRequest().getQueryText(),
+                                    queryCtx.getAgentId())) {
                         errDefault(parseResult, queryCtx);
                     } else {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
@@ -139,9 +140,13 @@ public class ChatWorkflowEngine {
         }
     }
 
-    private boolean containsDateKeywords(String question) {
+    private boolean containsDateKeywords(String question, Integer agentId) {
         if (StringUtils.isBlank(question)) {
             return false;
+        }
+        //TODO 红海app的临时方案，后续优化
+        if (agentId == 43) {
+            return true;
         }
         return DATE_KEYWORDS.stream().anyMatch(question::contains);
     }
@@ -158,7 +163,8 @@ public class ChatWorkflowEngine {
         SqlInfo sqlInfo = new SqlInfo();
         String emptyMapTips;
         if (!queryCtx.getMapInfo().isEmpty()
-                && !containsDateKeywords(queryCtx.getRequest().getQueryText())) {
+                && !containsDateKeywords(queryCtx.getRequest().getQueryText(),
+                        queryCtx.getAgentId())) {
             emptyMapTips = produceDateTips(queryCtx.getSemanticSchema());
         } else {
             emptyMapTips = produceEmptyMapTips(queryCtx.getSemanticSchema());
