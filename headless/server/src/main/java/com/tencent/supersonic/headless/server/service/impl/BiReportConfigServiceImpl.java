@@ -29,7 +29,7 @@ public class BiReportConfigServiceImpl extends ServiceImpl<BiReportConfigMapper,
         List<BiReportConfigDO> reportConfigDOList = this.getBiReportConfig(reportId);
         if (CollectionUtils.isNotEmpty(reportConfigDOList)) {
             BiReportConfigDO biReportConfigDO = reportConfigDOList.get(0);
-            return Arrays.asList(biReportConfigDO.getDimRelation().split(";"));
+            return Arrays.asList(biReportConfigDO.getDimRelation().split(","));
         }
         return null;
     }

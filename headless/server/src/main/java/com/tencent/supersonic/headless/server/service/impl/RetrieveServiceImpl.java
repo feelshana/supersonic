@@ -288,7 +288,7 @@ public class RetrieveServiceImpl implements RetrieveService {
                 searchResults.add(searchResult);
             }
         }
-        log.info("searchMetricAndDimension searchResults:{}", searchResults);
+        // log.info("searchMetricAndDimension searchResults:{}", searchResults);
         return searchResults;
     }
 

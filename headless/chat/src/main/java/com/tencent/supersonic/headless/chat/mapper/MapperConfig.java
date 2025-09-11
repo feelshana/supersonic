@@ -52,7 +52,7 @@ public class MapperConfig extends ParameterConfig {
                     "number", "Mapper相关配置");
 
     public static final Parameter EMBEDDING_MAPPER_NUMBER =
-            new Parameter("s2.mapper.embedding.number", "10", "批量向量召回文本返回结果个数",
+            new Parameter("s2.mapper.embedding.number", "1", "批量向量召回文本返回结果个数",
                     "每个文本进行向量语义召回的文本结果个数", "number", "Mapper相关配置");
 
     public static final Parameter EMBEDDING_MAPPER_THRESHOLD =

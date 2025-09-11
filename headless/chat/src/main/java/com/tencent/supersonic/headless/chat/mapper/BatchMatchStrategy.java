@@ -29,13 +29,18 @@ import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING
 @Slf4j
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
-    public static final String LLM_WORDS_SEGMENT_PROMPT =
-            "任务描述：你的任务是接收用户关于数据指标查询的问题输入，并将其按照中文语法规则准确地分割成独立的词汇单元" + "，提取其中的维度/指标/维度值\n"
-                    + "每个词汇或短语能够作为指标/维度/维度值。" + "输入示例：国色芳华最近一周的播放次数是多少？\n" + "输出格式应为两部分，用分号分隔：\n"
-                    + "第一部分：不包括日期和维度指标列表，术语信息中的内容，返回其余的分词结果，多个词语用英文逗号分隔；\n"
-                    + "第二部分：只包括当前问题在维度指标列表中涉及到维度和指标，必须是列表中存在的维度指标，禁止返回列表中没有的维度指标，问题没有涉及到的维度指标返回为空即可，涉及多个维度指标用英文逗号分隔；\n"
-                    + "不要输出其他内容，输出格式示例：国色芳华;播放次数,日期\n" + "已知维度列表：{{dimensionNames}}\n"
-                    + "已知指标列表：{{metricNames}}\n" + "已知术语信息：{{termInfo}}\n" + "输入问题为:{{text}}";
+    public static final String LLM_WORDS_SEGMENT_PROMPT = "任务描述：\n"
+            + "你是一个专业的数据查询分词系统，负责将用户关于数据指标查询的自然语言问题准确分割。\n" + "## 输入内容\n" + "- 用户问题：需要分词的自然语言查询\n"
+            + "- 维度列表：{{dimensionNames}}\n" + "- 指标列表：{{metricNames}}\n" + "- 术语映射：{{termInfo}}\n"
+            + "## 输出要求\n" + "请严格按照以下两部分输出，用分号分隔，不要输出任何其他内容：\n" + "第一部分：仅包含维度值信息（排除日期和维度指标列表中的内容）\n"
+            + "- 从用户问题中提取不属于已知维度、指标的词汇\n" + "- 多个词语用英文逗号分隔\n" + "- 如果没有相关内容，保留空位\n" + "\n"
+            + "第二部分：仅包含用户问题中涉及的已知维度和指标\n" + "- 必须严格匹配维度列表和指标列表中的项目\n" + "- 多个项目用英文逗号分隔\n"
+            + "- 如果没有相关内容，保留空位\n" + "\n" + "## 处理规则\n"
+            + "1. 日期相关词汇（如\"6月\"、\"最近一周\"、\"8月5日\"）不放入第一部分\n" + "2. 完全匹配维度列表和指标列表的词汇不放入第一部分\n"
+            + "3. 术语映射表中的内容应按映射后的含义处理\n" + "4. 确保输出格式严格遵循：第一部分内容;第二部分内容\n" + "\n" + "## 示例\n"
+            + "问题：国色芳华最近一周的播放次数是多少？\n" + "回答：国色芳华;日期,播放次数\n" + "\n" + "问题：8月5日四川小屏的活跃用户数\n"
+            + "回答：四川,小屏;日期,活跃用户数\n" + "\n" + "问题：6月咪咕音乐极速版的活跃用户数\n" + "回答：咪咕音乐极速版;日期,活跃用户数\n" + "\n"
+            + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}";
 
 
     @Autowired
@@ -88,6 +93,8 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             Map<String, String> termInfo = semanticSchema.getTerms().stream().collect(
                     Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
             variable.put("termInfo", termInfo);
+        } else {
+            variable.put("termInfo", "");
         }
         ChatApp chatApp = chatQueryContext.getRequest().getChatAppConfig()
                 .get(OnePassSCSqlGenStrategy.APP_KEY);

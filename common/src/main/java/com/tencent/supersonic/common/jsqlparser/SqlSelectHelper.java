@@ -328,12 +328,12 @@ public class SqlSelectHelper {
         lateralFields.removeAll(aliases);
 
         List<String> results = Lists.newArrayList();
-        results.addAll(selectFields);
-        results.addAll(groupByFields);
-        results.addAll(orderByFields);
+        // results.addAll(selectFields);
+        // results.addAll(groupByFields);
+        // results.addAll(orderByFields);
         results.addAll(whereFields);
-        results.addAll(havingFields);
-        results.addAll(lateralFields);
+        // results.addAll(havingFields);
+        // results.addAll(lateralFields);
         return new ArrayList<>(results);
     }
 
