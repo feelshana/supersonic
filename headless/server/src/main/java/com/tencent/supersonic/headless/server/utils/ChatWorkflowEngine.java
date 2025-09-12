@@ -144,7 +144,7 @@ public class ChatWorkflowEngine {
         if (StringUtils.isBlank(question)) {
             return false;
         }
-        //TODO 红海app的临时方案，后续优化
+        // TODO 红海app的临时方案，后续优化
         if (agentId == 43) {
             return true;
         }

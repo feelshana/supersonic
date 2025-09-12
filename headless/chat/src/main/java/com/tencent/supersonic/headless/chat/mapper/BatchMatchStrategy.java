@@ -110,6 +110,11 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             // detectSegments.addAll(words);
             String[] parts = response.split(";");
             List<String> words = Arrays.stream(parts[0].split(",")).toList();
+            if (!words.isEmpty()) {
+                // 过滤不等于全国，全部，全省，全部
+                words = words.stream().filter(word -> !word.isEmpty() && !"全国".equals(word)
+                        && !"全省".equals(word) && !"全部".equals(word)).toList();
+            }
             log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(parts));
             if (parts.length == 2) {
                 List<String> metricsAndDims = Arrays.stream(parts[1].split(",")).toList();
