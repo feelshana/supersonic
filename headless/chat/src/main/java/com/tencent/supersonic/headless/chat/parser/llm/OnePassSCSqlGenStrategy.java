@@ -65,7 +65,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             + "    - 若Dimensions中包含format为'yyyyMMdd'格式的**日期字段**时，（如 `创建日期`），根据提示词中声明的当前日期，自动根据日期格式添加：创建日期 = '20251001'\n"
             + "     - 若Dimensions中包含format为'yyyyMM'格式的**日期字段**时，（如 `订单月份`），根据提示词中声明的当前日期，自动根据日期格式添加：订单月份 = 202509\n"
             + "     - **例外情况**：问题中已包含明确日期条件（如“查询昨天的场景”）时，不再额外添加.\n"
-            + "6.涉及两组数据计算同环比，差值等时，必须通过left join实现,禁止使用with子查询，禁止使用over函数。\n"
+            + "6.涉及两组数据计算同环比，差值等时，必须通过left join实现,禁止使用with子查询，禁止使用over函数。计算排名时请参考Exemplars中的示例,通过left join来实现\n"
             + "7.禁止使用字符串作为查询列，如 select '8月' as month\n" + "#Exemplars: {{exemplar}}\n"
             + "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}\n"
             + "#排序规则\n" + "   - 当问题涉及排序要求时（如'最高'、'最低'、'top10'、'前10'等），\n"

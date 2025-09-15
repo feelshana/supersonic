@@ -28,5 +28,12 @@
         "sideInfo": "CurrentDate=[2025-08-19],DomainTerms=[]",
         "dbSchema": "DatabaseType=[mysql], Table=[体育赛事],  Dimensions=[<省份名称 COMMENT '省份名称'>,<日期 FORMAT 'yyyyMMdd' COMMENT '日期'>,<城市名称 COMMENT '城市名称'>], Metrics=[<活跃用户数  COMMENT '活跃用户数'], Values=[]",
         "sql": "SELECT  t1.城市名称, t1.活跃用户数 AS 本月活跃用户数,t2.活跃用户数 AS 上月同期活跃用户数,CASE  WHEN t2.活跃用户数 = 0 THEN NULL  ELSE CONCAT(ROUND((t1.活跃用户数 - t2.活跃用户数) / t2.活跃用户数 * 100, 2), '%')    END AS 环比增速百分比FROM    体育赛事 t1LEFT JOIN 体育赛事 t2 ON t1.城市名称 = t2.城市名称    AND t2.日期 = '20250719'WHERE    t1.日期 = '20250819'    AND t1.活跃用户数 IS NOT NULL    AND t2.活跃用户数 IS NOT NULL    AND t2.活跃用户数 > 0ORDER BY    环比增速百分比 DESC;"
+    },
+
+    {
+        "question": "辽宁省9月10日咪咕视频OKR付费用户全国第几",
+        "sideInfo": "CurrentDate=[2025-09-10],DomainTerms=[]",
+        "dbSchema": "DatabaseType=[mysql], Table=[2025年咪咕公司OKR指标监控报表], Metrics=[<31天滚动付费活跃用户数 COMMENT '31天滚动付费活跃用户数'>,<月累计付费用户数 COMMENT '月累计付费用户数'>,<31天滚动活跃用户数 COMMENT '31天滚动活跃用户数'>,<31天滚动付费用户数 COMMENT '31天滚动付费用户数'>,<月累计活跃用户数 COMMENT '月累计活跃用户数'>,<月累计付费活跃规模 COMMENT '月累计付费活跃规模'>], Dimensions=[<省份 COMMENT '省份'>,<日期 FORMAT 'yyyyMMdd' COMMENT '日期'>,<产品名称 COMMENT '产品名称'>,<地市 COMMENT '地市'>], Values=[<省份='四川'>,<产品名称='咪咕音乐'>,<产品名称='视频彩铃'>,<产品名称='咪咕视频'>,<产品名称='咪咕阅读'>]",
+        "sql": "SELECT t1.产品名称, t1.省份, t1.地市, t1.日期, t1.月累计付费用户数, COUNT(t2.省份) AS 全国排名 FROM 2025年咪咕公司OKR指标监控报表 t1 LEFT JOIN 2025年咪咕公司OKR指标监控报表 t2 ON t1.日期 = t2.日期 AND t1.产品名称 = t2.产品名称 AND t1.月累计付费用户数 < t2.月累计付费用户数 WHERE t1.省份 = '四川' AND t1.日期 = '20250910' AND t1.产品名称 = '咪咕视频' GROUP BY t1.产品名称, t1.省份, t1.地市, t1.日期, t1.月累计付费用户数 ORDER BY 全国排名 LIMIT 100;"
     }
 ]
