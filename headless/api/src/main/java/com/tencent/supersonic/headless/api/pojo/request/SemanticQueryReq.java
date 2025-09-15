@@ -36,6 +36,7 @@ public abstract class SemanticQueryReq {
     private Integer agentId;
 
     private String requestId = "";
+    private List<String> segmentDimBizNames = new ArrayList<>();
 
     public void addModelId(Long modelId) {
         modelIds.add(modelId);

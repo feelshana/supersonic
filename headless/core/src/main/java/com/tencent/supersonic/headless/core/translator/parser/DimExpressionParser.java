@@ -49,25 +49,25 @@ public class DimExpressionParser implements QueryParser {
     private Map<String, String> getDimensionExpressions(SemanticSchemaResp semanticSchema,
             OntologyQuery ontologyQuery) {
 
-//        Set<DimSchemaResp> queryDimensions = ontologyQuery.getDimensions();
+        // Set<DimSchemaResp> queryDimensions = ontologyQuery.getDimensions();
         Set<String> queryFields = ontologyQuery.getFields();
-//        log.debug("begin to generateDerivedMetric {} [{}]", queryDimensions);
+        // log.debug("begin to generateDerivedMetric {} [{}]", queryDimensions);
 
         Map<String, String> dim2Expr = new HashMap<>();
-//        for (DimSchemaResp queryDim : queryDimensions) {
-//            queryDim.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(queryDim.getExpr()));
-//            queryFields.addAll(queryDim.getFields());
-//            if (!queryDim.getBizName().equals(queryDim.getExpr())) {
-//                dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
-//            }
-//        }
+        // for (DimSchemaResp queryDim : queryDimensions) {
+        // queryDim.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(queryDim.getExpr()));
+        // queryFields.addAll(queryDim.getFields());
+        // if (!queryDim.getBizName().equals(queryDim.getExpr())) {
+        // dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
+        // }
+        // }
         for (DimSchemaResp queryDim : semanticSchema.getDimensions()) {
-          queryDim.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(queryDim.getExpr()));
-          queryFields.addAll(queryDim.getFields());
-          if (!queryDim.getBizName().equals(queryDim.getExpr())) {
-              dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
-          }
-      }
+            queryDim.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(queryDim.getExpr()));
+            queryFields.addAll(queryDim.getFields());
+            if (!queryDim.getBizName().equals(queryDim.getExpr())) {
+                dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
+            }
+        }
 
         return dim2Expr;
     }

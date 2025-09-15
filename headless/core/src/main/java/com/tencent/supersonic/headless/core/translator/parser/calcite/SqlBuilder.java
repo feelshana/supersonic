@@ -49,7 +49,7 @@ public class SqlBuilder {
         OntologyQuery ontologyQuery = queryStatement.getOntologyQuery();
         Ontology ontology = queryStatement.getOntology();
         SemanticSchemaResp semanticSchema = queryStatement.getSemanticSchema();
-
+        semanticSchema.setSegmentDimBizNames(queryStatement.getSegmentDimBizNames());
         if (ontologyQuery.getLimit() == null) {
             ontologyQuery.setLimit(0L);
         }
@@ -379,7 +379,8 @@ public class SqlBuilder {
         SqlParserPos pos = SqlParserPos.ZERO;
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
-            if (filterNameList.contains(defaultDimensionFiledName)) {
+            if (filterNameList.contains(defaultDimensionFiledName)
+                    || semanticSchema.getSegmentDimBizNames().contains(defaultDimensionFiledName)) {
                 SqlIdentifier column =
                         new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
                 SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);

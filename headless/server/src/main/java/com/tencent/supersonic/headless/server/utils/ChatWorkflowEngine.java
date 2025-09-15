@@ -230,6 +230,7 @@ public class ChatWorkflowEngine {
                 SemanticLayerService queryService =
                         ContextUtils.getBean(SemanticLayerService.class);
                 semanticQueryReq.setRequestId(queryCtx.getRequestId());
+                semanticQueryReq.setSegmentDimBizNames(queryCtx.getSegmentDimBizNames());
                 SemanticTranslateResp explain =
                         queryService.translate(semanticQueryReq, queryCtx.getRequest().getUser());
                 if (explain.isOk()) {

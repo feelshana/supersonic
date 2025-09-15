@@ -27,6 +27,7 @@ public class SemanticSchemaResp {
     private DataSetResp dataSetResp;
     private DatabaseResp databaseResp;
     private QueryType queryType;
+    private List<String> segmentDimBizNames;
 
     public MetricSchemaResp getMetric(String bizName) {
         return metrics.stream().filter(metric -> bizName.equalsIgnoreCase(metric.getBizName()))

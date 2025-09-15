@@ -36,6 +36,7 @@ public class ChatQueryContext implements Serializable {
     private Integer agentId;
     private String requestId;
     private List<String> queryFilters;
+    private List<String> segmentDimBizNames = new ArrayList<>();
 
     public ChatQueryContext() {
         this(new QueryNLReq());
