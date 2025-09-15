@@ -848,8 +848,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                     if (!StringUtils.isEmpty(value)) {
                         value = value.replace(SPACE, POUND);
                     }
-                    return String.format("%s %s %s", value, nature, 1L);
-                }).toList();
+                    return value;
+                }).filter(value->!value.equals("全国")).map(value-> String.format("%s %s %s", value, nature, 1L)).toList();
                 dictTaskService.importDictData(dictItemResp, lines, user);
                 List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
                 if (alias != null) {
