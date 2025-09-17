@@ -17,6 +17,7 @@ import com.tencent.supersonic.headless.core.pojo.QueryStatement;
 import com.tencent.supersonic.headless.core.translator.parser.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -39,10 +40,37 @@ public class SqlBuilder {
 
     private final S2CalciteSchema schema;
     private final SqlValidatorScope scope;
+    public  static  final  SqlParserPos pos = SqlParserPos.ZERO;
 
     public SqlBuilder(S2CalciteSchema schema) {
         this.schema = schema;
         this.scope = SchemaBuilder.getScope(schema);
+    }
+
+    public static String createTableSql(SemanticSchemaResp semanticSchema) throws Exception {
+        List<SqlNode> selectList=new ArrayList<>();
+        for(DimSchemaResp dimSchemaResp:semanticSchema.getDimensions()){
+            if(StringUtils.isNotBlank(dimSchemaResp.getExpr())&&!StringUtils.equalsIgnoreCase(dimSchemaResp.getExpr(),dimSchemaResp.getBizName())){
+                selectList.add(createAlias(dimSchemaResp.getExpr(),dimSchemaResp.getBizName(),pos));
+            } else {
+                selectList.add(createColumn(dimSchemaResp.getBizName(),pos));
+            }
+
+        }
+        for(MetricSchemaResp metricSchemaResp:semanticSchema.getMetrics()){
+            if(StringUtils.isBlank(metricSchemaResp.getExpr())){
+                selectList.add(createAlias(metricSchemaResp.getExpr(),metricSchemaResp.getBizName(),pos));
+            }else {
+                selectList.add(createColumn(metricSchemaResp.getBizName(),pos));
+            }
+        }
+        SqlNodeList selectListNode=new SqlNodeList(selectList,pos);
+
+        SqlIdentifier tableName = new SqlIdentifier(Arrays.asList(semanticSchema.getModelResps().getFirst()
+                .getModelDetail().getTableQuery().split("\\.")), pos);
+        SqlSelect sqlSelect=new SqlSelect(pos,null,selectListNode,tableName,null,null,null,null,null,null,null,null);
+        return sqlSelect.toString();
+
     }
 
     public String buildOntologySql(QueryStatement queryStatement) throws Exception {
@@ -336,8 +364,8 @@ public class SqlBuilder {
             S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
             List<String> dimensionRelations) {
         TableView tableView = new TableView();
-        // EngineType engineType =
-        // EngineType.fromString(schema.getOntology().getDatabase().getType());
+         EngineType engineType =
+         EngineType.fromString(schema.getOntology().getDatabase().getType());
         // Set<String> queryFields = tableView.getFields();
         // if (Objects.nonNull(queryMetrics)) {
         // queryMetrics.stream().forEach(m -> queryFields.addAll(m.getFields()));
@@ -347,11 +375,13 @@ public class SqlBuilder {
         // }
 
         try {
-            // for (String field : queryFields) {
-            // tableView.getSelect().add(SemanticNode.parse(field, scope, engineType));
-            // }
-            tableView.getSelect().add(SqlIdentifier.STAR);
-            tableView.setTable(DataModelNode.build(dataModel, scope));
+//             for (String field : queryFields) {
+//             tableView.getSelect().add(SemanticNode.parse(field, scope, engineType));
+//             }
+
+
+//            tableView.getSelect().add(SqlIdentifier.STAR);
+            tableView.setTable(DataModelNode.build(dataModel, scope,semanticSchema));
             tableView.setWhere(
                     extractDefaultDimValue(semanticSchema, queryDimensions, dimensionRelations));
         } catch (Exception e) {
@@ -376,7 +406,8 @@ public class SqlBuilder {
         Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
                 .collect(Collectors.toSet());
         List<SqlNode> andConditions = new ArrayList<>();
-        SqlParserPos pos = SqlParserPos.ZERO;
+
+
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
             if (filterNameList.contains(defaultDimensionFiledName)
@@ -403,6 +434,15 @@ public class SqlBuilder {
             return null;
         }
         return produceAndConditions(andConditions);
+
+    }
+
+    private static boolean isQuoteProvinceTop(String dimensionFiledName) {
+        if(!dimensionFiledName.startsWith("province")){
+            return false;
+        }
+        return false;
+
 
     }
 
@@ -500,4 +540,39 @@ public class SqlBuilder {
         return false;
     }
 
+    /**
+     * 为表达式创建别名节点
+     * @param expr 原始表达式
+     * @param aliasName 别名
+     * @param pos 解析位置
+     * @return 带别名的表达式节点
+     */
+    public static SqlNode createAlias(String expr, String aliasName, SqlParserPos pos) throws SqlParseException {
+
+        String exprPlusSql="select "+expr+" from dual";
+        SqlNode parsedNode = SqlParser.create(exprPlusSql).parseQuery();
+        // 提取表达式部分
+        if (parsedNode instanceof SqlSelect) {
+            SqlSelect select = (SqlSelect) parsedNode;
+            SqlNodeList selectList = select.getSelectList();
+            if (selectList.size() > 0) {
+                SqlNode exprNode= selectList.get(0);
+                // 创建别名标识符
+                SqlIdentifier alias = new SqlIdentifier(Arrays.asList(aliasName), pos);
+
+                // 使用AS操作符创建带别名的表达式
+                return SqlStdOperatorTable.AS.createCall(pos, exprNode, alias);
+            }
+        }
+        return null;
+    }
+
+    public static SqlNode createColumn( String name, SqlParserPos pos) {
+        // 创建别名标识符
+        SqlIdentifier column = new SqlIdentifier(Arrays.asList(name), pos);
+
+        // 使用AS操作符创建带别名的表达式
+        return column;
+    }
 }
+
