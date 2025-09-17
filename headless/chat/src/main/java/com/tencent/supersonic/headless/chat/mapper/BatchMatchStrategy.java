@@ -40,8 +40,8 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             + "3. 术语映射表中的内容应按映射后的含义处理\n" + "4. 确保输出格式严格遵循：第一部分内容;第二部分内容\n" + "\n" + "## 示例\n"
             + "国色芳华最近一周的播放次数是多少？\n" + "国色芳华;日期,播放次数\n" + "\n" + "8月5日四川小屏的活跃用户数\n"
             + "四川,小屏;日期,活跃用户数\n" + "\n" + "6月咪咕音乐极速版的活跃用户数\n" + "咪咕音乐极速版;日期,活跃用户数\n" + "\n"
-            + "8月28日球队通的在订用户数\n" + "球队通;日期,在订用户数\n" + "\n" + "## 当前任务\n" + "请处理以下用户问题：\n"
-            + "输入问题为:{{text}}";
+            + "8月28日球队通的在订用户数\n" + "球队通;日期,在订用户数\n" + "\n" + "8月26日咪咕视频各省的活跃用户数\n"
+            + "咪咕视频;日期,省份,活跃用户数\n" + "\n" + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}";
 
 
     @Autowired
@@ -121,6 +121,11 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                 detectSegments.addAll(words);
                 // 可以在这里添加对metricsAndDims的处理逻辑
                 chatQueryContext.setQueryFilters(metricsAndDims);
+                // 提取维度的字段名存入chatQueryContext中
+                List<String> dimensionBizNames = semanticSchema.getDimensions().stream()
+                        .filter(dimension -> metricsAndDims.contains(dimension.getName()))
+                        .map(SchemaElement::getBizName).toList();
+                chatQueryContext.setSegmentDimBizNames(dimensionBizNames);
             } else if (parts.length == 1) {
                 detectSegments.addAll(words);
             }

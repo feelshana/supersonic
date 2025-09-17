@@ -98,6 +98,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
     @Override
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
+        queryStatement.setSegmentDimBizNames(queryReq.getSegmentDimBizNames());
         List<String> dimensionRelationlist =
                 biReportConfigService.getDimRelations(queryReq.getRequestId());
         if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
