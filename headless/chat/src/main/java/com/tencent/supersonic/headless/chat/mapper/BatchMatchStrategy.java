@@ -15,6 +15,7 @@ import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.provider.ModelProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,18 +31,36 @@ import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
     public static final String LLM_WORDS_SEGMENT_PROMPT = "任务描述：\n"
-            + "你是一个专业的数据查询分词系统，负责将用户关于数据指标查询的自然语言问题准确分割。\n" + "## 输入内容\n" + "- 用户问题：需要分词的自然语言查询\n"
-            + "- 维度列表：{{dimensionNames}}\n" + "- 指标列表：{{metricNames}}\n" + "- 术语映射：{{termInfo}}\n"
-            + "## 输出要求\n" + "请严格按照以下两部分输出，用分号分隔，不要输出任何其他内容：\n" + "第一部分：仅包含维度值信息（排除日期和维度指标列表中的内容）\n"
-            + "- 从用户问题中提取不属于已知维度、指标的词汇\n" + "- 多个词语用英文逗号分隔\n" + "- 如果没有相关内容，保留空位\n" + "\n"
-            + "第二部分：仅包含用户问题中涉及的已知维度和指标\n" + "- 必须严格匹配维度列表和指标列表中的项目\n" + "- 多个项目用英文逗号分隔\n"
-            + "- 如果没有相关内容，保留空位\n" + "\n" + "## 处理规则\n"
-            + "1. 日期相关词汇（如\"6月\"、\"最近一周\"、\"8月5日\"）不放入第一部分\n" + "2. 完全匹配维度列表和指标列表的词汇不放入第一部分\n"
-            + "3. 术语映射表中的内容应按映射后的含义处理\n" + "4. 确保输出格式严格遵循：第一部分内容;第二部分内容\n" + "\n" + "## 示例\n"
-            + "国色芳华最近一周的播放次数是多少？\n" + "国色芳华;日期,播放次数\n" + "\n" + "8月5日四川小屏的活跃用户数\n"
-            + "四川,小屏;日期,活跃用户数\n" + "\n" + "6月咪咕音乐极速版的活跃用户数\n" + "咪咕音乐极速版;日期,活跃用户数\n" + "\n"
-            + "8月28日球队通的在订用户数\n" + "球队通;日期,在订用户数\n" + "\n" + "8月26日咪咕视频各省的活跃用户数\n"
-            + "咪咕视频;日期,省份,活跃用户数\n" + "\n" + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}";
+            + "你是一个专业的数据查询分词系统，负责将用户关于数据指标查询的自然语言问题准确分割,请根据输入内容，按照工作步骤进行输出\n"
+            + "## 输入内容\n" + "- 用户问题：需要分词的自然语言查询\n"
+            + "- 维度列表\n" + "- 指标列表\n" + "- 术语列表\n"
+            + "## 工作步骤\n"
+            + "-第一步：根据输入内容中的维度列表+指标列表+用户问题，提取用户问题中提及到的维度/指标，作为输出的第二部分\n"
+            + "-第二部：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第一部分\n"
+            + "## 输出内容要求\n"
+            + "-确保输出格式严格遵循：第一部分内容;第二部分内容\n"
+            + "-两个部分之间用分号分隔，不要输出任何其他内容\n"
+            + "-每个部分的多个词语之间，用英文逗号分隔\n"
+            + "-如果没有相关内容，保留空位\n"
+            + "## 示例\n"
+            + "- 用户问题:国色芳华最近一周的播放次数是多少？\n"
+            + "-维度列表：[剧集名称,日期]\n"
+            + "-指标列表：[播放次数,播放人数]\n"
+            + "-输出：日期,播放次数;国色芳华\n"
+            + "- 用户问题:8月5日四川小屏的活跃用户数\n"
+            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数]\n"
+            + "-输出：日期,活跃用户数;四川,小屏\n"
+            + "-用户问题:咪咕音乐昨日活跃用户排行前十的省份\n"
+            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数]\n"
+            + "-输出：省份名称,活跃用户数;咪咕音乐\n"
+            + "-用户问题:销量排行前十的城市\n"
+            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
+            + "-输出：订单数;\n"
+            + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}\n"
+            + "-维度列表：{{dimensionNames}}\n" + "- 指标列表：{{metricNames}}\n" + "- 术语列表：{{termInfo}}\n";
 
 
     @Autowired
@@ -49,7 +68,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
     @Override
     public List<T> detect(ChatQueryContext chatQueryContext, List<S2Term> terms,
-            Set<Long> detectDataSetIds) {
+                          Set<Long> detectDataSetIds) {
 
         String text = chatQueryContext.getRequest().getQueryText();
         Set<String> detectSegments = new HashSet<>();
@@ -77,7 +96,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
     // 通过llm进行分词
     private void useLLMSplit(Set<String> detectSegments, String text,
-            ChatQueryContext chatQueryContext) {
+                             ChatQueryContext chatQueryContext) {
         Map<String, Object> variable = new HashMap<>();
         variable.put("text", text);
         SemanticSchema semanticSchema = chatQueryContext.getSemanticSchema();
@@ -109,29 +128,34 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
             // log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(words));
             // detectSegments.addAll(words);
             String[] parts = response.split(";");
-            List<String> words = Arrays.stream(parts[0].split(",")).toList();
-            if (!words.isEmpty()) {
-                // 过滤不等于全国，全部，全省，全部
-                words = words.stream().filter(word -> !word.isEmpty() && !"全国".equals(word)
+            String metaPart = parts.length == 1 ? parts[0] : "";
+            String wordsPart = parts.length == 2 ? parts[1] : "";
+
+            if (StringUtils.isNotBlank(metaPart) && CollectionUtils.isNotEmpty(Arrays.asList(metaPart.split(",")))) {
+                String[] metricsAndDims = metaPart.split(",");
+
+                if (null != metricsAndDims) {
+                    List<String> metricsAndDimsList = List.of(metricsAndDims);
+                    // 可以在这里添加对metricsAndDims的处理逻辑
+                    chatQueryContext.setQueryFilters(metricsAndDimsList);
+                    // 提取维度的字段名存入chatQueryContext中
+                    List<String> dimensionBizNames = semanticSchema.getDimensions().stream()
+                            .filter(dimension -> metricsAndDimsList.contains(dimension.getName()))
+                            .map(SchemaElement::getBizName).toList();
+                    chatQueryContext.setSegmentDimBizNames(dimensionBizNames);
+                }
+            }
+            if (StringUtils.isNotBlank(wordsPart) && CollectionUtils.isNotEmpty(Arrays.asList(wordsPart.split(",")))) {
+                List<String> wordsArray = Arrays.asList(wordsPart.split(","));
+                wordsArray = wordsArray.stream().filter(word -> !word.isEmpty() && !"全国".equals(word)
                         && !"全省".equals(word) && !"全部".equals(word)).toList();
+                detectSegments.addAll(wordsArray);
+
             }
-            log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(parts));
-            if (parts.length == 2) {
-                List<String> metricsAndDims = Arrays.stream(parts[1].split(",")).toList();
-                detectSegments.addAll(words);
-                // 可以在这里添加对metricsAndDims的处理逻辑
-                chatQueryContext.setQueryFilters(metricsAndDims);
-                // 提取维度的字段名存入chatQueryContext中
-                List<String> dimensionBizNames = semanticSchema.getDimensions().stream()
-                        .filter(dimension -> metricsAndDims.contains(dimension.getName()))
-                        .map(SchemaElement::getBizName).toList();
-                chatQueryContext.setSegmentDimBizNames(dimensionBizNames);
-            } else if (parts.length == 1) {
-                detectSegments.addAll(words);
-            }
+
         }
     }
 
     public abstract List<T> detectByBatch(ChatQueryContext chatQueryContext,
-            Set<Long> detectDataSetIds, Set<String> detectSegments);
+                                          Set<Long> detectDataSetIds, Set<String> detectSegments);
 }
