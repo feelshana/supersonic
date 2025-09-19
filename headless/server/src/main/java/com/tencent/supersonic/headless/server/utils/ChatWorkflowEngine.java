@@ -57,7 +57,7 @@ public class ChatWorkflowEngine {
                     if (queryCtx.getIsTip()) {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
-//                    向量召回后仍然没有结果，则代表问题不相关
+                    // 向量召回后仍然没有结果，则代表问题不相关
                     if (queryCtx.getMapInfo().isEmpty()
                             || !containsDateKeywords(queryCtx.getRequest().getQueryText(),
                                     queryCtx.getAgentId())) {
@@ -243,12 +243,12 @@ public class ChatWorkflowEngine {
                     errorMsg.add(explain.getErrMsg());
                 }
                 log.info("【第三步最终的物理sql】:\n [{}] ", parseInfo.getSqlInfo().getQuerySQL());
-//                log.info(
-//                        "SqlInfoProcessor results:\n"
-//                                + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
-//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
-//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
-//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
+                // log.info(
+                // "SqlInfoProcessor results:\n"
+                // + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
+                // StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
+                // StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
+                // StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
             } catch (Exception e) {
                 log.warn("get sql info failed:{}", e);
                 errorMsg.add(String.format("S2SQL:%s %s", parseInfo.getSqlInfo().getParsedS2SQL(),

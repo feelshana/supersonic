@@ -219,7 +219,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                     log.error("Stream processing error", error);
                     emitter.completeWithError(error);
                 }, () -> {
-//                    log.info("Stream completed successfully");
+                    // log.info("Stream completed successfully");
                     emitter.complete();
                 });
                 // 添加取消订阅处理

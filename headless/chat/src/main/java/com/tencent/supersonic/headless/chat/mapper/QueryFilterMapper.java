@@ -25,7 +25,7 @@ public class QueryFilterMapper extends BaseMapper {
 
     @Override
     public boolean accept(ChatQueryContext chatQueryContext) {
-//        return !chatQueryContext.getRequest().getDataSetIds().isEmpty();
+        // return !chatQueryContext.getRequest().getDataSetIds().isEmpty();
         return false;
     }
 

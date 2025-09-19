@@ -31,7 +31,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DataModelNode extends SemanticNode {
 
-    public static SqlNode build(ModelResp dataModel, SqlValidatorScope scope,SemanticSchemaResp semanticSchemaResp) throws Exception {
+    public static SqlNode build(ModelResp dataModel, SqlValidatorScope scope,
+            SemanticSchemaResp semanticSchemaResp) throws Exception {
         String sqlTable = "";
         if (dataModel.getModelDetail().getSqlQuery() != null
                 && !dataModel.getModelDetail().getSqlQuery().isEmpty()) {
@@ -44,15 +45,15 @@ public class DataModelNode extends SemanticNode {
             }
         } else if (dataModel.getModelDetail().getTableQuery() != null
                 && !dataModel.getModelDetail().getTableQuery().isEmpty()) {
-//            if (dataModel.getModelDetail().getDbType()
-//                    .equalsIgnoreCase(EngineType.POSTGRESQL.getName())) {
-//                String fullTableName = String.join(".public.",
-//                        dataModel.getModelDetail().getTableQuery().split("\\."));
-//                sqlTable = "SELECT * FROM " + fullTableName;
-//            } else {
-//                sqlTable = "SELECT * FROM " + dataModel.getModelDetail().getTableQuery();
-//            }
-            sqlTable=SqlBuilder.createTableSql(semanticSchemaResp);
+            // if (dataModel.getModelDetail().getDbType()
+            // .equalsIgnoreCase(EngineType.POSTGRESQL.getName())) {
+            // String fullTableName = String.join(".public.",
+            // dataModel.getModelDetail().getTableQuery().split("\\."));
+            // sqlTable = "SELECT * FROM " + fullTableName;
+            // } else {
+            // sqlTable = "SELECT * FROM " + dataModel.getModelDetail().getTableQuery();
+            // }
+            sqlTable = SqlBuilder.createTableSql(semanticSchemaResp);
         }
 
         // String filterSql = dataModel.getFilterSql();
@@ -71,7 +72,7 @@ public class DataModelNode extends SemanticNode {
         }
         SqlNode source = getTable(sqlTable, scope,
                 EngineType.fromString(dataModel.getModelDetail().getDbType()));
-//         addSchema(scope, dataModel, sqlTable);
+        // addSchema(scope, dataModel, sqlTable);
         return buildAs(dataModel.getName(), source);
     }
 
