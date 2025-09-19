@@ -39,7 +39,10 @@ public abstract class BaseMapper implements SchemaMapper {
 
         try {
             doMap(chatQueryContext);
-            MapFilter.filter(chatQueryContext);
+//            向量召回的情况不过滤
+            if(acceptFilter()){
+                MapFilter.filter(chatQueryContext);
+            }
         } catch (Exception e) {
             log.error("work error", e);
         }
@@ -49,10 +52,13 @@ public abstract class BaseMapper implements SchemaMapper {
                 chatQueryContext.getMapInfo().getDataSetElementMatches());
     }
 
+
     public abstract void doMap(ChatQueryContext chatQueryContext);
 
-    protected boolean accept(ChatQueryContext chatQueryContext) {
-        return !MapModeEnum.LOOSE.equals(chatQueryContext.getRequest().getMapModeEnum());
+    protected abstract boolean accept(ChatQueryContext chatQueryContext) ;
+
+    protected boolean acceptFilter() {
+        return true;
     }
 
     public void addToSchemaMap(SchemaMapInfo schemaMap, Long dataSetId,

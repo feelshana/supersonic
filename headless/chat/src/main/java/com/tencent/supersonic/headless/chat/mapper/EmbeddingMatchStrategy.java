@@ -241,7 +241,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
         if (CollectionUtils.isEmpty(retrieveQueryResults)) {
             return Collections.emptyList();
         }
-        log.info("分词结果：");
+        log.info("维度值向量召回情况：");
         for (RetrieveQueryResult result : retrieveQueryResults) {
             String query = result.getQuery();
             List<Retrieval> retrievals = result.getRetrieval();

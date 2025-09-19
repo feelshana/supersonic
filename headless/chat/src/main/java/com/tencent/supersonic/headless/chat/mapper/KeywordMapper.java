@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.mapper;
 
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.*;
+import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.DatabaseMapResult;
@@ -48,6 +49,11 @@ public class KeywordMapper extends BaseMapper {
         List<DatabaseMapResult> databaseMatchResults =
                 getMatches(chatQueryContext, databaseMatchStrategy);
         convertMapResultToMapInfo(chatQueryContext, databaseMatchResults);
+    }
+
+    @Override
+    protected boolean accept(ChatQueryContext chatQueryContext) {
+        return !chatQueryContext.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE);
     }
 
     private void convertMapResultToMapInfo(List<HanlpMapResult> mapResults,

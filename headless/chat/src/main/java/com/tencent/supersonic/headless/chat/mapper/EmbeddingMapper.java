@@ -18,6 +18,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * A mapper that recognizes schema elements with vector embedding.
@@ -75,7 +76,28 @@ public class EmbeddingMapper extends BaseMapper {
             addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
         }
         if (CollectionUtils.isEmpty(matchResults)) {
-            log.info("embedding mapper no match");
+            if(!CollectionUtils.isEmpty(chatQueryContext.getQueryFilters())){
+                for(String queryFilter : chatQueryContext.getQueryFilters()){
+                    List<SchemaElement> list= (List<SchemaElement>) org.apache.commons.collections.CollectionUtils.union(chatQueryContext.getSemanticSchema().getDimensions()
+                                    ,chatQueryContext.getSemanticSchema().getMetrics());
+
+                    SchemaElement matched= list.stream().filter(element->element.getName().equals(queryFilter)).findFirst().orElse(null);
+                    if(matched!=null){
+                        SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
+                                .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+                                .detectWord(matched.getName())
+                                .word(matched.getName()).similarity(1).build();
+
+                       Long dataSetId = chatQueryContext.getSemanticSchema().getDataSets().get(0).getDataSetId();
+
+                        addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
+
+                    }
+                }
+
+
+            }
+
         } else {
             // for (EmbeddingResult matchResult : matchResults) {
             // log.info("embedding match name=[{}],detectWord=[{}],similarity=[{}],metadata=[{}]",
@@ -85,4 +107,8 @@ public class EmbeddingMapper extends BaseMapper {
         }
     }
 
+    @Override
+    protected boolean acceptFilter() {
+        return  false;
+    }
 }

@@ -102,24 +102,6 @@ public class NL2SQLParser implements ChatQueryParser {
             for (Long datasetId : requestedDatasets) {
                 queryNLReq.setDataSetIds(Collections.singleton(datasetId));
                 ChatParseResp parseResp = new ChatParseResp(parseContext.getRequest().getQueryId());
-                // for (MapModeEnum mode : Lists.newArrayList(MapModeEnum.STRICT,
-                // MapModeEnum.MODERATE)) {
-                // queryNLReq.setMapModeEnum(mode);
-                // doParse(queryNLReq, parseResp);
-                // }
-                // Integer valueSize = 0;
-                // if (!parseResp.getSelectedParses().isEmpty()) {
-                // valueSize = parseResp.getSelectedParses().get(0).getElementMatches().stream()
-                // .filter(schemaElementMatch -> schemaElementMatch.getElement()
-                // .getType() == SchemaElementType.VALUE)
-                // .collect(Collectors.toList()).size();
-                // }
-                // if ((parseResp.getSelectedParses().isEmpty() && candidateParses.isEmpty())
-                // || valueSize == 0) {
-                // queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
-                // doParse(queryNLReq, parseResp);
-                //
-                // }
                 queryNLReq.setMapModeEnum(MapModeEnum.MODERATE);
                 doParse(queryNLReq, parseResp);
                 List<SchemaElementMatch> keyWordsValues = new ArrayList<>();
@@ -134,60 +116,23 @@ public class NL2SQLParser implements ChatQueryParser {
                     parseResp.getSelectedParses().clear();
                 }
 
+
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
-                if (!CollectionUtils.isEmpty(keyWordsValues)) {
-                    StringBuilder keyWordsValuesInfo = new StringBuilder();
-                    for (SchemaElementMatch keyWordsValue : keyWordsValues) {
-                        keyWordsValuesInfo
-                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
-                                        keyWordsValue.getDetectWord(), keyWordsValue.getWord(),
-                                        keyWordsValue.getSimilarity()));
-                    }
-                    logger.info("严格模式映射到的keyWordsValues数量有 {} 个，分别是：{}", keyWordsValues.size(),
-                            keyWordsValuesInfo);
-                    List<SchemaElementMatch> looseElementMatches =
-                            parseResp.getSelectedParses().getFirst().getElementMatches();
-                    Set<SchemaElementMatch> uniqueElements = new LinkedHashSet<>();
-                    StringBuilder looseMatchesInfo = new StringBuilder();
-                    for (SchemaElementMatch matchResult : looseElementMatches) {
-                        looseMatchesInfo
-                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
-                                        matchResult.getDetectWord(), matchResult.getWord(),
-                                        matchResult.getSimilarity()));
-                    }
-                    logger.info("宽松模式映射到的ElementMatches数量有 {} 个，分别是：{}", looseElementMatches.size(),
-                            looseMatchesInfo.toString().trim());
+                List<SchemaElementMatch> looseElementMatches =
+                        parseResp.getSelectedParses().getFirst().getElementMatches();
+                looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch
+                        .getElement().getType() != SchemaElementType.VALUE
+                        && schemaElementMatch.getElement().getType() != SchemaElementType.TERM);
 
-                    // 移除非value类型和term类型的元素
-                    looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch
-                            .getElement().getType() != SchemaElementType.VALUE
-                            && schemaElementMatch.getElement().getType() != SchemaElementType.TERM);
-                    // 移除重复的元素
-                    Iterator<SchemaElementMatch> iterator = looseElementMatches.iterator();
-                    while (iterator.hasNext()) {
-                        SchemaElementMatch looseElementMatch = iterator.next();
-                        if (isDuplicate(looseElementMatch, keyWordsValues)) {
-                            iterator.remove();
-                        }
-                    }
-                    // uniqueElements.removeIf(schemaElementMatch ->
-                    // uniqueElements.contains(schemaElementMatch));
-                    uniqueElements.addAll(keyWordsValues);
-                    uniqueElements.addAll(looseElementMatches);
-                    StringBuilder matchesInfo = new StringBuilder();
-                    for (SchemaElementMatch matchResult : uniqueElements) {
-                        matchesInfo
-                                .append(String.format("DetectWord=[%s],Word=[%s],similarity=[%s]; ",
-                                        matchResult.getDetectWord(), matchResult.getWord(),
-                                        matchResult.getSimilarity()));
-                    }
-                    logger.info("宽松模式下合并keyWordsValues后的ElementMatches数量有 {} 个，分别是：{}",
-                            uniqueElements.size(), matchesInfo.toString().trim());
-                    parseResp.getSelectedParses().getFirst().getElementMatches().clear();
-                    parseResp.getSelectedParses().getFirst().getElementMatches()
-                            .addAll(uniqueElements);
-                }
+                logMatchResult(keyWordsValues,"词典模式");
+                logMatchResult(looseElementMatches,"向量模式");
+
+                List<SchemaElementMatch> merged= (List<SchemaElementMatch>) CollectionUtils.union(keyWordsValues,looseElementMatches);
+                logMatchResult(merged,"融合模式");
+
+                parseResp.getSelectedParses().getFirst().getElementMatches().clear();
+                parseResp.getSelectedParses().getFirst().getElementMatches().addAll(merged);
                 if (parseResp.getSelectedParses().isEmpty()) {
                     errMsg.append(parseResp.getErrorMsg());
                     continue;
@@ -236,6 +181,23 @@ public class NL2SQLParser implements ChatQueryParser {
                 doParse(queryNLReq, parseContext.getResponse());
             }
         }
+    }
+
+    private void logMatchResult(List<SchemaElementMatch> valueMatchs, String paternName) {
+        if(CollectionUtils.isEmpty(valueMatchs)){
+            log.info("{}未召回到维度值",paternName);
+            return;
+        }
+        StringBuilder stringBuilder = new StringBuilder();
+        for (SchemaElementMatch valueMatch : valueMatchs) {
+            stringBuilder
+                    .append(String.format("词语=[%s],维度值=[%s],相似度[%s]; ",
+                            valueMatch.getDetectWord(), valueMatch.getWord(),
+                            valueMatch.getSimilarity())).append("\n");
+        }
+        logger.info("{}召回的维度值数量有 {} 个，分别是：\n{}",paternName,valueMatchs.size(),
+                stringBuilder.substring(0,stringBuilder.length()-1).toString());
+
     }
 
     private boolean isDuplicate(SchemaElementMatch element,
