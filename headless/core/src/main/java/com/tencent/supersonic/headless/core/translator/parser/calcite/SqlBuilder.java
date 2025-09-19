@@ -213,7 +213,7 @@ public class SqlBuilder {
 
             TableView tableView = renderOne(queryMetrics, queryDimensions, dataModel, scope, schema,
                     semanticSchema, dimensionRelations);
-            log.info("tableView {}", StringUtils.normalizeSpace(tableView.getTable().toString()));
+            log.info("【内层表的sql】:\n{}", StringUtils.normalizeSpace(tableView.getTable().toString()));
             String alias = Constants.JOIN_TABLE_PREFIX + dataModel.getName();
             tableView.setAlias(alias);
             tableView.setPrimary(primary);
