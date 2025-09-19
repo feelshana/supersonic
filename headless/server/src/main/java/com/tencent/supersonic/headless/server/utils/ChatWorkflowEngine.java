@@ -5,6 +5,7 @@ import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
+import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticTranslateResp;
@@ -56,9 +57,8 @@ public class ChatWorkflowEngine {
                     if (queryCtx.getIsTip()) {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
+//                    向量召回后仍然没有结果，则代表问题不相关
                     if (queryCtx.getMapInfo().isEmpty()
-                            && (queryCtx.getQueryFilters() == null
-                                    || queryCtx.getQueryFilters().isEmpty())
                             || !containsDateKeywords(queryCtx.getRequest().getQueryText(),
                                     queryCtx.getAgentId())) {
                         errDefault(parseResult, queryCtx);
@@ -120,7 +120,7 @@ public class ChatWorkflowEngine {
                     break;
                 case TRANSLATING:
                     long start = System.currentTimeMillis();
-                    log.info("---【大模型生成的sql】--为\\n{}",
+                    log.info("【大模型生成的sql】:\n{}",
                             parseResult.getSelectedParses().get(0).getSqlInfo().getParsedS2SQL());
                     performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
@@ -242,12 +242,13 @@ public class ChatWorkflowEngine {
                 if (StringUtils.isNotBlank(explain.getErrMsg())) {
                     errorMsg.add(explain.getErrMsg());
                 }
-                log.info(
-                        "SqlInfoProcessor results:\n"
-                                + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
-                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
-                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
-                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
+                log.info("【第三步最终的物理sql】:\n [{}] ", parseInfo.getSqlInfo().getQuerySQL());
+//                log.info(
+//                        "SqlInfoProcessor results:\n"
+//                                + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
+//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
+//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
+//                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
             } catch (Exception e) {
                 log.warn("get sql info failed:{}", e);
                 errorMsg.add(String.format("S2SQL:%s %s", parseInfo.getSqlInfo().getParsedS2SQL(),

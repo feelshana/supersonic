@@ -100,7 +100,7 @@ public class SqlQueryParser implements QueryParser {
             sqlQuery.setWithAlias(false);
         }
 
-        log.info("parse sqlQuery [{}] ", sqlQuery);
+        log.info("【第一步替换变量】后的sql:\n [{}] ", sqlQuery.getSql());
     }
 
     private void aliasesWithBackticks(QueryStatement queryStatement) {

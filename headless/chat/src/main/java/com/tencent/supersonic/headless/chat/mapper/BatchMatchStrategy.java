@@ -31,34 +31,40 @@ import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
     public static final String LLM_WORDS_SEGMENT_PROMPT = "任务描述：\n"
-            + "你是一个专业的数据查询分词系统，负责将用户关于数据指标查询的自然语言问题准确分割,请根据输入内容，按照工作步骤进行输出\n"
-            + "## 输入内容\n" + "- 用户问题：需要分词的自然语言查询\n"
-            + "- 维度列表\n" + "- 指标列表\n" + "- 术语列表\n"
+            + "你是一个专业的数据查询问题分词系统，结合数据的业务知识(维度/指标/业务含义)，将用户关于数据指标查询的自然语言进行准确分割,输出两部分分词结果，请按照规定的工作步骤进行\n"
+            + "## 业务知识\n"
+            + "- 维度列表\n" + "- 指标列表\n" + "- 业务含义\n"
+            + "## 用户问题：需要分词的自然语言查询\n"
             + "## 工作步骤\n"
-            + "-第一步：根据输入内容中的维度列表+指标列表+用户问题，提取用户问题中提及到的维度/指标，作为输出的第二部分\n"
-            + "-第二部：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第一部分\n"
+            + "-第一步：根据知识中的维度列表+指标列表+业务含义，理解用户问题，提取用户问题中提及到的维度/指标，作为输出的第一部分\n"
+            + "-第二部：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第二部分\n"
             + "## 输出内容要求\n"
-            + "-确保输出格式严格遵循：第一部分内容;第二部分内容\n"
-            + "-两个部分之间用分号分隔，不要输出任何其他内容\n"
-            + "-每个部分的多个词语之间，用英文逗号分隔\n"
-            + "-如果没有相关内容，保留空位\n"
+            + "-确保输出格式严格遵循：第一部分内容&第二部分内容\n"
+            + "-确保输出格式严格遵循：每个部分的多个词语之间，用英文逗号分隔\n"
+            + "-如果某个部分没有相关内容，保留空位,任然保留&符号不变\n"
+            + "-如果问题与业务知识所涉及的维度和指标无关，那么两部分内容都保留空位，用&符号分割"
+            + "-不要生成任何多余内容，严格参考如下的示例"
             + "## 示例\n"
             + "- 用户问题:国色芳华最近一周的播放次数是多少？\n"
             + "-维度列表：[剧集名称,日期]\n"
             + "-指标列表：[播放次数,播放人数]\n"
-            + "-输出：日期,播放次数;国色芳华\n"
+            + "-输出：日期,播放次数&国色芳华\n"
             + "- 用户问题:8月5日四川小屏的活跃用户数\n"
             + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
             + "-指标列表：[活跃用户数,付费用户数]\n"
-            + "-输出：日期,活跃用户数;四川,小屏\n"
+            + "-输出：日期,活跃用户数&四川,小屏\n"
             + "-用户问题:咪咕音乐昨日活跃用户排行前十的省份\n"
             + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
             + "-指标列表：[活跃用户数,付费用户数]\n"
-            + "-输出：省份名称,活跃用户数;咪咕音乐\n"
+            + "-输出：省份名称,活跃用户数&咪咕音乐\n"
             + "-用户问题:销量排行前十的城市\n"
             + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
             + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
-            + "-输出：订单数;\n"
+            + "-输出：&订单数\n"
+            + "-用户问题:你能查什么数据\n"
+            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
+            + "-输出：&\n"
             + "## 当前任务\n" + "请处理以下用户问题：\n" + "输入问题为:{{text}}\n"
             + "-维度列表：{{dimensionNames}}\n" + "- 指标列表：{{metricNames}}\n" + "- 术语列表：{{termInfo}}\n";
 
@@ -124,12 +130,12 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
-            // List<String> words = Arrays.stream(response.split(",")).toList();
-            // log.info("使用大模型分词后的结果为: {}", JSON.toJSONString(words));
-            // detectSegments.addAll(words);
-            String[] parts = response.split(";");
-            String metaPart = parts.length == 1 ? parts[0] : "";
-            String wordsPart = parts.length == 2 ? parts[1] : "";
+            log.info("大模型分词返回:{}",response);
+            String[] parts = response.split("&");
+            String metaPart = parts.length >=1 ? parts[0].trim() : "";
+            String wordsPart = parts.length == 2 ? parts[1].trim() : "";
+            log.info("维度/指标分词结果:{}",metaPart);
+            log.info("维度值分词结果:{}",wordsPart);
 
             if (StringUtils.isNotBlank(metaPart) && CollectionUtils.isNotEmpty(Arrays.asList(metaPart.split(",")))) {
                 String[] metricsAndDims = metaPart.split(",");
