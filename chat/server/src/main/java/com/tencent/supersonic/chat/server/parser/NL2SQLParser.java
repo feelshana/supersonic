@@ -85,7 +85,7 @@ public class NL2SQLParser implements ChatQueryParser {
         // // 1.多轮对话改写，未解析出来数据时重写
         rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),
                 parseContext.getRequest().getQueryText());
-
+        Set<String> segmentDimBizNames = new HashSet<>();
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
@@ -119,6 +119,7 @@ public class NL2SQLParser implements ChatQueryParser {
 
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
+                segmentDimBizNames.addAll(queryNLReq.getSegmentDimBizNames());
                 List<SchemaElementMatch> looseElementMatches =
                         parseResp.getSelectedParses().getFirst().getElementMatches();
                 looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
@@ -168,6 +169,8 @@ public class NL2SQLParser implements ChatQueryParser {
                     : parseContext.getResponse().getSelectedParses().get(0));
             parseContext.setResponse(new ChatParseResp(parseContext.getResponse().getQueryId()));
 
+
+            queryNLReq.setSegmentDimBizNames(new ArrayList<>(segmentDimBizNames));
 
 
             // // 2.fowShot召回，召唤记忆中启用的，RAG向量库中召回
