@@ -15,8 +15,8 @@ public class PartitionTimeMapper extends BaseMapper {
 
     @Override
     public boolean accept(ChatQueryContext chatQueryContext) {
-//        return !(chatQueryContext.getRequest().getText2SQLType().equals(Text2SQLType.ONLY_RULE)
-//                || chatQueryContext.getMapInfo().isEmpty());
+        // return !(chatQueryContext.getRequest().getText2SQLType().equals(Text2SQLType.ONLY_RULE)
+        // || chatQueryContext.getMapInfo().isEmpty());
         return false;
     }
 

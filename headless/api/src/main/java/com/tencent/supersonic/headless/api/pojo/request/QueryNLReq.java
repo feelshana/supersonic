@@ -12,6 +12,7 @@ import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,7 @@ public class QueryNLReq extends SemanticQueryReq implements Serializable {
     private boolean descriptionMapped;
     private Integer agentId;
     private String requestId = "";
+    private List<String> segmentDimBizNames = new ArrayList<>();
 
     @Override
     public String toCustomizedString() {

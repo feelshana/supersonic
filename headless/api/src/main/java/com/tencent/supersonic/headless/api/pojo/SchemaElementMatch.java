@@ -27,8 +27,10 @@ public class SchemaElementMatch implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         SchemaElementMatch that = (SchemaElementMatch) o;
         return Objects.equals(detectWord, that.detectWord) && Objects.equals(word, that.word);
     }

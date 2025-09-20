@@ -18,8 +18,8 @@ public class TermDescMapper extends BaseMapper {
 
     @Override
     public boolean accept(ChatQueryContext chatQueryContext) {
-//        return !(CollectionUtils.isEmpty(chatQueryContext.getMapInfo().getTermDescriptionToMap())
-//                || chatQueryContext.getRequest().isDescriptionMapped());
+        // return !(CollectionUtils.isEmpty(chatQueryContext.getMapInfo().getTermDescriptionToMap())
+        // || chatQueryContext.getRequest().isDescriptionMapped());
         return false;
     }
 

@@ -76,21 +76,27 @@ public class EmbeddingMapper extends BaseMapper {
             addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
         }
         if (CollectionUtils.isEmpty(matchResults)) {
-            if(!CollectionUtils.isEmpty(chatQueryContext.getQueryFilters())){
-                for(String queryFilter : chatQueryContext.getQueryFilters()){
-                    List<SchemaElement> list= (List<SchemaElement>) org.apache.commons.collections.CollectionUtils.union(chatQueryContext.getSemanticSchema().getDimensions()
-                                    ,chatQueryContext.getSemanticSchema().getMetrics());
+            if (!CollectionUtils.isEmpty(chatQueryContext.getQueryFilters())) {
+                for (String queryFilter : chatQueryContext.getQueryFilters()) {
+                    List<SchemaElement> list =
+                            (List<SchemaElement>) org.apache.commons.collections.CollectionUtils
+                                    .union(chatQueryContext.getSemanticSchema().getDimensions(),
+                                            chatQueryContext.getSemanticSchema().getMetrics());
 
-                    SchemaElement matched= list.stream().filter(element->element.getName().equals(queryFilter)).findFirst().orElse(null);
-                    if(matched!=null){
+                    SchemaElement matched =
+                            list.stream().filter(element -> element.getName().equals(queryFilter))
+                                    .findFirst().orElse(null);
+                    if (matched != null) {
                         SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
                                 .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
-                                .detectWord(matched.getName())
-                                .word(matched.getName()).similarity(1).build();
+                                .detectWord(matched.getName()).word(matched.getName()).similarity(1)
+                                .build();
 
-                       Long dataSetId = chatQueryContext.getSemanticSchema().getDataSets().get(0).getDataSetId();
+                        Long dataSetId = chatQueryContext.getSemanticSchema().getDataSets().get(0)
+                                .getDataSetId();
 
-                        addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
+                        addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId,
+                                schemaElementMatch);
 
                     }
                 }
@@ -109,6 +115,6 @@ public class EmbeddingMapper extends BaseMapper {
 
     @Override
     protected boolean acceptFilter() {
-        return  false;
+        return false;
     }
 }

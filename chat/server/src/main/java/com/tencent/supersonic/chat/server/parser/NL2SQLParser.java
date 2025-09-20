@@ -85,7 +85,7 @@ public class NL2SQLParser implements ChatQueryParser {
         // // 1.多轮对话改写，未解析出来数据时重写
         rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),
                 parseContext.getRequest().getQueryText());
-
+        Set<String> segmentDimBizNames = new HashSet<>();
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
@@ -119,17 +119,19 @@ public class NL2SQLParser implements ChatQueryParser {
 
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
+                segmentDimBizNames.addAll(queryNLReq.getSegmentDimBizNames());
                 List<SchemaElementMatch> looseElementMatches =
                         parseResp.getSelectedParses().getFirst().getElementMatches();
-                looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch
-                        .getElement().getType() != SchemaElementType.VALUE
+                looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
+                        .getType() != SchemaElementType.VALUE
                         && schemaElementMatch.getElement().getType() != SchemaElementType.TERM);
 
-                logMatchResult(keyWordsValues,"词典模式");
-                logMatchResult(looseElementMatches,"向量模式");
+                logMatchResult(keyWordsValues, "词典模式");
+                logMatchResult(looseElementMatches, "向量模式");
 
-                List<SchemaElementMatch> merged= (List<SchemaElementMatch>) CollectionUtils.union(keyWordsValues,looseElementMatches);
-                logMatchResult(merged,"融合模式");
+                List<SchemaElementMatch> merged = (List<SchemaElementMatch>) CollectionUtils
+                        .union(keyWordsValues, looseElementMatches);
+                logMatchResult(merged, "融合模式");
 
                 parseResp.getSelectedParses().getFirst().getElementMatches().clear();
                 parseResp.getSelectedParses().getFirst().getElementMatches().addAll(merged);
@@ -168,6 +170,8 @@ public class NL2SQLParser implements ChatQueryParser {
             parseContext.setResponse(new ChatParseResp(parseContext.getResponse().getQueryId()));
 
 
+            queryNLReq.setSegmentDimBizNames(new ArrayList<>(segmentDimBizNames));
+
 
             // // 2.fowShot召回，召唤记忆中启用的，RAG向量库中召回
             addDynamicExemplars(parseContext, queryNLReq);
@@ -184,19 +188,18 @@ public class NL2SQLParser implements ChatQueryParser {
     }
 
     private void logMatchResult(List<SchemaElementMatch> valueMatchs, String paternName) {
-        if(CollectionUtils.isEmpty(valueMatchs)){
-            log.info("{}未召回到维度值",paternName);
+        if (CollectionUtils.isEmpty(valueMatchs)) {
+            log.info("{}未召回到维度值", paternName);
             return;
         }
         StringBuilder stringBuilder = new StringBuilder();
         for (SchemaElementMatch valueMatch : valueMatchs) {
-            stringBuilder
-                    .append(String.format("词语=[%s],维度值=[%s],相似度[%s]; ",
-                            valueMatch.getDetectWord(), valueMatch.getWord(),
-                            valueMatch.getSimilarity())).append("\n");
+            stringBuilder.append(String.format("词语=[%s],维度值=[%s],相似度[%s]; ",
+                    valueMatch.getDetectWord(), valueMatch.getWord(), valueMatch.getSimilarity()))
+                    .append("\n");
         }
-        logger.info("{}召回的维度值数量有 {} 个，分别是：\n{}",paternName,valueMatchs.size(),
-                stringBuilder.substring(0,stringBuilder.length()-1).toString());
+        logger.info("{}召回的维度值数量有 {} 个，分别是：\n{}", paternName, valueMatchs.size(),
+                stringBuilder.substring(0, stringBuilder.length() - 1).toString());
 
     }
 

@@ -74,6 +74,9 @@ public class S2ChatLayerService implements ChatLayerService {
         } else {
             chatWorkflowEngine.start(ChatWorkflowState.PARSING, queryCtx);
         }
+        if (CollectionUtils.isNotEmpty(queryCtx.getSegmentDimBizNames())) {
+            queryNLReq.setSegmentDimBizNames(queryCtx.getSegmentDimBizNames());
+        }
         return parseResp;
     }
 
@@ -95,6 +98,7 @@ public class S2ChatLayerService implements ChatLayerService {
 
     private ChatQueryContext buildChatQueryContext(QueryNLReq queryNLReq) {
         ChatQueryContext queryCtx = new ChatQueryContext(queryNLReq);
+        queryCtx.setSegmentDimBizNames(queryNLReq.getSegmentDimBizNames());
         SemanticSchema semanticSchema = schemaService.getSemanticSchema(queryNLReq.getDataSetIds());
         Map<Long, List<Long>> modelIdToDataSetIds = dataSetService.getModelIdToDataSetIds();
         queryCtx.setSemanticSchema(semanticSchema);
