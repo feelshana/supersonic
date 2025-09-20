@@ -54,6 +54,17 @@ public class ChatWorkflowEngine {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
                     performMapping(queryCtx);
+//                    非向量模型只走mapping,向量模型下才会进行text-2-dsl
+                    if(!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)){
+                        SemanticParseInfo semanticParseInfo=new SemanticParseInfo();
+                        List<SchemaElementMatch> matchedElements = queryCtx.getMapInfo().getDataSetElementMatches().values().stream().findFirst().get();
+                        semanticParseInfo.setElementMatches(matchedElements);
+                        parseResult.setSelectedParses(List.of(semanticParseInfo));
+                        parseResult.setState(ParseResp.ParseState.COMPLETED);
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                        break;
+                    }
+
                     if (queryCtx.getIsTip()) {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
@@ -78,21 +89,33 @@ public class ChatWorkflowEngine {
                     break;
                 case PARSING:
                     performParsing(queryCtx);
-                    if (queryCtx.getCandidateQueries().isEmpty()) {
-                        errDefault(parseResult, queryCtx);
+                    List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
+                            .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
+                    parseResult.setSelectedParses(parseInfos);
+                    if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
+                            queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
+                            "直连模式")) {
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
                     } else {
-                        List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
-                                .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
-                        parseResult.setSelectedParses(parseInfos);
-                        if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
-                                queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
-                                "直连模式")) {
-                            queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
-                        } else {
-                            parseResult.setState(ParseResp.ParseState.COMPLETED);
-                            queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
-                        }
+                        parseResult.setState(ParseResp.ParseState.COMPLETED);
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
                     }
+
+//                    if (queryCtx.getCandidateQueries().isEmpty()) {
+//                        errDefault(parseResult, queryCtx);
+//                    } else {
+//                        List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
+//                                .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
+//                        parseResult.setSelectedParses(parseInfos);
+//                        if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
+//                                queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
+//                                "直连模式")) {
+//                            queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
+//                        } else {
+//                            parseResult.setState(ParseResp.ParseState.COMPLETED);
+//                            queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+//                        }
+//                    }
                     /**
                      * 原逻辑
                      */
