@@ -42,14 +42,13 @@ s2:
       min:
         threshold:value: 0.25
     value:
-      threshold: 0.5
+      threshold: 1
       min:
-        threshold: 0.3
+        threshold: 1
     embedding:
-      number: 10
+      number: 1
       use-llm-words-segement: true
-      use-llm-enhance: false
-      threshold: 0.7
+      threshold: 0.9
       round:
         number: 2
 

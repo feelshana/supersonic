@@ -57,7 +57,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             + "#任务：用户将提供自然语言问题，请将其转换为SQL查询语句，以便通过对底层数据库执行该SQL查询返回相关数据\n" + "#规则：\n"
             + "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表问题分词后，通过向量召回得到的维度及其对应的维度值，必须使用Values中的结果作为筛选条件\n"
             + "2.SQL语句中查询的列名与作为过滤条件的列名，必须严格引用Schema中的Dimensions和Metrics中的字段名，完全一致，禁止任何改造\n"
-            + "3.3.Schema中的Dimensions包含日期字段，日期字段包含FORMAT，比如<订购日期 FORMAT 'yyyyMMdd' COMMENT '订购日期'> 代表Table为日表，<订购日期 FORMAT 'yyyyMM' COMMENT '订购日期'>代表Table为月表 \n"
+            + "3.Schema中的Dimensions包含日期字段，日期字段包含FORMAT，比如<订购日期 FORMAT 'yyyyMMdd' COMMENT '订购日期'> 代表Table为日表，<订购日期 FORMAT 'yyyyMM' COMMENT '订购日期'>代表Table为月表 \n"
             + "4.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n"
             + "4.为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题限制最多返回100条数据，根据情况在sql添加limit，保证没有语法错误。\n"
             + "5.别名使用中文\n" + "#维度值智能查询规则\n" + "   - 当问题属于**维度值查询**（如“有哪些场景”、“列出XX”等开放式查询），\n"

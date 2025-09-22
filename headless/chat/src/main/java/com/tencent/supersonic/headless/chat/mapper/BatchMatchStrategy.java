@@ -120,7 +120,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                     && CollectionUtils.isNotEmpty(Arrays.asList(metaPart.split(",")))) {
                 String[] metricsAndDims = metaPart.split(",");
 
-                if (null != metricsAndDims) {
+                if (metricsAndDims.length > 0) {
                     List<String> metricsAndDimsList = List.of(metricsAndDims);
                     // 可以在这里添加对metricsAndDims的处理逻辑
                     chatQueryContext.setQueryFilters(metricsAndDimsList);
