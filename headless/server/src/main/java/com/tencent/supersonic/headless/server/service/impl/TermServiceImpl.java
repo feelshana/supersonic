@@ -75,6 +75,16 @@ public class TermServiceImpl extends ServiceImpl<TermMapper, TermDO> implements 
                 .collect(Collectors.groupingBy(TermResp::getDomainId));
     }
 
+    @Override
+    public void deleteByDomainId(Long domainId) {
+        if (domainId == null) {
+            return;
+        }
+        QueryWrapper<TermDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().eq(TermDO::getDomainId, domainId);
+        remove(queryWrapper);
+    }
+
     private TermResp convert(TermDO termDO) {
         TermResp termSetResp = new TermResp();
         BeanMapper.mapper(termDO, termSetResp);

@@ -20,4 +20,6 @@ public interface TermService {
     List<TermResp> getTerms(Long domainId, String queryKey);
 
     Map<Long, List<TermResp>> getTermSets(Set<Long> domainIds);
+
+    void deleteByDomainId(Long id);
 }

@@ -39,28 +39,11 @@ import com.tencent.supersonic.headless.api.pojo.ModelDetail;
 import com.tencent.supersonic.headless.api.pojo.enums.DataType;
 import com.tencent.supersonic.headless.api.pojo.enums.DimensionType;
 import com.tencent.supersonic.headless.api.pojo.enums.ModelDefineType;
-import com.tencent.supersonic.headless.api.pojo.request.DataSetReq;
-import com.tencent.supersonic.headless.api.pojo.request.DatabaseReq;
-import com.tencent.supersonic.headless.api.pojo.request.DictItemReq;
-import com.tencent.supersonic.headless.api.pojo.request.DomainReq;
-import com.tencent.supersonic.headless.api.pojo.request.ModelReq;
-import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
-import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
-import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
-import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
-import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
-import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
-import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
+import com.tencent.supersonic.headless.api.pojo.request.*;
+import com.tencent.supersonic.headless.api.pojo.response.*;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
-import com.tencent.supersonic.headless.server.service.DataSetService;
-import com.tencent.supersonic.headless.server.service.DatabaseService;
-import com.tencent.supersonic.headless.server.service.DictConfService;
-import com.tencent.supersonic.headless.server.service.DictTaskService;
-import com.tencent.supersonic.headless.server.service.DimensionService;
-import com.tencent.supersonic.headless.server.service.DomainService;
-import com.tencent.supersonic.headless.server.service.MetricService;
-import com.tencent.supersonic.headless.server.service.ModelService;
+import com.tencent.supersonic.headless.server.service.*;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Alias;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -117,7 +100,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     private DictTaskService dictTaskService;
     @Autowired
     private UserService userService;
-
+    @Autowired
+    private TermService termService;
     @Override
     @Transactional
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
@@ -142,6 +126,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         // 判断是否唯一,如果存在多个同样的助理，清除多余的只保留一个agent
         Agent uniqueAgent = findUniqueAgent(agents, domains);
+        // 提取并删除主题域下的术语信息
+        List<TermResp> termResps = clearOldTerms(domains);
         // 删除旧的模型和主题域
         if (config.getAgentId() != null || !CollectionUtils.isEmpty(domains)) {
             log.info("清理旧配置, agentId: {}, domain是否为空: {}", config.getAgentId(), domains.isEmpty());
@@ -156,6 +142,11 @@ public class BiAgentServiceImpl implements BiAgentService {
         log.info("开始创建主题域");
         DomainResp domainResp = createDomain(domainName, domainBizName, config.getAdmins(),
                 config.getViewers(), user);
+        if (!termResps.isEmpty()){
+            // 创建术语
+            log.info("开始创建术语");
+            createTerms(termResps, domainResp,user);
+        }
         // 创建模型
         log.info("开始创建模型");
         List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, user,
@@ -171,6 +162,29 @@ public class BiAgentServiceImpl implements BiAgentService {
         Agent agent = createOrUpdateAgent(config, uniqueAgent, toolConfig, user, domainName);
         log.info("智能助手创建完成, id: {}", agent.getId());
         return agent;
+    }
+
+    private void createTerms(List<TermResp> termResps, DomainResp domainResp, User user) {
+        for (TermResp termResp : termResps) {
+            TermReq termReq = new TermReq();
+            termReq.setName(termResp.getName());
+            termReq.setDomainId(domainResp.getId());
+            termReq.setDescription(termResp.getDescription());
+            termReq.setAlias(termResp.getAlias());
+            termService.saveOrUpdate(termReq, user);
+        }
+    }
+
+    private List<TermResp> clearOldTerms(List<DomainDO> domains) {
+        if (CollectionUtils.isEmpty(domains)) {
+            return Collections.emptyList();
+        }
+        List<TermResp> termResps = new ArrayList<>();
+        for (DomainDO domain : domains) {
+            termResps.addAll(termService.getTerms(domain.getId(), null));
+            termService.deleteByDomainId(domain.getId());
+        }
+        return termResps;
     }
 
     private ToolConfig createToolConfig(DataSetResp dataSetResp) {
