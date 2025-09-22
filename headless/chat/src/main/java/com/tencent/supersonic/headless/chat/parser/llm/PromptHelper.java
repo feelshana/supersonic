@@ -33,6 +33,8 @@ public class PromptHelper {
     @Autowired
     private EmbeddingConfig embeddingConfig;
 
+    private static final String[] EXEMPLARS = {"1-5月的总收入最多的产品", "上个月哪个产品的付费活跃最高", "4月咪咕视频的活跃用户数",
+                    "本月和上月同期的活跃用户数环比增速百分比", "辽宁省9月10日咪咕视频OKR付费用户全国第几"};
 
     public List<List<Text2SQLExemplar>> getFewShotExemplars(LLMReq llmReq) {
         int exemplarRecallNumber =
@@ -67,22 +69,36 @@ public class PromptHelper {
             Text2SQLExemplar mostSimilar = noSame.get(noSame.size() - 1);
 
             Collections.shuffle(noSame);
-            List<Text2SQLExemplar> ts;
-            if (same.size() > 0) {// 一样的话，必须作为提示语
-                ts = new ArrayList<>();
+            List<Text2SQLExemplar> ts = new ArrayList<>();
+            List<Text2SQLExemplar> notInExemplars = noSame.stream()
+                    .filter(e -> !Arrays.asList(EXEMPLARS).contains(e.getQuestion()))
+                    .sorted(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed())
+                    .toList();
+
+            List<Text2SQLExemplar> inExemplars = noSame.stream()
+                    .filter(e -> Arrays.asList(EXEMPLARS).contains(e.getQuestion()))
+                    .sorted(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed())
+                    .toList();
+            if (!same.isEmpty()) {
+                // 一样的话，必须作为提示语
                 ts.addAll(same);
-                int needSize = Math.min(noSame.size() + same.size(), fewShotNumber);
-                if (needSize > same.size()) {
-                    ts.addAll(noSame.subList(0, needSize - same.size()));
+                // 先添加不在EXEMPLARS中的（相似度高的在前）
+                ts.addAll(notInExemplars);
+                // 再添加在EXEMPLARS中的（相似度高的在前）
+                ts.addAll(inExemplars);
+
+                // 如果超过fewShotNumber限制，则截取
+                if (ts.size() > fewShotNumber) {
+                    ts = ts.subList(0, fewShotNumber);
                 }
-                ts.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed());
             } else { // 至少要一个最像的
-                ts = noSame.subList(0, Math.min(noSame.size(), fewShotNumber));
+                ts.addAll(notInExemplars);
+                ts.addAll(inExemplars);
+                ts = ts.subList(0, Math.min(ts.size(), fewShotNumber));
                 if (!ts.contains(mostSimilar)) {
-                    ts.remove(ts.size() - 1);
+                    ts.removeLast();
                     ts.add(mostSimilar);
                 }
-                ts.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed());
             }
             results.add(ts);
         }
