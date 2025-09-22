@@ -62,22 +62,27 @@ public class PromptHelper {
                 noSame.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity));
                 noSame = noSame.subList((noSame.size() - fewShotNumber) / 2, noSame.size());
             }
+            // 先排序，取相似度最高的
+            noSame.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity));
             Text2SQLExemplar mostSimilar = noSame.get(noSame.size() - 1);
+
             Collections.shuffle(noSame);
             List<Text2SQLExemplar> ts;
             if (same.size() > 0) {// 一样的话，必须作为提示语
                 ts = new ArrayList<>();
+                ts.addAll(same);
                 int needSize = Math.min(noSame.size() + same.size(), fewShotNumber);
                 if (needSize > same.size()) {
                     ts.addAll(noSame.subList(0, needSize - same.size()));
                 }
-                ts.addAll(same);
+                ts.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed());
             } else { // 至少要一个最像的
                 ts = noSame.subList(0, Math.min(noSame.size(), fewShotNumber));
                 if (!ts.contains(mostSimilar)) {
                     ts.remove(ts.size() - 1);
                     ts.add(mostSimilar);
                 }
+                ts.sort(Comparator.comparingDouble(Text2SQLExemplar::getSimilarity).reversed());
             }
             results.add(ts);
         }

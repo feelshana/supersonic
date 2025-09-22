@@ -131,6 +131,17 @@ public class NL2SQLParser implements ChatQueryParser {
 
                 List<SchemaElementMatch> merged = (List<SchemaElementMatch>) CollectionUtils
                         .union(keyWordsValues, looseElementMatches);
+                // 过滤掉schemaElementMatch的word等于SchemaElement中的任何默认值的元素
+                merged = merged.stream().filter(schemaElementMatch -> {
+                    List<String> defaultValues = schemaElementMatch.getElement().getDefaultValues();
+                    // 如果 defaultValues 为 null，则不过滤该元素（即保留它）
+                    if (defaultValues == null) {
+                        return true;
+                    }
+                    // 否则，检查当前 word 是否不在默认值列表中
+                    return !defaultValues.contains(schemaElementMatch.getWord());
+                }).toList();
+
                 logMatchResult(merged, "融合模式");
 
                 parseResp.getSelectedParses().getFirst().getElementMatches().clear();

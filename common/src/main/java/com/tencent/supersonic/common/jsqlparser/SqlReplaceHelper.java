@@ -45,7 +45,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceAggFields(String sql,
-                                          Map<String, Pair<String, String>> fieldNameToAggMap) {
+            Map<String, Pair<String, String>> fieldNameToAggMap) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
 
         if (!(selectStatement instanceof PlainSelect)) {
@@ -78,12 +78,12 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceValue(String sql,
-                                      Map<String, Map<String, String>> filedNameToValueMap) {
+            Map<String, Map<String, String>> filedNameToValueMap) {
         return replaceValue(sql, filedNameToValueMap, true);
     }
 
     public static String replaceValue(String sql,
-                                      Map<String, Map<String, String>> filedNameToValueMap, boolean exactReplace) {
+            Map<String, Map<String, String>> filedNameToValueMap, boolean exactReplace) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         if (!(selectStatement instanceof PlainSelect)) {
             return sql;
@@ -101,7 +101,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceFieldNameByValue(String sql,
-                                                 Map<String, Set<String>> fieldValueToFieldNames) {
+            Map<String, Set<String>> fieldValueToFieldNames) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         if (!(selectStatement instanceof PlainSelect)) {
             return sql;
@@ -146,7 +146,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceFields(String sql, Map<String, String> fieldNameMap,
-                                       boolean exactReplace) {
+            boolean exactReplace) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         // alias field should not be replaced
         // Set<String> aliases = SqlSelectHelper.getAliasFields(sql);
@@ -167,7 +167,7 @@ public class SqlReplaceHelper {
     }
 
     private static void replaceFieldsInPlainOneSelect(Map<String, String> fieldNameMap,
-                                                      boolean exactReplace, PlainSelect plainSelect) {
+            boolean exactReplace, PlainSelect plainSelect) {
         // 1. replace where fields
         Expression where = plainSelect.getWhere();
         FieldReplaceVisitor visitor = new FieldReplaceVisitor(fieldNameMap, exactReplace);
@@ -230,7 +230,7 @@ public class SqlReplaceHelper {
 
 
     private static void replaceFieldsInSetOperationList(Map<String, String> fieldNameMap,
-                                                        boolean exactReplace, SetOperationList operationList) {
+            boolean exactReplace, SetOperationList operationList) {
         List<OrderByElement> orderByElements = operationList.getOrderByElements();
         if (!CollectionUtils.isEmpty(orderByElements)) {
             for (OrderByElement orderByElement : orderByElements) {
@@ -264,7 +264,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceFunction(String sql, Map<String, String> functionMap,
-                                         Map<String, UnaryOperator> functionCall) {
+            Map<String, UnaryOperator> functionCall) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         if (!(selectStatement instanceof PlainSelect)) {
             return sql;
@@ -279,7 +279,7 @@ public class SqlReplaceHelper {
     }
 
     private static void replaceFunction(Map<String, String> functionMap,
-                                        Map<String, UnaryOperator> functionCall, PlainSelect selectBody) {
+            Map<String, UnaryOperator> functionCall, PlainSelect selectBody) {
         PlainSelect plainSelect = selectBody;
         // 1. replace where dataDiff function
         Expression where = plainSelect.getWhere();
@@ -340,7 +340,7 @@ public class SqlReplaceHelper {
     }
 
     private static void replaceComparisonOperatorFunction(Map<String, String> functionMap,
-                                                          Expression expression) {
+            Expression expression) {
         if (Objects.isNull(expression)) {
             return;
         }
@@ -360,7 +360,7 @@ public class SqlReplaceHelper {
     }
 
     private static void replaceOrderByFunction(Map<String, String> functionMap,
-                                               List<OrderByElement> orderByElementList) {
+            List<OrderByElement> orderByElementList) {
         if (Objects.isNull(orderByElementList)) {
             return;
         }
@@ -413,7 +413,7 @@ public class SqlReplaceHelper {
     }
 
     private static void processPlainSelect(PlainSelect plainSelect, String tableName,
-                                           List<String> withNameList, Set<String> tableWithAlias) {
+            List<String> withNameList, Set<String> tableWithAlias) {
         if (plainSelect.getFromItem() instanceof Table) {
             replaceSingleTable(plainSelect, tableName, withNameList, tableWithAlias);
         } else if (plainSelect.getFromItem() instanceof ParenthesedSelect) {
@@ -425,8 +425,8 @@ public class SqlReplaceHelper {
         if (!CollectionUtils.isEmpty(joinList)) {
             joinList.forEach(join -> {
                 if (join.getFromItem() instanceof Table) {
-                    TableNameReplaceVisitor fromItemVisitor =
-                            new TableNameReplaceVisitor(tableName, new HashSet<>(withNameList), tableWithAlias);
+                    TableNameReplaceVisitor fromItemVisitor = new TableNameReplaceVisitor(tableName,
+                            new HashSet<>(withNameList), tableWithAlias);
                     join.getFromItem().accept(fromItemVisitor);
                 } else if (join.getFromItem() instanceof ParenthesedSelect) {
                     ParenthesedSelect parenthesedSelect = (ParenthesedSelect) join.getFromItem();
@@ -435,14 +435,14 @@ public class SqlReplaceHelper {
 
                 }
 
-//                processPlainSelect(join.getFromItem(),tableName,withNameList,tableWithAlias);
+                // processPlainSelect(join.getFromItem(),tableName,withNameList,tableWithAlias);
             });
         }
-//        replaceSubTable(plainSelect, tableName, withNameList, tableWithAlias);
+        // replaceSubTable(plainSelect, tableName, withNameList, tableWithAlias);
     }
 
     public static void replaceSingleTable(PlainSelect plainSelect, String tableName,
-                                          List<String> withNameList, Set<String> tableWithAlias) {
+            List<String> withNameList, Set<String> tableWithAlias) {
         List<PlainSelect> plainSelects =
                 SqlSelectHelper.getPlainSelects(Collections.singletonList(plainSelect));
         plainSelects.forEach(painSelect -> {
@@ -455,12 +455,12 @@ public class SqlReplaceHelper {
                     }
                 }
             });
-//            replaceJoins(painSelect, tableName, withNameList, tableWithAlias);
+            // replaceJoins(painSelect, tableName, withNameList, tableWithAlias);
         });
     }
 
     private static void replaceJoins(PlainSelect plainSelect, String tableName,
-                                     List<String> withNameList, Set<String> tableWithAlias) {
+            List<String> withNameList, Set<String> tableWithAlias) {
         List<Join> joins = plainSelect.getJoins();
         TableNameReplaceVisitor fromItemVisitor =
                 new TableNameReplaceVisitor(tableName, new HashSet<>(withNameList), tableWithAlias);
@@ -480,7 +480,7 @@ public class SqlReplaceHelper {
     }
 
     public static void replaceSubTable(PlainSelect plainSelect, String tableName,
-                                       List<String> withNameList, Set<String> tableWithAlias) {
+            List<String> withNameList, Set<String> tableWithAlias) {
         if (plainSelect.getFromItem() instanceof ParenthesedSelect) {
             ParenthesedSelect parenthesedSelect = (ParenthesedSelect) plainSelect.getFromItem();
             replaceSingleTable(parenthesedSelect.getPlainSelect(), tableName, withNameList,
@@ -580,7 +580,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceHavingValue(String sql,
-                                            Map<String, Map<String, String>> filedNameToValueMap) {
+            Map<String, Map<String, String>> filedNameToValueMap) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         if (!(selectStatement instanceof PlainSelect)) {
             return sql;
@@ -595,7 +595,7 @@ public class SqlReplaceHelper {
     }
 
     public static Expression distinguishDateDiffFilter(Expression leftExpression,
-                                                       Expression expression) {
+            Expression expression) {
         if (leftExpression instanceof Function) {
             Function function = (Function) leftExpression;
             if (function.getName().equals(JsqlConstants.DATE_FUNCTION)) {
@@ -704,7 +704,7 @@ public class SqlReplaceHelper {
     }
 
     public static String replaceSqlByExpression(String tableName, String sql,
-                                                Map<String, String> replace) {
+            Map<String, String> replace) {
         Select selectStatement = SqlSelectHelper.getSelect(sql);
         List<PlainSelect> plainSelectList = new ArrayList<>();
         if (selectStatement instanceof PlainSelect) {
@@ -819,7 +819,7 @@ public class SqlReplaceHelper {
     }
 
     private static void replacePlainSelectByExpr(PlainSelect plainSelect,
-                                                 Map<String, String> replace) {
+            Map<String, String> replace) {
         QueryExpressionReplaceVisitor expressionReplaceVisitor =
                 new QueryExpressionReplaceVisitor(replace);
         for (SelectItem selectItem : plainSelect.getSelectItems()) {
@@ -845,7 +845,7 @@ public class SqlReplaceHelper {
     }
 
     public static void replaceFunction(Function expression, Map<String, String> fieldNameMap,
-                                       boolean exactReplace) {
+            boolean exactReplace) {
         Function function = expression;
         ExpressionList<?> expressions = function.getParameters();
         for (Expression column : expressions) {
@@ -856,7 +856,7 @@ public class SqlReplaceHelper {
     }
 
     public static void replaceColumn(Column column, Map<String, String> fieldNameMap,
-                                     boolean exactReplace) {
+            boolean exactReplace) {
         String columnName = StringUtil.replaceBackticks(column.getColumnName());
         String replaceColumn = getReplaceValue(columnName, fieldNameMap, exactReplace);
         if (StringUtils.isNotBlank(replaceColumn)) {
@@ -866,7 +866,7 @@ public class SqlReplaceHelper {
     }
 
     public static String getReplaceValue(String beforeValue, Map<String, String> valueMap,
-                                         boolean exactReplace) {
+            boolean exactReplace) {
         String replaceValue = valueMap.get(beforeValue);
         if (StringUtils.isNotBlank(replaceValue)) {
             return replaceValue;
@@ -894,7 +894,7 @@ public class SqlReplaceHelper {
     }
 
     public static String simpleReplaceTable(String sql, String originalTableName,
-                                            String tableName) {
+            String tableName) {
 
         return sql.replaceAll("\\s+" + originalTableName + "\\s+", " " + tableName + " ");
 
@@ -902,7 +902,7 @@ public class SqlReplaceHelper {
     }
 
     public static String simpleReplaceFields(String sql,
-                                             Map<String, String> fieldNameToBizNameMap) {
+            Map<String, String> fieldNameToBizNameMap) {
         for (Map.Entry<String, String> entry : fieldNameToBizNameMap.entrySet()) {
             String originalFieldName = entry.getKey();
             String fieldName = entry.getValue();
