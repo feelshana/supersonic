@@ -79,7 +79,7 @@ public class RetrieveServiceImpl implements RetrieveService {
         Set<Long> dataSetIds = queryNLReq.getDataSetIds();
 
         ChatQueryContext chatQueryContext = new ChatQueryContext(queryNLReq);
-        chatQueryContext.setModelIdToDataSetIds(dataSetService.getModelIdToDataSetIds());
+        chatQueryContext.setModelIdToDataSetIds(modelIdToDataSetIds);
 
         Map<MatchText, List<HanlpMapResult>> regTextMap =
                 searchMatchStrategy.match(chatQueryContext, originals, dataSetIds);
