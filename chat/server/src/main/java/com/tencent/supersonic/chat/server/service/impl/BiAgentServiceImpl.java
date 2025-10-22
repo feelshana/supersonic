@@ -27,7 +27,6 @@ import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.common.util.ChatAppManager;
-import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.HttpUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
@@ -62,8 +61,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
-import java.util.function.Consumer;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -901,7 +898,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         BiDataSource dataSource = config.getDataSource();
         DatabaseReq databaseReq = new DatabaseReq();
         databaseReq.setName("BI-" + dataSource.getName());
-        switch (dataSource.getType()) {
+        switch (dataSource.getType().toLowerCase()) {
             case "mysql" -> {
                 databaseReq.setType(EngineType.MYSQL.getName());
                 databaseReq.setVersion("5.7");
@@ -915,7 +912,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 databaseService.getDatabaseByType(DataType.urlOf(dataSource.getConnectionUrl()));
         if (databases != null && !databases.isEmpty()) {
             for (DatabaseResp databaseResp : databases) {
-                if (Strings.equals(dataSource.getConnectionUrl(), databaseResp.getUrl())
+                if (StringUtils.equalsIgnoreCase(dataSource.getConnectionUrl(), databaseResp.getUrl())
                         && Strings.equals(dataSource.getUserName(), databaseResp.getUsername())) {
                     return databaseResp;
                 }
