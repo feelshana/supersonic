@@ -1,6 +1,7 @@
 package com.tencent.supersonic.headless.server.utils;
 
 import com.tencent.supersonic.common.pojo.enums.QueryType;
+import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.*;
@@ -55,12 +56,15 @@ public class ChatWorkflowEngine {
                 case MAPPING:
                     performMapping(queryCtx);
                     // 非向量模型只走mapping,向量模型下才会进行text-2-dsl
-                    if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)) {
+                    if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE) && !queryCtx.getRequest().getText2SQLType().equals(Text2SQLType.LLM_OR_RULE)) {
                         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
-                        List<SchemaElementMatch> matchedElements = queryCtx.getMapInfo()
-                                .getDataSetElementMatches().values().stream().findFirst().get();
-                        semanticParseInfo.setElementMatches(matchedElements);
-                        parseResult.setSelectedParses(List.of(semanticParseInfo));
+                        if (!queryCtx.getMapInfo().isEmpty() && !queryCtx.getMapInfo().getDataSetElementMatches().isEmpty()) {
+                            errDefault(parseResult, queryCtx);
+                            List<SchemaElementMatch> matchedElements = queryCtx.getMapInfo()
+                                    .getDataSetElementMatches().values().stream().findFirst().get();
+                            semanticParseInfo.setElementMatches(matchedElements);
+                            parseResult.setSelectedParses(List.of(semanticParseInfo));
+                        }
                         parseResult.setState(ParseResp.ParseState.COMPLETED);
                         queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
                         break;
@@ -177,7 +181,7 @@ public class ChatWorkflowEngine {
 
     /**
      * 当mapping为空时或queryCtx.getCandidateQueries()调用
-     * 
+     *
      * @param parseResult
      * @param queryCtx
      */
@@ -325,11 +329,13 @@ public class ChatWorkflowEngine {
 
     public String produceDateTips(SemanticSchema semanticSchema) {
         String baseTips = """
-                您好，你所提问的问题缺少日期范围。
-                请基于以下维度：
-                %s
-
-                补充日期范围后进行提问""";
+                您好！为了更准确地查询数据，请在问题中补充**日期范围**。
+                例如：
+                - “2024年10月1日的支付订单数”
+                - “最近7天各省份的产品销量”
+                
+                支持的其他维度包括：%s 等（日期为必填）。
+                """;
         String dimensionStr = semanticSchema.getDimensions().stream()
                 .map(schemaElement -> "【" + schemaElement.getName() + "】")
                 .collect(Collectors.joining("，"));

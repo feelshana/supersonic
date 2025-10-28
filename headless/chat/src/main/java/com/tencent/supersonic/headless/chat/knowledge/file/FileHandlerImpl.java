@@ -226,9 +226,10 @@ public class FileHandlerImpl implements FileHandler {
             createDir(dictDirectoryLatest);
         }
         String filePath = dictDirectoryLatest + FILE_SPILT + fileName;
-        if (existPath(filePath)) {
-            backupFile(fileName);
-        }
+        // 备份文件暂时没用，暂注释后续根据业务情况再行调整
+//        if (existPath(filePath)) {
+//            backupFile(fileName);
+//        }
         try (BufferedWriter writer = getWriter(filePath, append)) {
             if (!CollectionUtils.isEmpty(lines)) {
                 for (String line : lines) {
@@ -253,7 +254,7 @@ public class FileHandlerImpl implements FileHandler {
 
     @Override
     public Boolean deleteDictFile(String fileName) {
-        backupFile(fileName);
+//        backupFile(fileName);
         deleteFile(localFileConfig.getDictDirectoryLatest() + FILE_SPILT + fileName);
         return true;
     }

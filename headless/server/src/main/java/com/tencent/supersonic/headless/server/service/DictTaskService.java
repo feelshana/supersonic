@@ -28,4 +28,9 @@ public interface DictTaskService {
     String queryDictFilePath(DictValueReq dictValueReq, User user);
 
     void importDictData(DictItemResp dictItemResp, List<String> data, User user);
+
+    Long deleteDictTaskForBI(DictSingleTaskReq deleteTaskReq, User user);
+
+    void reloadDictWord();
+
 }

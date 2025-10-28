@@ -113,6 +113,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         checkBIUsers(config.getAdmins(), config.getViewers());
         User user = User.getDefaultUser();
         Map<String, List<DimValueMap>> dimAliasMap = null;
+        Map<String, List<String>> oldDimDefaultValuesMap = new HashMap<>();
         String domainName = "BI-" + config.getReportName();
         String domainBizName = "bi-" + config.getReportId();
 
@@ -131,7 +132,9 @@ public class BiAgentServiceImpl implements BiAgentService {
         // 删除旧的模型和主题域
         if (config.getAgentId() != null || !CollectionUtils.isEmpty(domains)) {
             log.info("清理旧配置, agentId: {}, domain是否为空: {}", config.getAgentId(), domains.isEmpty());
-            dimAliasMap = clearOldConfig(config.getAgentId(), domains, agents, user);
+            Map<String, Object> clearResult = clearOldConfig(config.getAgentId(), domains, agents, user);
+            dimAliasMap = (Map<String, List<DimValueMap>>) clearResult.get("dimAliasMap");
+            oldDimDefaultValuesMap = (Map<String, List<String>>) clearResult.get("dimDefaultValuesMap");
         } else {
             dimAliasMap = Collections.emptyMap();
         }
@@ -142,14 +145,14 @@ public class BiAgentServiceImpl implements BiAgentService {
         log.info("开始创建主题域");
         DomainResp domainResp = createDomain(domainName, domainBizName, config.getAdmins(),
                 config.getViewers(), user);
-        if (!termResps.isEmpty()){
+        if (!termResps.isEmpty()) {
             // 创建术语
             log.info("开始创建术语");
-            createTerms(termResps, domainResp,user);
+            createTerms(termResps, domainResp, user);
         }
         // 创建模型
         log.info("开始创建模型");
-        List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, user,
+        List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, oldDimDefaultValuesMap,user,
                 databaseResp, domainResp, config.getAdmins(), config.getViewers());
         // 创建数据集
         log.info("开始创建数据集");
@@ -459,12 +462,15 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     // 清理旧的配置---传参指定了助理id，或者存在同名的主题域
-    private Map<String, List<DimValueMap>> clearOldConfig(Integer agentId, List<DomainDO> domains,
+    private Map<String, Object> clearOldConfig(Integer agentId, List<DomainDO> domains,
             List<Agent> agents, User user) {
         // 没有智能助手id,但是有主题域
         if (agentId == null && domains != null) {
 
             Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
+            Map<String, List<String>> dimDefaultValuesMap = new HashMap<>();
+            Map<String, Object> result = new HashMap<>();
+
             // 清理没有助理，只有主题域，模型和数据集的情况，清空所有的主题域与模型与数据集
             if (CollectionUtils.isEmpty(agents)) {
                 for (DomainDO domain : domains) {
@@ -474,10 +480,12 @@ public class BiAgentServiceImpl implements BiAgentService {
                     for (DataSetResp dataSetResp : dataSetResps) {
                         dataSetService.delete(dataSetResp.getId(), user);
                     }
-                    clearModel(user, domain.getId(), dimAliasMap);
+                    clearModel(user, domain.getId(), dimDefaultValuesMap, dimAliasMap);
                     domainService.deleteDomain(domain.getId());
                 }
-                return dimAliasMap;
+                result.put("dimAliasMap", dimAliasMap);
+                result.put("dimDefaultValuesMap", dimDefaultValuesMap);
+                return result;
             }
             // 清理有助理的情况，匹配该助理工具配置对应的数据集，清理该数据集与其对应的模型，主题域
             for (Agent agent : agents) {
@@ -492,28 +500,34 @@ public class BiAgentServiceImpl implements BiAgentService {
                         Long domainId = dataSet.getDomainId();
                         if (domains.stream().anyMatch(item -> item.getId().equals(domainId))) {
                             dataSetService.delete(dataSetId, user);
-                            clearModel(user, domainId, dimAliasMap);
+                            clearModel(user, domainId, dimDefaultValuesMap, dimAliasMap);
                             domainService.deleteDomain(domainId);
                         }
 
                     }
                 }
             }
-            return dimAliasMap;
+            result.put("dimAliasMap", dimAliasMap);
+            result.put("dimDefaultValuesMap", dimDefaultValuesMap);
+            return result;
         }
         // 有智能助手id，只清理该智能助手对应的数据集，模型，主题域
         Agent agent = agentService.getAgent(agentId);
         if (agent == null) {
-            return Collections.emptyMap();
+            Map<String, Object> result = new HashMap<>();
+            result.put("dimAliasMap", Collections.emptyMap());
+            result.put("dimDefaultValuesMap", new HashMap<>());
+            return result;
         }
-        Map<String, List<DimValueMap>> dimAliasMap = saveDimensionAlias(user, agent);
-        return dimAliasMap;
+        return saveDimensionAlias(user, agent);
     }
 
     @NotNull
-    private Map<String, List<DimValueMap>> saveDimensionAlias(User user, Agent agent) {
+    private  Map<String, Object> saveDimensionAlias(User user, Agent agent) {
         // 保存维度值别名
         Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
+        Map<String, List<String>> dimDefaultValuesMap = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
         List<DatasetTool> tools = agent.getParserTools(AgentToolType.DATASET);
         for (DatasetTool tool : tools) {
             List<Long> dataSetIds = tool.getDataSetIds();
@@ -524,14 +538,16 @@ public class BiAgentServiceImpl implements BiAgentService {
                 }
                 dataSetService.delete(dataSetId, user);
                 Long domainId = dataSet.getDomainId();
-                clearModel(user, domainId, dimAliasMap);
+                clearModel(user, domainId, dimDefaultValuesMap, dimAliasMap);
                 domainService.deleteDomain(domainId);
             }
         }
-        return dimAliasMap;
+        result.put("dimAliasMap", dimAliasMap);
+        result.put("dimDefaultValuesMap", dimDefaultValuesMap);
+        return result;
     }
 
-    private void clearModel(User user, Long domainId, Map<String, List<DimValueMap>> dimAliasMap) {
+    private void clearModel(User user, Long domainId, Map<String, List<String>> dimDefaultValuesMap, Map<String, List<DimValueMap>> dimAliasMap) {
         MetaFilter filter = new MetaFilter();
         filter.setDomainId(domainId);
         List<ModelResp> models = modelService.getModelList(filter);
@@ -540,9 +556,26 @@ public class BiAgentServiceImpl implements BiAgentService {
             List<DimensionResp> dimensions = dimensionService.getDimensions(modelFilter);
             if (!CollectionUtils.isEmpty(dimensions)) {
                 dimensions.forEach(item -> {
+                    // 保存维度默认值
+                    if (item.getDefaultValues() != null && !item.getDefaultValues().isEmpty()) {
+                        dimDefaultValuesMap.put(item.getName(), item.getDefaultValues());
+                    }
+
+                    // 保存维度值映射
                     List<DimValueMap> dimValueMaps = item.getDimValueMaps();
                     if (!CollectionUtils.isEmpty(dimValueMaps)) {
                         dimAliasMap.put(item.getName(), dimValueMaps);
+                    }
+
+                    // 删除旧维度对应的词典文件
+                    DictSingleTaskReq deleteTaskReq = DictSingleTaskReq.builder()
+                            .type(TypeEnums.DIMENSION)
+                            .itemId(item.getId())
+                            .build();
+                    try {
+                        dictTaskService.deleteDictTaskForBI(deleteTaskReq, user);
+                    } catch (Exception e) {
+                        log.warn("删除维度词典文件失败, dimensionId: {}", item.getId(), e);
                     }
                 });
                 List<Long> dimensionIds =
@@ -557,6 +590,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             modelService.deleteModel(model.getId(), user);
         }
+        dictTaskService.reloadDictWord();
     }
 
     private DataSetResp createDataSet(BiModelConfig config, User user, DomainResp domainResp,
@@ -591,7 +625,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig,
-            Map<String, List<DimValueMap>> dimAliasMap, User user, DatabaseResp databaseResp,
+            Map<String, List<DimValueMap>> dimAliasMap, Map<String, List<String>> oldDimDefaultValuesMap,User user, DatabaseResp databaseResp,
             DomainResp domainResp, List<String> admins, List<String> viewers) throws Exception {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
@@ -603,6 +637,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                         && !biDimensionCofig.getDefaultValues().isEmpty())
                 .collect(Collectors.toMap(BiDimensionCofig::getName,
                         BiDimensionCofig::getDefaultValues));
+        if (oldDimDefaultValuesMap != null) {
+            for (Map.Entry<String, List<String>> entry : oldDimDefaultValuesMap.entrySet()) {
+                if (!defaultValuesMap.containsKey(entry.getKey())) {
+                    defaultValuesMap.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
         // 取出有value的维度名称
         List<String> dimensionNamesList = dimensionConfigs.stream()
                 .filter(biDimensionCofig -> biDimensionCofig.getValues() != null
@@ -849,7 +890,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 if (resps == null || resps.size() != 1) {
                     continue;
                 }
-                DimensionResp resp = resps.get(0);
+                DimensionResp resp = resps.getFirst();
                 DictItemReq dictItemReq = new DictItemReq();
                 dictItemReq.setType(TypeEnums.DIMENSION);
                 dictItemReq.setItemId(resp.getId());
@@ -872,6 +913,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 }
             }
         }
+        dictTaskService.reloadDictWord();
     }
 
     private List<BiModelItem> processCustom(List<BiModelItem> customs) {
@@ -912,7 +954,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         // 检查是否已有该数据源
         List<DatabaseResp> databases =
-                databaseService.getDatabaseByType(DataType.urlOf(dataSource.getConnectionUrl()));
+                databaseService.getDatabaseByTypeForBI(dataSource.getType());
         if (databases != null && !databases.isEmpty()) {
             for (DatabaseResp databaseResp : databases) {
                 if (Strings.equals(dataSource.getConnectionUrl(), databaseResp.getUrl())

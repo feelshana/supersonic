@@ -47,4 +47,6 @@ public interface DatabaseService {
     List<DBColumn> getColumns(Long id, String catalog, String db, String table) throws SQLException;
 
     List<DBColumn> getColumns(Long id, String sql) throws SQLException;
+
+    List<DatabaseResp> getDatabaseByTypeForBI(String type);
 }

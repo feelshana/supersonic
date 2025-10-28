@@ -100,7 +100,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
         queryStatement.setSegmentDimBizNames(queryReq.getSegmentDimBizNames());
         List<String> dimensionRelationlist =
-                biReportConfigService.getDimRelations(queryReq.getRequestId());
+                biReportConfigService.getDimRelations("123");
         if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
             queryStatement.setDimensionRelations(dimensionRelationlist);
         }

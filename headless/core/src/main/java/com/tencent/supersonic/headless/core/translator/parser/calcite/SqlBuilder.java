@@ -406,11 +406,33 @@ public class SqlBuilder {
         if (null == defaultDimNameMap || defaultDimNameMap.isEmpty()) {
             return null;
         }
-        Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
+        Set<String> filterNameList = dimSchemaRespSet.stream()
+                .map(DimSchemaResp::getBizName)
                 .collect(Collectors.toSet());
         List<SqlNode> andConditions = new ArrayList<>();
 
+        //判断是否存在维度的维度值和默认值是一致的，存在就剔除筛选，不存在就继续后续的判断。
+        Set<String> defaultDimFilterNameList = dimSchemaRespSet.stream()
+                .filter(dim -> {
+                    if (CollectionUtils.isEmpty(dim.getDefaultValues())) {
+                        return false;
+                    }
+                    if (StringUtils.isBlank(dim.getCurrentValue())) {
+                        return false;
+                    }
+                    String defaultValue = dim.getDefaultValues().get(0);
+                    String currentValue = dim.getCurrentValue();
+                    return defaultValue.equals(currentValue);
+                })
+                .map(DimSchemaResp::getBizName)
+                .collect(Collectors.toSet());
 
+        if (!CollectionUtils.isEmpty(defaultDimFilterNameList)) {
+            filterNameList.removeAll(defaultDimFilterNameList);
+            semanticSchema.getSegmentDimBizNames().removeAll(defaultDimFilterNameList);
+        }
+        log.info("需要进行默认值排除的维度:{}", filterNameList);
+        log.info("用户问题涉及的维度:{}", semanticSchema.getSegmentDimBizNames());
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
             if (filterNameList.contains(defaultDimensionFiledName)

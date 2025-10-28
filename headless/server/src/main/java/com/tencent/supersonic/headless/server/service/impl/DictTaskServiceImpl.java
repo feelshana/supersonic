@@ -179,7 +179,32 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictRepository.addDictTask(dictTaskDO);
         return 0L;
     }
+    @Override
+    public Long deleteDictTaskForBI(DictSingleTaskReq taskReq, User user) {
+        DictItemResp dictItemResp = fetchDictItemResp(taskReq);
+        if (Objects.isNull(dictItemResp)) {
+            return 0L;
+        }
+        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+        deleteEmbedding(dictItemResp, fileName);
+        fileHandler.deleteDictFile(fileName);
 
+        // Add a clear dictionary file record
+        DictTaskDO dictTaskDO =
+                dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.INITIAL);
+        log.info("[addDictTask] dictTaskDO:{}", dictTaskDO);
+        dictRepository.addDictTask(dictTaskDO);
+        return 0L;
+    }
+
+    @Override
+    public void reloadDictWord () {
+        try {
+            dictWordService.loadDictWord();
+        } catch (Exception e) {
+            log.error("reloadCustomDictionary error", e);
+        }
+    }
     public void deleteEmbedding(DictItemResp dictItemResp, String fileName) {
         List<DimensionValueDO> dimensionValueDOS;
         // TODO，直接从文件中读取所有维度值不妥，后续待优化
@@ -352,12 +377,6 @@ public class DictTaskServiceImpl implements DictTaskService {
         String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
         fileHandler.writeFile(data, fileName, false);
 
-        // Change in-memory dictionary data in real time
-        try {
-            dictWordService.loadDictWord();
-        } catch (Exception e) {
-            log.error("reloadCustomDictionary error", e);
-        }
         if (!data.isEmpty() && user != null) {
             // 维度值存向量库
             List<DimensionValueDO> dimensionValueDOS;

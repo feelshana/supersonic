@@ -2,11 +2,13 @@ package com.tencent.supersonic.headless.core.translator.parser;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.tencent.supersonic.common.jsqlparser.FieldExpression;
 import com.tencent.supersonic.common.jsqlparser.SqlReplaceHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectFunctionHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.enums.EngineType;
+import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
 import com.tencent.supersonic.headless.api.pojo.enums.AggOption;
@@ -46,12 +48,13 @@ public class SqlQueryParser implements QueryParser {
         // build ontologyQuery
         SqlQuery sqlQuery = queryStatement.getSqlQuery();
         List<String> queryFields = SqlSelectHelper.getAllSelectFields(sqlQuery.getSql());
+        List<FieldExpression> whereExpressions = SqlSelectHelper.getWhereExpressions(sqlQuery.getSql());
         Set<String> queryAliases = SqlSelectHelper.getAliasFields(sqlQuery.getSql());
         Set<String> ontologyMetricsDimensions = Collections.synchronizedSet(new HashSet<String>());
         Set<String> ontologyBizNameMetricsDimensions = Collections.synchronizedSet(new HashSet<>());
         // queryFields.removeAll(queryAliases);
         Ontology ontology = queryStatement.getOntology();
-        OntologyQuery ontologyQuery = buildOntologyQuery(ontology, queryFields);
+        OntologyQuery ontologyQuery = buildOntologyQuery(ontology, queryFields, whereExpressions);
         Set<String> queryFieldsSet = new HashSet<>(queryFields);
         ontologyQuery.getMetrics().forEach(m -> {
             ontologyMetricsDimensions.add(m.getName());
@@ -211,7 +214,8 @@ public class SqlQueryParser implements QueryParser {
         queryStatement.getSqlQuery().setSql(newSql);
     }
 
-    private OntologyQuery buildOntologyQuery(Ontology ontology, List<String> queryFields) {
+    private OntologyQuery buildOntologyQuery(Ontology ontology, List<String> queryFields,
+            List<FieldExpression> whereExpressions) {
         OntologyQuery ontologyQuery = new OntologyQuery();
         Set<String> fields = Sets.newHashSet(queryFields);
 
@@ -290,6 +294,16 @@ public class SqlQueryParser implements QueryParser {
             });
         }
 
+        if (!whereExpressions.isEmpty()){
+            whereExpressions.forEach(expression -> {
+                if (expression.getFieldName() != null){
+                    ontologyQuery.getDimensionMap().values().stream()
+                            .flatMap(Collection::stream)
+                            .filter(d ->  d.getTypeEnum() == TypeEnums.DIMENSION && "=".equals(expression.getOperator()) && (d.getName().equals(expression.getFieldName()) || d.getBizName().equals(expression.getFieldName())))
+                            .findFirst().ifPresent(dimSchemaResp -> dimSchemaResp.setCurrentValue(expression.getFieldValue().toString()));
+                }
+            });
+        }
         return ontologyQuery;
     }
 
