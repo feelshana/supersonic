@@ -675,7 +675,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                         continue;
                     }
                     Dimension dimension = new Dimension();
-                    dimension.setName(modelDimension.getName());
+                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1").replace("：", "").replace(":", "");
+                    dimension.setName(name);
                     if (dimensionNamesList.contains(modelDimension.getName())) {
                         dimension.setHasDimValues(true);
                     }
@@ -704,7 +706,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                         continue;
                     }
                     Measure measure = new Measure();
-                    measure.setName(modelMeasure.getName());
+                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
+                            .replaceAll("\\(([^)]*)\\)", "$1").replace("：", "").replace(":", "");
+                    measure.setName(name);
                     measure.setBizName(modelMeasure.getColumnName());
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
                     if (modelMeasure.getAggregationType() != null) {
