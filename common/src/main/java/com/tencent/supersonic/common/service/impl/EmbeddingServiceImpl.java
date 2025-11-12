@@ -135,6 +135,10 @@ public class EmbeddingServiceImpl implements EmbeddingService {
 
     private RetrieveQueryResult retrieveSingleQuery(String queryText, EmbeddingModel embeddingModel,
             EmbeddingStore embeddingStore, Map<String, Object> filterCondition, int num) {
+        if (queryText.contains("北京") || queryText.contains("上海") || queryText.contains("天津")
+                || queryText.contains("重庆")) {
+            num = 2;
+        }
         Embedding embeddedText = embeddingModel.embed(queryText).content();
         Filter filter = createCombinedFilter(filterCondition);
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()

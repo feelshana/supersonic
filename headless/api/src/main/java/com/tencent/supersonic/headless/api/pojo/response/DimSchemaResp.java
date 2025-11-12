@@ -13,6 +13,7 @@ public class DimSchemaResp extends DimensionResp {
     private Long useCnt = 0L;
     private Set<String> fields = Sets.newHashSet();
     private String currentValue;
+
     @Override
     public boolean equals(Object o) {
         return super.equals(o);

@@ -56,9 +56,12 @@ public class ChatWorkflowEngine {
                 case MAPPING:
                     performMapping(queryCtx);
                     // 非向量模型只走mapping,向量模型下才会进行text-2-dsl
-                    if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE) && !queryCtx.getRequest().getText2SQLType().equals(Text2SQLType.LLM_OR_RULE)) {
+                    if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)
+                            && !queryCtx.getRequest().getText2SQLType()
+                                    .equals(Text2SQLType.LLM_OR_RULE)) {
                         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
-                        if (!queryCtx.getMapInfo().isEmpty() && !queryCtx.getMapInfo().getDataSetElementMatches().isEmpty()) {
+                        if (!queryCtx.getMapInfo().isEmpty()
+                                && !queryCtx.getMapInfo().getDataSetElementMatches().isEmpty()) {
                             errDefault(parseResult, queryCtx);
                             List<SchemaElementMatch> matchedElements = queryCtx.getMapInfo()
                                     .getDataSetElementMatches().values().stream().findFirst().get();
@@ -333,7 +336,7 @@ public class ChatWorkflowEngine {
                 例如：
                 - “2024年10月1日的支付订单数”
                 - “最近7天各省份的产品销量”
-                
+
                 支持的其他维度包括：%s 等（日期为必填）。
                 """;
         String dimensionStr = semanticSchema.getDimensions().stream()

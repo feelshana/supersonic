@@ -7,7 +7,7 @@ import java.util.List;
 
 @Component
 public class NL2SQLParserConfig {
-    @Value("${s2.manage.parser.agent.ids:11,12,13}")
+    @Value("${s2.manage.parser.agent.ids:43}")
     private List<Integer> simpleModelAgentIds;
 
 

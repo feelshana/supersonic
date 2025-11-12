@@ -34,46 +34,26 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
     public static final String LLM_WORDS_SEGMENT_PROMPT = "任务描述：\n"
             + "你是一个专业的数据查询问题分词系统，结合数据的业务知识(维度/指标/业务含义)，将用户关于数据指标查询的自然语言进行准确分割,输出两部分分词结果，请按照规定的工作步骤进行，并以JSON格式返回结果\n"
-            + "## 业务知识\n"
-            + "- 维度列表\n"
-            + "- 指标列表\n"
-            + "- 业务含义\n"
-            + "## 用户问题：需要分词的自然语言查询\n"
+            + "## 业务知识\n" + "- 维度列表\n" + "- 指标列表\n" + "- 业务含义\n" + "## 用户问题：需要分词的自然语言查询\n"
             + "## 工作步骤\n"
-            + "-第一步：根据业务知识中的维度列表+指标列表+业务含义，理解用户问题，提取用户问题中提及到的维度/指标，作为输出的第一部分\n"
-            + "-第二步：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第二部分\n"
-            + "## 输出格式要求\n"
+            + "-第一步：根据业务知识中的维度列表+指标列表+业务含义，理解用户问题，提取用户问题中提及到且维度指标列表存在的维度/指标，作为输出的第一部分\n"
+            + "-第二步：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第二部分\n" + "## 输出格式要求\n"
             + "-请严格按照JSON格式输出，格式为：{\"metaPart\":\"第一部分内容\",\"valuePart\":\"第二部分内容\"}\n"
-            + "-每个部分的多个词语之间，用英文逗号分隔\n"
-            + "-如果某个部分没有相关内容，则对应字段为空字符串\n"
-            + "-直接返回JSON格式的结果，不要做任何说明或其他文本\n"
-            + "## 示例\n"
-            + "- 用户问题:国色芳华最近一周的播放次数是多少？\n"
-            + "-维度列表：[剧集名称,日期]\n"
-            + "-指标列表：[播放次数,播放人数]\n"
-            + "{\"metaPart\":\"日期,播放次数\",\"valuePart\":\"国色芳华\"}\n"
-            + "- 用户问题:8月5日四川小屏场景的活跃用户数\n"
-            + "-维度列表：[省份名称,日期,一级场景分类,二级场景分类,三级场景分类,产品名称]\n"
-            + "-指标列表：[活跃用户数,付费用户数]\n"
+            + "-每个部分的多个词语之间，用英文逗号分隔\n" + "-如果某个部分没有相关内容，则对应字段为空字符串\n"
+            + "-直接返回JSON格式的结果，不要做任何说明或其他文本\n" + "-第一部分提取的指标，必须是业务知识中的维度指标列表存在且完全一致的，否则不放入第一部分\n"
+            + "-对于20250913,0824这种类似日期格式的词汇，视为日期维度的取值，不应放入第二部分\n" + "## 示例\n"
+            + "- 用户问题:国色芳华最近一周的播放次数是多少？\n" + "-维度列表：[剧集名称,日期]\n" + "-指标列表：[播放次数,播放人数]\n"
+            + "{\"metaPart\":\"日期,播放次数\",\"valuePart\":\"国色芳华\"}\n" + "- 用户问题:8月5日四川小屏场景的活跃用户数\n"
+            + "-维度列表：[省份名称,日期,一级场景分类,二级场景分类,三级场景分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数]\n"
             + "{\"metaPart\":\"日期,活跃用户数\",\"valuePart\":\"四川,小屏\"}\n"
-            + "-用户问题:咪咕音乐昨日活跃用户排行前十的省份\n"
-            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
-            + "-指标列表：[活跃用户数,付费用户数]\n"
-            + "{\"metaPart\":\"省份名称,活跃用户数\",\"valuePart\":\"咪咕音乐\"}\n"
-            + "-用户问题:销量排行前十的城市\n"
-            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
-            + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
-            + "{\"metaPart\":\"\",\"valuePart\":\"订单数\"}\n"
-            + "-用户问题:你能查什么数据\n"
-            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
-            + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
-            + "{\"metaPart\":\"\",\"valuePart\":\"\"}\n"
-            + "## 当前任务\n"
-            + "请处理以下用户问题，并严格按照JSON格式返回结果：\n"
-            + "输入问题为:{{text}}\n"
-            + "-维度列表：{{dimensionNames}}\n"
-            + "-指标列表：{{metricNames}}\n"
-            + "-业务含义：{{termInfo}}\n";
+            + "-用户问题:咪咕音乐20251011活跃用户排行前十的省份\n" + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数]\n" + "{\"metaPart\":\"日期,省份名称,活跃用户数\",\"valuePart\":\"咪咕音乐\"}\n"
+            + "-用户问题:销量排行前十的城市\n" + "-维度列表：[省份名称,日期,一级分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
+            + "{\"metaPart\":\"\",\"valuePart\":\"订单数\"}\n" + "-用户问题:你能查什么数据\n"
+            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
+            + "{\"metaPart\":\"\",\"valuePart\":\"\"}\n" + "## 当前任务\n"
+            + "请处理以下用户问题，并严格按照JSON格式返回结果：\n" + "输入问题为:{{text}}\n" + "-维度列表：{{dimensionNames}}\n"
+            + "-指标列表：{{metricNames}}\n" + "-业务含义：{{termInfo}}\n";
 
 
 
@@ -159,11 +139,16 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
                     if (metricsAndDims.length > 0) {
                         List<String> metricsAndDimsList = List.of(metricsAndDims);
+                        // 过滤掉‘日期’维度
+                        metricsAndDimsList = metricsAndDimsList.stream()
+                                .filter(dim -> !dim.contains("日期")).collect(Collectors.toList());
                         // 可以在这里添加对metricsAndDims的处理逻辑
                         chatQueryContext.setQueryFilters(metricsAndDimsList);
                         // 提取维度的字段名存入chatQueryContext中
+                        List<String> finalMetricsAndDimsList = metricsAndDimsList;
                         List<String> dimensionBizNames = semanticSchema.getDimensions().stream()
-                                .filter(dimension -> metricsAndDimsList.contains(dimension.getName()))
+                                .filter(dimension -> finalMetricsAndDimsList
+                                        .contains(dimension.getName()))
                                 .map(SchemaElement::getBizName).toList();
                         chatQueryContext.setSegmentDimBizNames(dimensionBizNames);
                     }
@@ -171,8 +156,9 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                 if (StringUtils.isNotBlank(valuePart)
                         && CollectionUtils.isNotEmpty(Arrays.asList(valuePart.split(",")))) {
                     List<String> wordsArray = Arrays.asList(valuePart.split(","));
-                    wordsArray = wordsArray.stream().filter(word -> !word.isEmpty()
-                            && !"全国".equals(word) && !"全省".equals(word) && !"全部".equals(word)).toList();
+                    wordsArray =
+                            wordsArray.stream().filter(word -> !word.isEmpty() && !"全国".equals(word)
+                                    && !"全省".equals(word) && !"全部".equals(word)).toList();
                     detectSegments.addAll(wordsArray);
                 }
             } catch (Exception e) {

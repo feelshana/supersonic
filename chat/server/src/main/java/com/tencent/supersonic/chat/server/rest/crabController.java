@@ -36,6 +36,7 @@ public class crabController {
 
     @Autowired
     private CrabConfig crabConfig;
+
     @GetMapping(value = "/testSignature")
     public void test() {
         Map<String, Object> map = new HashMap<>();

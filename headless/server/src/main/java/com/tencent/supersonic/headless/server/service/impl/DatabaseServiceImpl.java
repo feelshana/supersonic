@@ -178,6 +178,7 @@ public class DatabaseServiceImpl extends ServiceImpl<DatabaseDOMapper, DatabaseD
         return list.stream().map(DatabaseConverter::convertWithPassword)
                 .collect(Collectors.toList());
     }
+
     @Override
     public List<DatabaseResp> getDatabaseByTypeForBI(String type) {
         QueryWrapper<DatabaseDO> queryWrapper = new QueryWrapper<>();
@@ -186,6 +187,7 @@ public class DatabaseServiceImpl extends ServiceImpl<DatabaseDOMapper, DatabaseD
         return list.stream().map(DatabaseConverter::convertWithPassword)
                 .collect(Collectors.toList());
     }
+
     @Override
     public SemanticQueryResp executeSql(SqlExecuteReq sqlExecuteReq, User user) {
         DatabaseResp databaseResp = getDatabase(sqlExecuteReq.getId());
