@@ -903,6 +903,19 @@ public class SqlReplaceHelper {
 
     public static String simpleReplaceFields(String sql,
             Map<String, String> fieldNameToBizNameMap) {
+
+        // 按键长度排序，生成LinkedHashMap,让新增活跃用户先替换，活跃用户再进行替换，避免包含替换的BUG
+        LinkedHashMap<String, String> sortedMap = fieldNameToBizNameMap.entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(String::length)))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1, // 合并函数，处理键冲突
+                        LinkedHashMap::new
+                ));
+
+
         for (Map.Entry<String, String> entry : fieldNameToBizNameMap.entrySet()) {
             String originalFieldName = entry.getKey();
             String fieldName = entry.getValue();
