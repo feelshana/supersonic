@@ -99,6 +99,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     private UserService userService;
     @Autowired
     private TermService termService;
+
     @Override
     @Transactional
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
@@ -129,9 +130,11 @@ public class BiAgentServiceImpl implements BiAgentService {
         // 删除旧的模型和主题域
         if (config.getAgentId() != null || !CollectionUtils.isEmpty(domains)) {
             log.info("清理旧配置, agentId: {}, domain是否为空: {}", config.getAgentId(), domains.isEmpty());
-            Map<String, Object> clearResult = clearOldConfig(config.getAgentId(), domains, agents, user);
+            Map<String, Object> clearResult =
+                    clearOldConfig(config.getAgentId(), domains, agents, user);
             dimAliasMap = (Map<String, List<DimValueMap>>) clearResult.get("dimAliasMap");
-            oldDimDefaultValuesMap = (Map<String, List<String>>) clearResult.get("dimDefaultValuesMap");
+            oldDimDefaultValuesMap =
+                    (Map<String, List<String>>) clearResult.get("dimDefaultValuesMap");
         } else {
             dimAliasMap = Collections.emptyMap();
         }
@@ -149,8 +152,9 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         // 创建模型
         log.info("开始创建模型");
-        List<ModelResp> modelResps = createModel(modelConfig, pageConfig, dimAliasMap, oldDimDefaultValuesMap,user,
-                databaseResp, domainResp, config.getAdmins(), config.getViewers());
+        List<ModelResp> modelResps =
+                createModel(modelConfig, pageConfig, dimAliasMap, oldDimDefaultValuesMap, user,
+                        databaseResp, domainResp, config.getAdmins(), config.getViewers());
         // 创建数据集
         log.info("开始创建数据集");
         DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps,
@@ -520,7 +524,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     @NotNull
-    private  Map<String, Object> saveDimensionAlias(User user, Agent agent) {
+    private Map<String, Object> saveDimensionAlias(User user, Agent agent) {
         // 保存维度值别名
         Map<String, List<DimValueMap>> dimAliasMap = new HashMap<>();
         Map<String, List<String>> dimDefaultValuesMap = new HashMap<>();
@@ -544,7 +548,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         return result;
     }
 
-    private void clearModel(User user, Long domainId, Map<String, List<String>> dimDefaultValuesMap, Map<String, List<DimValueMap>> dimAliasMap) {
+    private void clearModel(User user, Long domainId, Map<String, List<String>> dimDefaultValuesMap,
+            Map<String, List<DimValueMap>> dimAliasMap) {
         MetaFilter filter = new MetaFilter();
         filter.setDomainId(domainId);
         List<ModelResp> models = modelService.getModelList(filter);
@@ -566,9 +571,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
                     // 删除旧维度对应的词典文件
                     DictSingleTaskReq deleteTaskReq = DictSingleTaskReq.builder()
-                            .type(TypeEnums.DIMENSION)
-                            .itemId(item.getId())
-                            .build();
+                            .type(TypeEnums.DIMENSION).itemId(item.getId()).build();
                     try {
                         dictTaskService.deleteDictTaskForBI(deleteTaskReq, user);
                     } catch (Exception e) {
@@ -622,7 +625,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig,
-            Map<String, List<DimValueMap>> dimAliasMap, Map<String, List<String>> oldDimDefaultValuesMap,User user, DatabaseResp databaseResp,
+            Map<String, List<DimValueMap>> dimAliasMap,
+            Map<String, List<String>> oldDimDefaultValuesMap, User user, DatabaseResp databaseResp,
             DomainResp domainResp, List<String> admins, List<String> viewers) throws Exception {
         List<ModelResp> modelResps = Lists.newArrayList();
         List<BiModelItem> biDimensions = config.getDimensions();
@@ -950,11 +954,11 @@ public class BiAgentServiceImpl implements BiAgentService {
             default -> throw new IllegalArgumentException("不支持的数据库类型 : " + dataSource.getType());
         }
         // 检查是否已有该数据源
-        List<DatabaseResp> databases =
-                databaseService.getDatabaseByTypeForBI(dataSource.getType());
+        List<DatabaseResp> databases = databaseService.getDatabaseByTypeForBI(dataSource.getType());
         if (databases != null && !databases.isEmpty()) {
             for (DatabaseResp databaseResp : databases) {
-                if (StringUtils.equalsIgnoreCase(dataSource.getConnectionUrl(), databaseResp.getUrl())
+                if (StringUtils.equalsIgnoreCase(dataSource.getConnectionUrl(),
+                        databaseResp.getUrl())
                         && Strings.equals(dataSource.getUserName(), databaseResp.getUsername())) {
                     return databaseResp;
                 }

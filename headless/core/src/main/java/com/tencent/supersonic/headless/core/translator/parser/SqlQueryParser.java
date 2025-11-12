@@ -48,7 +48,8 @@ public class SqlQueryParser implements QueryParser {
         // build ontologyQuery
         SqlQuery sqlQuery = queryStatement.getSqlQuery();
         List<String> queryFields = SqlSelectHelper.getAllSelectFields(sqlQuery.getSql());
-        List<FieldExpression> whereExpressions = SqlSelectHelper.getWhereExpressions(sqlQuery.getSql());
+        List<FieldExpression> whereExpressions =
+                SqlSelectHelper.getWhereExpressions(sqlQuery.getSql());
         Set<String> queryAliases = SqlSelectHelper.getAliasFields(sqlQuery.getSql());
         Set<String> ontologyMetricsDimensions = Collections.synchronizedSet(new HashSet<String>());
         Set<String> ontologyBizNameMetricsDimensions = Collections.synchronizedSet(new HashSet<>());
@@ -294,13 +295,16 @@ public class SqlQueryParser implements QueryParser {
             });
         }
 
-        if (!whereExpressions.isEmpty()){
+        if (!whereExpressions.isEmpty()) {
             whereExpressions.forEach(expression -> {
-                if (expression.getFieldName() != null){
-                    ontologyQuery.getDimensionMap().values().stream()
-                            .flatMap(Collection::stream)
-                            .filter(d ->  d.getTypeEnum() == TypeEnums.DIMENSION && "=".equals(expression.getOperator()) && (d.getName().equals(expression.getFieldName()) || d.getBizName().equals(expression.getFieldName())))
-                            .findFirst().ifPresent(dimSchemaResp -> dimSchemaResp.setCurrentValue(expression.getFieldValue().toString()));
+                if (expression.getFieldName() != null) {
+                    ontologyQuery.getDimensionMap().values().stream().flatMap(Collection::stream)
+                            .filter(d -> d.getTypeEnum() == TypeEnums.DIMENSION
+                                    && "=".equals(expression.getOperator())
+                                    && (d.getName().equals(expression.getFieldName())
+                                            || d.getBizName().equals(expression.getFieldName())))
+                            .findFirst().ifPresent(dimSchemaResp -> dimSchemaResp
+                                    .setCurrentValue(expression.getFieldValue().toString()));
                 }
             });
         }

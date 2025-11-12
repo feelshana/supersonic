@@ -85,6 +85,17 @@ public class NL2SQLParser implements ChatQueryParser {
         // // 1.多轮对话改写，未解析出来数据时重写
         rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),
                 parseContext.getRequest().getQueryText());
+
+        // 检查当前请求的 agentId 是否在 simpleModelAgentIds 列表中
+        if (parseContext.getRequest().getAgentId() == 43) {
+            QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
+            queryNLReq.setText2SQLType(Text2SQLType.LLM_OR_RULE);
+            queryNLReq.setSelectedParseInfo(null);
+            queryNLReq.setMapModeEnum(MapModeEnum.ALL);
+            addDynamicExemplars(parseContext, queryNLReq);
+            doParse(queryNLReq, parseContext.getResponse());
+            return;
+        }
         Set<String> segmentDimBizNames = new HashSet<>();
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
@@ -129,8 +140,17 @@ public class NL2SQLParser implements ChatQueryParser {
                 logMatchResult(keyWordsValues, "词典模式");
                 logMatchResult(looseElementMatches, "向量模式");
 
-                List<SchemaElementMatch> merged = (List<SchemaElementMatch>) CollectionUtils
-                        .union(keyWordsValues, looseElementMatches);
+                // List<SchemaElementMatch> merged = (List<SchemaElementMatch>) CollectionUtils
+                // .union(keyWordsValues, looseElementMatches);
+                List<SchemaElementMatch> distinctMerged = new ArrayList<>(keyWordsValues);
+                distinctMerged.addAll(looseElementMatches);
+                List<SchemaElementMatch> merged = new ArrayList<>(distinctMerged.stream()
+                        .collect(Collectors.toMap(
+                                match -> String.format("%s|%s|%s|%s", match.getDetectWord(),
+                                        match.getWord(), match.getElement().getName(),
+                                        match.getElement().getBizName()),
+                                match -> match, (existing, replacement) -> existing))
+                        .values());
                 // 过滤掉schemaElementMatch的word等于SchemaElement中的任何默认值的元素
                 merged = merged.stream().filter(schemaElementMatch -> {
                     List<String> defaultValues = schemaElementMatch.getElement().getDefaultValues();
@@ -236,16 +256,21 @@ public class NL2SQLParser implements ChatQueryParser {
 
     public void rewriteMultiTurn(ParseContext parseContext, Integer agentId, String queryText) {
         ChatApp chatApp = parseContext.getAgent().getChatAppConfig().get(APP_KEY_MULTI_TURN);
+        if (Objects.isNull(chatApp) || !chatApp.isEnable()) {
+            return;
+        }
         RecommendedQuestionsService recommendedQuestionsService =
                 ContextUtils.getBean(RecommendedQuestionsService.class);
         boolean isRecommendQuestion = recommendedQuestionsService
                 .findQuerySqlByQuestion(Math.toIntExact(agentId), queryText) != null;
+        if (isRecommendQuestion) {
+            return;
+        }
         // 示例问题
         AgentService agentService = ContextUtils.getBean(AgentService.class);
         List<String> examples =
                 agentService.getAgent(parseContext.getRequest().getAgentId()).getExamples();
-        if (Objects.isNull(chatApp) || !chatApp.isEnable() || isRecommendQuestion
-                || examples.contains(queryText)) {
+        if (examples.contains(queryText)) {
             return;
         }
 
@@ -306,7 +331,6 @@ public class NL2SQLParser implements ChatQueryParser {
         parseContext.getRequest().setQueryText(rewrittenQuery);
         log.info(" Current Query: {}, Rewritten Query: {}", queryText, rewrittenQuery);
     }
-
 
 
     private String generateSchemaPrompt(List<SchemaElementMatch> elementMatches) {
@@ -374,7 +398,6 @@ public class NL2SQLParser implements ChatQueryParser {
 
     public static class HistoryQuery {
         String question;
-
 
 
         public String getQuestion() {

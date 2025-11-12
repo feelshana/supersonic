@@ -41,6 +41,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -100,7 +101,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
         queryStatement.setSegmentDimBizNames(queryReq.getSegmentDimBizNames());
         List<String> dimensionRelationlist =
-                biReportConfigService.getDimRelations("123");
+                biReportConfigService.getDimRelations(queryReq.getRequestId());
         if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
             queryStatement.setDimensionRelations(dimensionRelationlist);
         }

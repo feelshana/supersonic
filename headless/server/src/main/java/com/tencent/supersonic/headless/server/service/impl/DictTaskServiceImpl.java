@@ -179,6 +179,7 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictRepository.addDictTask(dictTaskDO);
         return 0L;
     }
+
     @Override
     public Long deleteDictTaskForBI(DictSingleTaskReq taskReq, User user) {
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
@@ -198,13 +199,14 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     @Override
-    public void reloadDictWord () {
+    public void reloadDictWord() {
         try {
             dictWordService.loadDictWord();
         } catch (Exception e) {
             log.error("reloadCustomDictionary error", e);
         }
     }
+
     public void deleteEmbedding(DictItemResp dictItemResp, String fileName) {
         List<DimensionValueDO> dimensionValueDOS;
         // TODO，直接从文件中读取所有维度值不妥，后续待优化
