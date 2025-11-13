@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.parser.llm;
 
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import dev.langchain4j.model.input.Prompt;
@@ -23,7 +24,18 @@ import static com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStr
 public class SimpleStrategy {
 
     public static String DIMENSION_DETECT_REGEX = "维度探测:\\[(.*?)\\]";
-
+    public static final String STREAM_PROMPT = "您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n" + "\n"
+            + "### 业务背景信息：\n" + "#角色：你是一位细心周到的数据分析师，擅长准确理解用户的数据需求\n"
+            + "#任务：理解用户的自然语言问题，分析需求与现有数据的匹配程度，并提供清晰的解决方案\n" + "\n" + "#理解用户需求的思路：\n"
+            + "1. 首先确认理解用户的问题意图\n" + "2. 分析用户提到的指标和维度是否在现有数据范围内\n" + "3. 检查维度取值是否在预定义的枚举值中\n"
+            + "4. 对于模糊或不匹配的术语，提供可能的对应关系\n" + "5. 给出明确的下步建议或需要澄清的内容\n" + "\n" + "#当前可用的数据资源：\n"
+            + "- 分析维度：{{dimensionNames}}\n" + "- 数据指标：{{metricNames}} \n" + "- 业务背景：{{termInfo}}\n"
+            + "- 当前日期：{{currentDate}}\n" + "\n" + "===回复指南\n" + "1. **思考过程**：按照以下自然流程进行分析：\n"
+            + "   - 友好问候并确认理解的问题\n" + "   - 分析用户术语与现有字段的匹配情况\n" + "   - 指出可能存在的不匹配或模糊之处\n"
+            + "   - 提供具体的建议或需要澄清的内容\n" + "\n" + "2. 如果用户的问题与业务背景信息无关，请友好提示可查询的数据范围。\n" + "\n"
+            + "3. **严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，使用中文业务术语描述。\n" + "\n"
+            + "4. 保持专业但亲切的语气，避免机械化的技术描述。\n" + "\n" + "5. 如果问题提及考核指标，自然地提示当前参考标准。\n" + "\n"
+            + "当前用户的问题是：{{question}}\n" + "\n" + "请开始分析并用自然的语言回复：";
 
     public Prompt generatePrompt(LLMReq llmReq, PromptHelper promptHelper) {
         StringBuilder context = new StringBuilder();
@@ -67,44 +79,64 @@ public class SimpleStrategy {
 
     public Prompt generateStreamPrompt(LLMReq llmReq, SemanticSchema semanticSchema) {
         StringBuilder context = new StringBuilder();
-        // 添加SQL专家说明
-        context.append("您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");
-        ChatApp s2SQLParser = llmReq.getChatAppConfig().get(APP_KEY);
-        if (null != s2SQLParser) {
-            String fullPrompt = s2SQLParser.getPrompt();
-            context.append("### 业务背景信息：\n").append(fullPrompt).append("\n\n");
-        }
-
-        // 组装回复指南部分
-        String replyGuideline = "===回复指南\n"
-                + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"
-                + "2. 如果用户的问题与业务背景信息无关，请礼貌引导用户提问与当前表及数据的相关问题。例：\n"
-                + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内。" + "我可以帮您查询以下维度的数据："
-                + semanticSchema.getDimensions().stream().map(d -> "【" + d.getName() + "】")
-                        .collect(Collectors.joining("，"))
-                + "；以及以下指标："
-                + semanticSchema.getMetrics().stream().map(m -> "【" + m.getName() + "】")
-                        .collect(Collectors.joining("，"))
-                + "。\n" + "3. 只需要查询思考思路，**严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，必须使用中文描述查询逻辑。\n"
-                + "4. 输出内容请尽量格式清晰，思路正确，字数控制在80-100字左右。\n"
-                + "5. 如果问题提及集团考核/考核/考核指标，那么在输出的思路中增加提示：\"暂时以24年考核目标作为参照，待25年考核指标下达后再更新\",其他任何情况请不要添加如上的提示\n";
-
-
-
+        context.append(STREAM_PROMPT).append("\n\n");
         Map<String, Object> variable = new HashMap<>();
-        StringBuilder exemplars = new StringBuilder();
-        variable.put("exemplar", exemplars);
         variable.put("question", llmReq.getQueryText());
-        variable.put("schema", "");
-        variable.put("information", "");
+        List<String> dimensionNames =
+                semanticSchema.getDimensions().stream().map(SchemaElement::getName).toList();
+        // 取出所有的指标名称
+        List<String> metricNames =
+                semanticSchema.getMetrics().stream().map(SchemaElement::getName).toList();
+        variable.put("dimensionNames", dimensionNames);
+        variable.put("metricNames", metricNames);
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateFormat.format(new Date());
         variable.put("currentDate", currentDate);
-        String currentDayRule = new StringBuilder("所有日期不用日期函数，根据今天的日期去推算过去，今天的日期是")
-                .append(DateFormatUtils.format(new Date(), "yyyyMMdd")).append("\n").toString();
-        variable.put("current-day-rule", currentDayRule);
-        context.append(replyGuideline).append("\n当前用户的问题是：").append(llmReq.getQueryText())
-                .toString();
+        if (semanticSchema.getTerms() != null && !semanticSchema.getTerms().isEmpty()) {
+            // 取出所有的术语信息放入map集合中,key为术语名称,value为术语描述
+            Map<String, String> termInfo = semanticSchema.getTerms().stream().collect(
+                    Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
+            variable.put("termInfo", termInfo);
+        } else {
+            variable.put("termInfo", "");
+        }
+        // 添加SQL专家说明
+        // context.append("您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");
+        // ChatApp s2SQLParser = llmReq.getChatAppConfig().get(APP_KEY);
+        // if (null != s2SQLParser) {
+        // String fullPrompt = s2SQLParser.getPrompt();
+        // context.append("### 业务背景信息：\n").append(fullPrompt).append("\n\n");
+        // }
+
+        // 组装回复指南部分
+        // String replyGuideline = "===回复指南\n"
+        // + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"
+        // + "2. 如果用户的问题与业务背景信息无关，请礼貌引导用户提问与当前表及数据的相关问题。例：\n"
+        // + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内。" + "我可以帮您查询以下维度的数据："
+        // + semanticSchema.getDimensions().stream().map(d -> "【" + d.getName() + "】")
+        // .collect(Collectors.joining("，"))
+        // + "；以及以下指标："
+        // + semanticSchema.getMetrics().stream().map(m -> "【" + m.getName() + "】")
+        // .collect(Collectors.joining("，"))
+        // + "。\n" + "3. 只需要查询思考思路，**严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，必须使用中文描述查询逻辑。\n"
+        // + "4. 输出内容请尽量格式清晰，思路正确，字数控制在80-100字左右。\n"
+        // + "5.
+        // 如果问题提及集团考核/考核/考核指标，那么在输出的思路中增加提示：\"暂时以24年考核目标作为参照，待25年考核指标下达后再更新\",其他任何情况请不要添加如上的提示\n";
+        //
+
+        // StringBuilder exemplars = new StringBuilder();
+        // variable.put("exemplar", exemplars);
+        // variable.put("question", llmReq.getQueryText());
+        // variable.put("schema", "");
+        // variable.put("information", "");
+        // SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
+        // String currentDate = dateFormat.format(new Date());
+        // variable.put("currentDate", currentDate);
+        // String currentDayRule = new StringBuilder("所有日期不用日期函数，根据今天的日期去推算过去，今天的日期是")
+        // .append(DateFormatUtils.format(new Date(), "yyyyMMdd")).append("\n").toString();
+        // variable.put("current-day-rule", currentDayRule);
+        // context.append(replyGuideline).append("\n当前用户的问题是：").append(llmReq.getQueryText())
+        // .toString();
         // 拼接完整的prompt
         return PromptTemplate.from(String.valueOf(context)).apply(variable);
     }
