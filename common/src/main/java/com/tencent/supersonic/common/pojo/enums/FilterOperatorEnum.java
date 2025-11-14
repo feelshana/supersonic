@@ -39,6 +39,10 @@ public enum FilterOperatorEnum {
                 return operatorEnum;
             }
         }
+        // 添加对 <> 的特殊处理
+        if ("<>".equalsIgnoreCase(type)) {
+            return NOT_EQUALS;
+        }
         return null;
     }
 
