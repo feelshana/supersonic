@@ -35,7 +35,7 @@ public class SimpleStrategy {
             + "   - 提供具体的建议或需要澄清的内容\n" + "2. 使用陈述句，避免使用疑问句。\n"
             + "3. 如果用户的问题与业务背景信息无关，请友好提示可查询的数据范围。\n"
             + "4. **严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，使用中文业务术语描述。\n" + "5. 保持专业但亲切的语气，避免机械化的技术描述。\n"
-            + "当前用户的问题是：{{question}}\n" + "请开始分析并用自然的语言回复：";
+            + "6. 术语信息：{{termInfo}}。\n" + "当前用户的问题是：{{question}}\n" + "请开始分析并用自然的语言回复：";
 
     public Prompt generatePrompt(LLMReq llmReq, PromptHelper promptHelper) {
         StringBuilder context = new StringBuilder();
@@ -105,6 +105,14 @@ public class SimpleStrategy {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateFormat.format(new Date());
         variable.put("currentDate", currentDate);
+        if (semanticSchema.getTerms() != null && !semanticSchema.getTerms().isEmpty()) {
+            // 取出所有的术语信息放入map集合中,key为术语名称,value为术语描述
+            Map<String, String> termInfo = semanticSchema.getTerms().stream().collect(
+                    Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
+            variable.put("termInfo", termInfo);
+        } else {
+            variable.put("termInfo", "");
+        }
         // 组装回复指南部分
         // String replyGuideline = "===回复指南\n"
         // + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"

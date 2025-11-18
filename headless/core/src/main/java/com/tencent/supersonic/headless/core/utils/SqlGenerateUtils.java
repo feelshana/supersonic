@@ -269,6 +269,9 @@ public class SqlGenerateUtils {
                 && StringUtil.compareVersion(version, executorConfig.getCkLowVersion()) < 0) {
             return false;
         }
+        if (engineTypeEnum.equals(EngineType.DORIS)) {
+            return false;
+        }
         return true;
     }
 

@@ -8,6 +8,7 @@ import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.enums.EngineType;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.Identify;
+import com.tencent.supersonic.headless.api.pojo.SchemaItem;
 import com.tencent.supersonic.headless.api.pojo.enums.IdentifyType;
 import com.tencent.supersonic.headless.api.pojo.response.*;
 import com.tencent.supersonic.headless.core.pojo.JoinRelation;
@@ -398,14 +399,18 @@ public class SqlBuilder {
 
     private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema,
             Set<DimSchemaResp> dimSchemaRespSet, List<String> dimensionRelations) {
+
+        // 获取所有有默认值的维度
         Map<String, String> defaultDimNameMap = semanticSchema.getDimensions().stream()
                 .filter(dimSchemaResp -> !org.springframework.util.CollectionUtils
                         .isEmpty(dimSchemaResp.getDefaultValues()))
-                .collect(Collectors.toMap(dimSchemaResp -> dimSchemaResp.getBizName(),
-                        dimSchemaResp -> dimSchemaResp.getDefaultValues().get(0)));
-        if (null == defaultDimNameMap || defaultDimNameMap.isEmpty()) {
+                .collect(Collectors.toMap(SchemaItem::getBizName,
+                        dimSchemaResp -> dimSchemaResp.getDefaultValues().getFirst()));
+        if (defaultDimNameMap.isEmpty()) {
             return null;
         }
+
+        // 当前查询涉及的维度
         Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
                 .collect(Collectors.toSet());
         List<SqlNode> andConditions = new ArrayList<>();
@@ -423,16 +428,18 @@ public class SqlBuilder {
             return defaultValue.equals(currentValue);
         }).map(DimSchemaResp::getBizName).collect(Collectors.toSet());
 
+        // 提取分词阶段提及的维度
+        // List<String> segmentDimBizNames = semanticSchema.getSegmentDimBizNames();
+
         if (!CollectionUtils.isEmpty(defaultDimFilterNameList)) {
             filterNameList.removeAll(defaultDimFilterNameList);
-            semanticSchema.getSegmentDimBizNames().removeAll(defaultDimFilterNameList);
+            // segmentDimBizNames.removeAll(defaultDimFilterNameList);
         }
         log.info("需要进行默认值排除的维度:{}", filterNameList);
-        log.info("用户问题涉及的维度:{}", semanticSchema.getSegmentDimBizNames());
+        // log.info("用户问题涉及的维度:{}", segmentDimBizNames);
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
-            if (filterNameList.contains(defaultDimensionFiledName)
-                    || semanticSchema.getSegmentDimBizNames().contains(defaultDimensionFiledName)) {
+            if (filterNameList.contains(defaultDimensionFiledName)) {
                 SqlIdentifier column =
                         new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
                 SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);
