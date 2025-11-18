@@ -13,6 +13,7 @@ import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
 import com.tencent.supersonic.common.pojo.enums.AppModule;
+import com.tencent.supersonic.common.pojo.enums.MatchType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.service.impl.ExemplarServiceImpl;
 import com.tencent.supersonic.common.util.ChatAppManager;
@@ -123,6 +124,8 @@ public class NL2SQLParser implements ChatQueryParser {
                                             .getType() == SchemaElementType.VALUE
                                             || schemaElementMatch.getElement()
                                                     .getType() == SchemaElementType.TERM)
+                                    .peek(schemaElementMatch -> schemaElementMatch
+                                            .setMatchType(MatchType.KEYWORD.name()))
                                     .toList();
                     parseResp.getSelectedParses().clear();
                 }
@@ -136,6 +139,10 @@ public class NL2SQLParser implements ChatQueryParser {
                 looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
                         .getType() != SchemaElementType.VALUE
                         && schemaElementMatch.getElement().getType() != SchemaElementType.TERM);
+                if (!looseElementMatches.isEmpty()) {
+                    looseElementMatches.forEach(schemaElementMatch -> schemaElementMatch
+                            .setMatchType(MatchType.EMBEDDING.name()));
+                }
 
                 logMatchResult(keyWordsValues, "词典模式");
                 logMatchResult(looseElementMatches, "向量模式");
@@ -144,12 +151,25 @@ public class NL2SQLParser implements ChatQueryParser {
                 // .union(keyWordsValues, looseElementMatches);
                 List<SchemaElementMatch> distinctMerged = new ArrayList<>(keyWordsValues);
                 distinctMerged.addAll(looseElementMatches);
+                // 合并词典模式和向量模式的匹配结果，保留词典模式的匹配结果
                 List<SchemaElementMatch> merged = new ArrayList<>(distinctMerged.stream()
                         .collect(Collectors.toMap(
                                 match -> String.format("%s|%s|%s|%s", match.getDetectWord(),
                                         match.getWord(), match.getElement().getName(),
                                         match.getElement().getBizName()),
-                                match -> match, (existing, replacement) -> existing))
+                                match -> match, (existing, replacement) -> {
+                                    String existingMatchType = existing.getMatchType();
+                                    if (existingMatchType != null
+                                            && existingMatchType.equals(MatchType.KEYWORD.name())) {
+                                        return existing;
+                                    }
+                                    String replacementMatchType = replacement.getMatchType();
+                                    if (replacementMatchType != null && replacementMatchType
+                                            .equals(MatchType.KEYWORD.name())) {
+                                        return replacement;
+                                    }
+                                    return existing;
+                                }))
                         .values());
                 // 过滤掉schemaElementMatch的word等于SchemaElement中的任何默认值的元素
                 merged = merged.stream().filter(schemaElementMatch -> {

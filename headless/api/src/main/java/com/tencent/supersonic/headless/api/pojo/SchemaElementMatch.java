@@ -19,6 +19,7 @@ public class SchemaElementMatch implements Serializable {
     private Long frequency;
     private boolean isInherited;
     private boolean llmMatched;
+    private String matchType;
 
     public boolean isFullMatched() {
         return 1.0 == similarity;

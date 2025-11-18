@@ -34,6 +34,7 @@ public class LLMReq {
     public static class ElementValue {
         private String fieldName;
         private String fieldValue;
+        private String matchType;
     }
 
     @Data

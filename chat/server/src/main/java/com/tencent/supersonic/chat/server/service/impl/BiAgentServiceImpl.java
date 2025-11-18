@@ -675,8 +675,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         continue;
                     }
                     Dimension dimension = new Dimension();
-                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
-                            .replaceAll("\\(([^)]*)\\)", "$1").replace("：", "").replace(":", "");
+                    String name = getReplacedAll(modelDimension.getName());
                     dimension.setName(name);
                     if (dimensionNamesList.contains(modelDimension.getName())) {
                         dimension.setHasDimValues(true);
@@ -706,8 +705,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         continue;
                     }
                     Measure measure = new Measure();
-                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
-                            .replaceAll("\\(([^)]*)\\)", "$1").replace("：", "").replace(":", "");
+                    String name = getReplacedAll(modelMeasure.getName());
                     measure.setName(name);
                     measure.setBizName(modelMeasure.getColumnName());
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
@@ -804,8 +802,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setDimensions(dimensions);
                 for (BiModelItem modelDimension : modelDimensions) {
                     Dimension dimension = new Dimension();
-                    String name = modelDimension.getName().replaceAll("\\（([^)]*)\\）", "$1")
-                            .replaceAll("\\(([^)]*)\\)", "$1");
+                    String name = getReplacedAll(modelDimension.getName());
                     dimension.setName(name);
                     if (dimensionNamesList.contains(modelDimension.getName())) {
                         dimension.setHasDimValues(true);
@@ -831,8 +828,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 modelDetail.setMeasures(measures);;
                 for (BiModelItem modelMeasure : modelMeasures) {
                     Measure measure = new Measure();
-                    String name = modelMeasure.getName().replaceAll("\\（([^)]*)\\）", "$1")
-                            .replaceAll("\\(([^)]*)\\)", "$1");
+                    String name = getReplacedAll(modelMeasure.getName());
                     measure.setName(name);
                     measure.setBizName(name);
                     measure.setAgg(AggOperatorEnum.NONE.getOperator());
@@ -857,6 +853,12 @@ public class BiAgentServiceImpl implements BiAgentService {
             throw new IllegalArgumentException("不支持的建模类型 : " + config.getCreateModelType());
         }
         return modelResps;
+    }
+
+    @NotNull
+    private static String getReplacedAll(String name) {
+        return name.replaceAll("\\（([^)]*)\\）", "$1").replaceAll("\\(([^)]*)\\)", "$1")
+                .replace("：", "").replace(":", "").replaceAll("\\s+", "");
     }
 
     private String processQuerySql(String querySql) {

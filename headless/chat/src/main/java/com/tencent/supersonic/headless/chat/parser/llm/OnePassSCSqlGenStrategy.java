@@ -1,14 +1,27 @@
 package com.tencent.supersonic.headless.chat.parser.llm;
 
 import com.amazonaws.services.bedrockagent.model.Agent;
+import com.github.pagehelper.PageInfo;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
 import com.tencent.supersonic.common.pojo.enums.AppModule;
+import com.tencent.supersonic.common.pojo.enums.MatchType;
+import com.tencent.supersonic.common.pojo.enums.TypeEnums;
+import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.common.util.ContextUtils;
+import com.tencent.supersonic.headless.api.pojo.DimValueMap;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
+import com.tencent.supersonic.headless.api.pojo.enums.DimensionType;
+import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
+import com.tencent.supersonic.headless.api.pojo.response.DictValueDimResp;
+import com.tencent.supersonic.headless.api.pojo.response.DictValueResp;
+import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
+import com.tencent.supersonic.headless.chat.knowledge.file.FileHandler;
 import com.tencent.supersonic.headless.chat.parser.ParserConfig;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMResp;
@@ -31,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -44,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.headless.chat.parser.ParserConfig.PARSER_FORMAT_JSON_TYPE;
 
@@ -58,15 +73,16 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             + "1.Schema中的Dimensions代表维度，Metrics代表指标，Values代表问题分词后，通过向量召回得到的维度及其对应的维度值，必须使用Values中的结果作为筛选条件\n"
             + "2.SQL语句中查询的列名与作为过滤条件的列名，必须严格引用Schema中的Dimensions和Metrics中的字段名，完全一致，禁止任何改造\n"
             + "3.Schema中的Dimensions包含日期字段，日期字段包含FORMAT，比如<订购日期 FORMAT 'yyyyMMdd' COMMENT '订购日期'> 代表Table为日表，<订购日期 FORMAT 'yyyyMM' COMMENT '订购日期'>代表Table为月表 \n"
-            + "4.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n"
-            + "4.为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题限制最多返回100条数据，根据情况在sql添加limit，保证没有语法错误。\n"
-            + "5.别名使用中文\n" + "#维度值智能查询规则\n" + "   - 当问题属于**维度值查询**（如“有哪些场景”、“列出XX”等开放式查询），\n"
+            + "4.#维度值说明：\n" + "  {{dimensionValues}}\n"
+            + "5.当前日期为:{{currentDate}},请根据当前日期，来生成日期范围，必须使用>/</>=/<=运算符显式声明，而不是使用日期函数\n"
+            + "6.为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题限制最多返回100条数据，根据情况在sql添加limit，保证没有语法错误。\n"
+            + "7.别名使用中文\n" + "#维度值智能查询规则\n" + "   - 当问题属于**维度值查询**（如“有哪些场景”、“列出XX”等开放式查询），\n"
             + "   - 对维度进行 distinct查询\n" + "    - 若提示词中包含当前日期为2025年10月2日\n"
             + "    - 若Dimensions中包含format为'yyyyMMdd'格式的**日期字段**时，（如 `创建日期`），根据提示词中声明的当前日期，自动根据日期格式添加：创建日期 = '20251001'\n"
             + "     - 若Dimensions中包含format为'yyyyMM'格式的**日期字段**时，（如 `订单月份`），根据提示词中声明的当前日期，自动根据日期格式添加：订单月份 = 202509\n"
             + "     - **例外情况**：问题中已包含明确日期条件（如“查询昨天的场景”）时，不再额外添加.\n"
-            + "6.涉及两组数据计算同环比，差值等时，必须通过left join实现,禁止使用with子查询，禁止使用over函数。计算排名时请参考Exemplars中的示例,通过left join来实现\n"
-            + "7.禁止使用字符串作为查询列，如 select '8月' as month\n" + "#Exemplars: {{exemplar}}\n"
+            + "8.涉及两组数据计算同环比，差值等时，必须通过left join实现,禁止使用with子查询，禁止使用over函数。计算排名时请参考Exemplars中的示例,通过left join来实现\n"
+            + "9.禁止使用字符串作为查询列，如 select '8月' as month\n" + "#Exemplars: {{exemplar}}\n"
             + "#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}\n"
             + "#排序规则\n" + "   - 当问题涉及排序要求时（如'最高'、'最低'、'top10'、'前10'等），\n"
             + "   - 必须根据问题要求添加ORDER BY子句\n" + "   - 对于'最高'、'最大'等要求，使用DESC降序排列\n"
@@ -323,7 +339,10 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         return null;
     }
 
-    private Prompt generatePrompt(LLMReq llmReq, LLMResp llmResp, ChatApp chatApp) {
+    @Autowired
+    private FileHandler fileHandler;
+
+    public Prompt generatePrompt(LLMReq llmReq, LLMResp llmResp, ChatApp chatApp) {
         StringBuilder exemplars = new StringBuilder();
         for (Text2SQLExemplar exemplar : llmReq.getDynamicExemplars()) {
             String exemplarStr = String.format("\nQuestion:%s,Schema:%s,SideInfo:%s,SQL:%s",
@@ -335,13 +354,13 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         String sideInformation = promptHelper.buildSideInformation(llmReq);
         llmResp.setSchema(dataSemantics);
         llmResp.setSideInfo(sideInformation);
-
+        String dimensionValueInfo = buildDimensionValueInfo(llmReq);
         Map<String, Object> variable = new HashMap<>();
         variable.put("exemplar", exemplars);
         variable.put("question", llmReq.getQueryText());
         variable.put("schema", dataSemantics);
         variable.put("information", sideInformation);
-
+        variable.put("dimensionValues", dimensionValueInfo);
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateFormat.format(new Date());
         variable.put("currentDate", currentDate);
@@ -349,6 +368,120 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         // use custom prompt template if provided.
         String promptTemplate = chatApp.getPrompt();
         return PromptTemplate.from(promptTemplate).apply(variable);
+    }
+
+    public String buildDimensionValueInfo(LLMReq llmReq) {
+        StringBuilder dimensionValueInfo = new StringBuilder();
+        boolean hasDimensionValues = false;
+        List<SchemaElement> dimensions = llmReq.getSchema().getDimensions();
+        // 提取Values中matchTpye不为空的且类型为keyword的维度名称
+        Set<String> matchedDimensionNames = llmReq.getSchema().getValues().stream()
+                .filter(elementValue -> StringUtils.isNotBlank(elementValue.getMatchType())
+                        && elementValue.getMatchType().equals(MatchType.KEYWORD.name()))
+                .map(LLMReq.ElementValue::getFieldValue).collect(Collectors.toSet());
+        for (SchemaElement dimension : dimensions) {
+            // 筛选条件1：跳过已经匹配到的维度
+            if (matchedDimensionNames.contains(dimension.getName())) {
+                continue;
+            }
+            // 筛选条件2：跳过省份、城市和日期维度
+            if (isSkipDimension(dimension)) {
+                continue;
+            }
+            // 筛选条件3：跳过没有维度值的维度
+            if (!dimension.isHasDimValues()) {
+                continue;
+            }
+            PageInfo<DictValueDimResp> dimensionValuesFromDict =
+                    getDimensionValuesFromDict(dimension);
+            List<DictValueDimResp> list = dimensionValuesFromDict.getList();
+            List<String> dimensionValues = list.stream().map(DictValueDimResp::getValue).toList();
+            // 筛选条件4：跳过维度值数量为0和数量大于等于50的维度
+            if (CollectionUtils.isEmpty(dimensionValues) || dimensionValues.size() >= 50) {
+                continue;
+            }
+            dimensionValueInfo.append(dimension.getName()).append("包含如下维度值: ")
+                    .append(String.join("，", dimensionValues)).append("\n");
+            hasDimensionValues = true;
+        }
+        // 添加说明
+        if (hasDimensionValues) {
+            dimensionValueInfo.append("请注意，根据用户的语义，和上述的维度值可选内容，生成维度选条件，作为sql的where条件.\n");
+            return dimensionValueInfo.toString();
+        }
+
+        return "";
+    }
+
+    private PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
+        DictValueReq dictValueReq = new DictValueReq();
+        dictValueReq.setModelId(dimension.getModel());
+        dictValueReq.setItemId(dimension.getId());
+        dictValueReq.setType(TypeEnums.DIMENSION);
+        dictValueReq.setPageSize(50);
+        dictValueReq.setCurrent(1);
+        String fileName = String.format("dic_value_%d_%s_%s", dictValueReq.getModelId(),
+                dictValueReq.getType().name(), dictValueReq.getItemId()) + Constants.DOT + "txt";
+        PageInfo<DictValueResp> dictValueRespList =
+                fileHandler.queryDictValue(fileName, dictValueReq);
+        PageInfo<DictValueDimResp> result = convert2DictValueDimRespPage(dictValueRespList);
+        fillDimMapInfo(result.getList(), dimension);
+        return result;
+    }
+
+    private void fillDimMapInfo(List<DictValueDimResp> list, SchemaElement dimension) {
+
+        if (CollectionUtils.isEmpty(dimension.getDimValueMaps())) {
+            return;
+        }
+        Map<String, DimValueMap> valueAndMap = dimension.getDimValueMaps().stream()
+                .collect(Collectors.toMap(DimValueMap::getValue, v -> v, (v1, v2) -> v2));
+        if (CollectionUtils.isEmpty(valueAndMap)) {
+            return;
+        }
+        list.forEach(dictValueDimResp -> {
+            String dimValue = dictValueDimResp.getValue();
+            if (valueAndMap.containsKey(dimValue) && Objects.nonNull(valueAndMap.get(dimValue))) {
+                dictValueDimResp.setAlias(valueAndMap.get(dimValue).getAlias());
+            }
+        });
+    }
+
+    private PageInfo<DictValueDimResp> convert2DictValueDimRespPage(
+            PageInfo<DictValueResp> dictValueRespPage) {
+        PageInfo<DictValueDimResp> result = new PageInfo<>();
+        BeanMapper.mapper(dictValueRespPage, result);
+        if (CollectionUtils.isEmpty(dictValueRespPage.getList())) {
+            return result;
+        }
+
+        List<DictValueDimResp> list = getDictValueDimRespList(dictValueRespPage.getList());
+        result.setList(list);
+        return result;
+    }
+
+    private List<DictValueDimResp> getDictValueDimRespList(List<DictValueResp> dictValueRespList) {
+        List<DictValueDimResp> list = dictValueRespList.stream()
+                .map(this::convert2DictValueInternal).collect(Collectors.toList());
+        return list;
+    }
+
+    private DictValueDimResp convert2DictValueInternal(DictValueResp dictValue) {
+        DictValueDimResp dictValueDimResp = new DictValueDimResp();
+        BeanMapper.mapper(dictValue, dictValueDimResp);
+        return dictValueDimResp;
+    }
+
+    private boolean isSkipDimension(SchemaElement dimension) {
+        if (dimension == null) {
+            return true;
+        }
+        // 跳过省份、城市和日期维度
+        String dimensionName = dimension.getName().toLowerCase();
+        return dimensionName.contains("省份") || dimensionName.contains("城市")
+                || dimensionName.contains("日期") || dimensionName.contains("时间")
+                || dimensionName.contains("province") || dimensionName.contains("city")
+                || dimensionName.contains("date") || dimensionName.contains("time");
     }
 
     @Override

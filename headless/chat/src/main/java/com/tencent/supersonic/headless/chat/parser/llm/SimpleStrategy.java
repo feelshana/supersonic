@@ -2,13 +2,18 @@ package com.tencent.supersonic.headless.chat.parser.llm;
 
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
+import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
+import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
+import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMResp;
 import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.text.SimpleDateFormat;
@@ -21,22 +26,16 @@ import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy.APP_KEY;
 
+@Service
 public class SimpleStrategy {
 
     public static String DIMENSION_DETECT_REGEX = "维度探测:\\[(.*?)\\]";
-    public static final String STREAM_PROMPT = "您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n" + "\n"
-            + "### 业务背景信息：\n" + "#角色：你是一位细心周到的数据分析师，擅长准确理解用户的数据需求\n"
-            + "#任务：理解用户的自然语言问题，分析需求与现有数据的匹配程度，并提供清晰的解决方案\n" + "\n" + "#理解用户需求的思路：\n"
-            + "1. 首先确认理解用户的问题意图\n" + "2. 分析用户提到的指标和维度是否在现有数据范围内\n" + "3. 检查维度取值是否在预定义的枚举值中\n"
-            + "4. 对于模糊或不匹配的术语，提供可能的对应关系\n" + "5. 给出明确的下步建议或需要澄清的内容\n" + "\n" + "#当前可用的数据资源：\n"
-            + "- 分析维度：{{dimensionNames}}\n" + "- 数据指标：{{metricNames}} \n" + "- 业务背景：{{termInfo}}\n"
-            + "- 当前日期：{{currentDate}}\n" + "\n" + "===回复指南\n" + "1. **思考过程**：按照以下自然流程进行分析：\n"
+    public static final String STREAM_PROMPT = "===回复指南\n" + "1. **思考过程**：按照以下自然流程进行分析：\n"
             + "   - 友好问候并确认理解的问题\n" + "   - 分析用户术语与现有字段的匹配情况\n" + "   - 指出可能存在的不匹配或模糊之处\n"
-            + "   - 提供具体的建议或需要澄清的内容\n" + "\n" + "2. 使用陈述句，避免使用疑问句。\n" + "\n"
-            + "3. 如果用户的问题与业务背景信息无关，请友好提示可查询的数据范围。\n" + "\n"
-            + "4. **严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，使用中文业务术语描述。\n" + "\n"
-            + "5. 保持专业但亲切的语气，避免机械化的技术描述。\n" + "\n" + "5. 如果问题提及考核指标，自然地提示当前参考标准。\n" + "\n"
-            + "当前用户的问题是：{{question}}\n" + "\n" + "请开始分析并用自然的语言回复：";
+            + "   - 提供具体的建议或需要澄清的内容\n" + "2. 使用陈述句，避免使用疑问句。\n"
+            + "3. 如果用户的问题与业务背景信息无关，请友好提示可查询的数据范围。\n"
+            + "4. **严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，使用中文业务术语描述。\n" + "5. 保持专业但亲切的语气，避免机械化的技术描述。\n"
+            + "当前用户的问题是：{{question}}\n" + "请开始分析并用自然的语言回复：";
 
     public Prompt generatePrompt(LLMReq llmReq, PromptHelper promptHelper) {
         StringBuilder context = new StringBuilder();
@@ -49,12 +48,12 @@ public class SimpleStrategy {
         }
 
         // 组装回复指南部分
-        String replyGuideline = "===回复指南\n"
+        String replyGuideline = "===回复指南"
                 + "1. 如果问题与表中字段和表的补充解释等数据相关，则生成有效的SQL查询来回答问题。如果问题与提供的上下文无关，请礼貌引导用户提问与当前表及数据的相关问题。例：\n"
-                + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。\n"
-                + "2. 如果提供的上下文足够，请在不附加任何解释的情况下生成一个有效的SQL查询来回答问题。\n"
-                + "3. 确保输出的SQL是mysql兼容且可执行的，没有语法错误。\n"
-                + "4. 为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题最后生成的SQL没有LIMIT结尾的时候，要求生成的SQL的最后必须加上LIMIT 100，按照用户问题最后生成的SQL有LIMIT结尾的时候不用再加LIMIT，没有语法错误。\n";
+                + "您好~这里是红海ChatBI，您的问题不在我的业务知识范围内，我可以帮您查询咪咕重点产品的核心指标数据、分省、分渠道、分场景的活跃数据，咪咕视频的内容播放数据，比如您可以查询咪咕视频上月的全场景活跃用户，最近一周最火的体育赛事。"
+                + "2. 如果提供的上下文足够，请在不附加任何解释的情况下生成一个有效的SQL查询来回答问题。"
+                + "3. 确保输出的SQL是mysql兼容且可执行的，没有语法错误。"
+                + "4. 为了防止输出的SQL在使用后返回数据量太大，确保输出的SQL都是限制了最大返回条数的，按照用户问题最后生成的SQL没有LIMIT结尾的时候，要求生成的SQL的最后必须加上LIMIT 100，按照用户问题最后生成的SQL有LIMIT结尾的时候不用再加LIMIT，没有语法错误。";
 
         StringBuilder exemplars = new StringBuilder();
         if (Objects.nonNull(llmReq.getDynamicExemplars())) {
@@ -80,35 +79,32 @@ public class SimpleStrategy {
 
     public Prompt generateStreamPrompt(LLMReq llmReq, SemanticSchema semanticSchema) {
         StringBuilder context = new StringBuilder();
+        // 添加SQL专家说明
+        context.append("您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");
+        ChatApp s2SQLParser = llmReq.getChatAppConfig().get(APP_KEY);
+
+        if (null != s2SQLParser) {
+            ChatQueryContext queryCtx = new ChatQueryContext();
+            queryCtx.getRequest().setQueryText(llmReq.getQueryText());
+            queryCtx.setSemanticSchema(semanticSchema);
+            LLMRequestService requestService = ContextUtils.getBean(LLMRequestService.class);
+            llmReq = requestService.getLlmReq(queryCtx,
+                    semanticSchema.getDataSets().getFirst().getDataSetId());
+            LLMResp llmResp = new LLMResp();
+            llmResp.setQuery(llmReq.getQueryText());
+            OnePassSCSqlGenStrategy onePassSCSqlGenStrategy =
+                    ContextUtils.getBean(OnePassSCSqlGenStrategy.class);
+            Prompt prompt = onePassSCSqlGenStrategy.generatePrompt(llmReq, llmResp, s2SQLParser);
+            String fullPrompt = prompt.toString();
+            context.append("### 业务背景信息：\n").append(fullPrompt).append("\n\n");
+        }
         context.append(STREAM_PROMPT).append("\n\n");
+
         Map<String, Object> variable = new HashMap<>();
         variable.put("question", llmReq.getQueryText());
-        List<String> dimensionNames =
-                semanticSchema.getDimensions().stream().map(SchemaElement::getName).toList();
-        // 取出所有的指标名称
-        List<String> metricNames =
-                semanticSchema.getMetrics().stream().map(SchemaElement::getName).toList();
-        variable.put("dimensionNames", dimensionNames);
-        variable.put("metricNames", metricNames);
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateFormat.format(new Date());
         variable.put("currentDate", currentDate);
-        if (semanticSchema.getTerms() != null && !semanticSchema.getTerms().isEmpty()) {
-            // 取出所有的术语信息放入map集合中,key为术语名称,value为术语描述
-            Map<String, String> termInfo = semanticSchema.getTerms().stream().collect(
-                    Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
-            variable.put("termInfo", termInfo);
-        } else {
-            variable.put("termInfo", "");
-        }
-        // 添加SQL专家说明
-        // context.append("您的名字叫红海ChatBI。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");
-        // ChatApp s2SQLParser = llmReq.getChatAppConfig().get(APP_KEY);
-        // if (null != s2SQLParser) {
-        // String fullPrompt = s2SQLParser.getPrompt();
-        // context.append("### 业务背景信息：\n").append(fullPrompt).append("\n\n");
-        // }
-
         // 组装回复指南部分
         // String replyGuideline = "===回复指南\n"
         // + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"

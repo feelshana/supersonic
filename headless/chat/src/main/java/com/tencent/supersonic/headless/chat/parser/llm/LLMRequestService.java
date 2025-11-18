@@ -117,6 +117,7 @@ public class LLMRequestService {
                     LLMReq.ElementValue elementValue = new LLMReq.ElementValue();
                     elementValue.setFieldName(elementMatch.getElement().getName());
                     elementValue.setFieldValue(elementMatch.getWord());
+                    elementValue.setMatchType(elementMatch.getMatchType());
                     return elementValue;
                 }).collect(Collectors.toSet());
         return new ArrayList<>(valueMatches);

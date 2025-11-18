@@ -107,8 +107,8 @@ public class DataSetSchemaBuilder {
                     .dataSetName(resp.getName()).model(dim.getModelId()).id(dim.getId())
                     .name(dim.getName()).bizName(dim.getBizName()).useCnt(dim.getUseCnt())
                     .alias(alias).schemaValueMaps(schemaValueMaps).isTag(dim.getIsTag())
-                    .defaultValues(dim.getDefaultValues()).description(dim.getDescription())
-                    .type(SchemaElementType.DIMENSION).build();
+                    .defaultValues(dim.getDefaultValues()).hasDimValues(dim.isHasDimValues())
+                    .description(dim.getDescription()).type(SchemaElementType.DIMENSION).build();
             dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_TYPE, dim.getType());
 
             if (dim.isTimeDimension()) {
