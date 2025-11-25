@@ -326,6 +326,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         LLMReq llmReq = new LLMReq();
         llmReq.setQueryText(chatParseReq.getQueryText());
         llmReq.setChatAppConfig(chatAgent.getChatAppConfig());
+        llmReq.setAgentId(chatParseReq.getAgentId());
         OnePassSCSqlGenStrategy sqlGenStrategy =
                 (OnePassSCSqlGenStrategy) SqlGenStrategyFactory.get(ONE_PASS_SELF_CONSISTENCY);
         return sqlGenStrategy.streamGenerate(llmReq, semanticSchema);

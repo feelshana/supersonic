@@ -80,8 +80,9 @@ public abstract class BaseMatchStrategy<T extends MapResult> implements MatchStr
                 future.call();
             }
         } catch (Exception e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Task execution interrupted", e);
+            // Thread.currentThread().interrupt();
+            log.error("Task execution failed, but continuing: ", e);
+            // throw new RuntimeException("Task execution interrupted", e);
         }
     }
 

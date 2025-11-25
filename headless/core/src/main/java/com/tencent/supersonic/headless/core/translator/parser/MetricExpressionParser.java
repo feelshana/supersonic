@@ -72,7 +72,7 @@ public class MetricExpressionParser implements QueryParser {
             queryMetric.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(fieldExpr));
             queryFields.addAll(queryMetric.getFields());
             if (!queryMetric.getBizName().equals(fieldExpr)) {
-                metric2Expr.put(queryMetric.getBizName(), fieldExpr);
+                metric2Expr.put(queryMetric.getBizName(), queryMetric.getBizName());
             }
         }
 

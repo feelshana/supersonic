@@ -48,6 +48,7 @@ public class SqlQueryParser implements QueryParser {
         // build ontologyQuery
         SqlQuery sqlQuery = queryStatement.getSqlQuery();
         List<String> queryFields = SqlSelectHelper.getAllSelectFields(sqlQuery.getSql());
+        List<String> whereFields = SqlSelectHelper.getAllSelectFieldsOnlyWhere(sqlQuery.getSql());
         List<FieldExpression> whereExpressions =
                 SqlSelectHelper.getWhereExpressions(sqlQuery.getSql());
         Set<String> queryAliases = SqlSelectHelper.getAliasFields(sqlQuery.getSql());
@@ -55,7 +56,8 @@ public class SqlQueryParser implements QueryParser {
         Set<String> ontologyBizNameMetricsDimensions = Collections.synchronizedSet(new HashSet<>());
         // queryFields.removeAll(queryAliases);
         Ontology ontology = queryStatement.getOntology();
-        OntologyQuery ontologyQuery = buildOntologyQuery(ontology, queryFields, whereExpressions);
+        OntologyQuery ontologyQuery =
+                buildOntologyQuery(ontology, queryFields, whereFields, whereExpressions);
         Set<String> queryFieldsSet = new HashSet<>(queryFields);
         ontologyQuery.getMetrics().forEach(m -> {
             ontologyMetricsDimensions.add(m.getName());
@@ -216,21 +218,25 @@ public class SqlQueryParser implements QueryParser {
     }
 
     private OntologyQuery buildOntologyQuery(Ontology ontology, List<String> queryFields,
-            List<FieldExpression> whereExpressions) {
+            List<String> whereFields, List<FieldExpression> whereExpressions) {
         OntologyQuery ontologyQuery = new OntologyQuery();
-        Set<String> fields = Sets.newHashSet(queryFields);
+        Set<String> fields = Sets.newHashSet(whereFields);
+        Set<String> allFields = Sets.newHashSet(queryFields);
+
 
         // find belonging model for every querying metrics
         ontology.getMetricMap().entrySet().forEach(entry -> {
             String modelName = entry.getKey();
             entry.getValue().forEach(m -> {
-                if (fields.contains(m.getName()) || fields.contains(m.getBizName())) {
+                if (allFields.contains(m.getName()) || allFields.contains(m.getBizName())) {
                     ontologyQuery.getModelMap().put(modelName,
                             ontology.getModelMap().get(modelName));
                     ontologyQuery.getMetricMap().computeIfAbsent(modelName, k -> Sets.newHashSet())
                             .add(m);
                     fields.remove(m.getName());
                     fields.remove(m.getBizName());
+                    allFields.remove(m.getName());
+                    allFields.remove(m.getBizName());
                 }
             });
         });

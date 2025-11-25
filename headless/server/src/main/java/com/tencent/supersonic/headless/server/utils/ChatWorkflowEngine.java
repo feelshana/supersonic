@@ -55,6 +55,11 @@ public class ChatWorkflowEngine {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
                     performMapping(queryCtx);
+                    if ((queryCtx.getAgentId() != null && queryCtx.getAgentId() == 43)
+                            || (queryCtx.getRequest().getAgentId() != null
+                                    && queryCtx.getRequest().getAgentId() == 43)) {
+                        queryCtx.getRequest().setText2SQLType(Text2SQLType.LLM_OR_RULE);
+                    }
                     // 非向量模型只走mapping,向量模型下才会进行text-2-dsl
                     if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)
                             && !queryCtx.getRequest().getText2SQLType()

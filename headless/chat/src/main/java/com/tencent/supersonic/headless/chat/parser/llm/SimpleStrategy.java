@@ -88,13 +88,14 @@ public class SimpleStrategy {
             queryCtx.getRequest().setQueryText(llmReq.getQueryText());
             queryCtx.setSemanticSchema(semanticSchema);
             LLMRequestService requestService = ContextUtils.getBean(LLMRequestService.class);
-            llmReq = requestService.getLlmReq(queryCtx,
+            LLMReq newLlmReq = requestService.getLlmReq(queryCtx,
                     semanticSchema.getDataSets().getFirst().getDataSetId());
+            newLlmReq.setAgentId(llmReq.getAgentId());
             LLMResp llmResp = new LLMResp();
             llmResp.setQuery(llmReq.getQueryText());
             OnePassSCSqlGenStrategy onePassSCSqlGenStrategy =
                     ContextUtils.getBean(OnePassSCSqlGenStrategy.class);
-            Prompt prompt = onePassSCSqlGenStrategy.generatePrompt(llmReq, llmResp, s2SQLParser);
+            Prompt prompt = onePassSCSqlGenStrategy.generatePrompt(newLlmReq, llmResp, s2SQLParser);
             String fullPrompt = prompt.toString();
             context.append("### 业务背景信息：\n").append(fullPrompt).append("\n\n");
         }
@@ -113,6 +114,7 @@ public class SimpleStrategy {
         } else {
             variable.put("termInfo", "");
         }
+
         // 组装回复指南部分
         // String replyGuideline = "===回复指南\n"
         // + "1. 如果用户的问题与业务背景信息相关，则展示当前用户问题的查询思考思路，结合表的元数据与查询的条件数据，仅说明中文名称不要英文字段。\n"

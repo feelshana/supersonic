@@ -90,7 +90,7 @@ public class NL2SQLParser implements ChatQueryParser {
         // 检查当前请求的 agentId 是否在 simpleModelAgentIds 列表中
         if (parseContext.getRequest().getAgentId() == 43) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
-            queryNLReq.setText2SQLType(Text2SQLType.LLM_OR_RULE);
+            queryNLReq.setText2SQLType(Text2SQLType.ONLY_RULE);
             queryNLReq.setSelectedParseInfo(null);
             queryNLReq.setMapModeEnum(MapModeEnum.ALL);
             addDynamicExemplars(parseContext, queryNLReq);
@@ -182,6 +182,14 @@ public class NL2SQLParser implements ChatQueryParser {
                     return !defaultValues.contains(schemaElementMatch.getWord());
                 }).toList();
 
+                // 增加直辖市检查，若用户问题涉及直辖市，检查召回结果是否存在城市为直辖市的结果，若存在剔除该
+                if (isMunicipality(parseContext.getRequest().getQueryText())) {
+                    merged = merged.stream()
+                            .filter(schemaElementMatch -> !(isMunicipality(
+                                    schemaElementMatch.getDetectWord())
+                                    && (isCityDim(schemaElementMatch.getElement().getName()))))
+                            .toList();
+                }
                 logMatchResult(merged, "融合模式");
 
                 parseResp.getSelectedParses().getFirst().getElementMatches().clear();
@@ -236,6 +244,27 @@ public class NL2SQLParser implements ChatQueryParser {
                 doParse(queryNLReq, parseContext.getResponse());
             }
         }
+    }
+
+    // 比对传参的字符串是否有直辖市
+    private boolean isMunicipality(String queryText) {
+        String[] cities = {"北京", "上海", "天津", "重庆"};
+        for (String city : cities) {
+            if (queryText.contains(city)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isCityDim(String queryText) {
+        String[] cities = {"城市", "城市名称", "地市", "地市名称"};
+        for (String city : cities) {
+            if (queryText.contains(city)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void logMatchResult(List<SchemaElementMatch> valueMatchs, String paternName) {

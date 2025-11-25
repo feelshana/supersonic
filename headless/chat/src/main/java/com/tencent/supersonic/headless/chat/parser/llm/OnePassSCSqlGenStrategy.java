@@ -37,6 +37,7 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -364,7 +365,11 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateFormat.format(new Date());
         variable.put("currentDate", currentDate);
-
+        if (llmReq.getAgentId() != null && llmReq.getAgentId() == 43) {
+            String currentDayRule = "所有日期不用日期函数，根据今天的日期去推算过去，今天的日期是"
+                    + DateFormatUtils.format(new Date(), "yyyyMMdd") + "\n";
+            variable.put("current-day-rule", currentDayRule);
+        }
         // use custom prompt template if provided.
         String promptTemplate = chatApp.getPrompt();
         return PromptTemplate.from(promptTemplate).apply(variable);

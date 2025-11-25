@@ -65,7 +65,9 @@ public class DimExpressionParser implements QueryParser {
             queryDim.getFields().addAll(SqlSelectHelper.getFieldsFromExpr(queryDim.getExpr()));
             queryFields.addAll(queryDim.getFields());
             if (!queryDim.getBizName().equals(queryDim.getExpr())) {
-                dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
+                // 这里这样改动是为了和内层sql对表达式设置别名保持一致，如果内层替换变动此处也做修改
+                dim2Expr.put(queryDim.getBizName(), queryDim.getBizName());
+                // dim2Expr.put(queryDim.getBizName(), queryDim.getExpr());
             }
         }
 

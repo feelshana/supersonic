@@ -61,7 +61,8 @@ public class SqlBuilder {
 
         }
         for (MetricSchemaResp metricSchemaResp : semanticSchema.getMetrics()) {
-            if (StringUtils.isBlank(metricSchemaResp.getExpr())) {
+            if (StringUtils.isNotBlank(metricSchemaResp.getExpr()) && !StringUtils
+                    .equalsIgnoreCase(metricSchemaResp.getExpr(), metricSchemaResp.getBizName())) {
                 selectList.add(createAlias(metricSchemaResp.getExpr(),
                         metricSchemaResp.getBizName(), pos));
             } else {
@@ -525,7 +526,11 @@ public class SqlBuilder {
         return filterNameList.stream()
                 .filter(name -> StringUtils.equalsIgnoreCase(name, "city_name")
                         || StringUtils.equalsIgnoreCase(name, "cityName")
-                        || StringUtils.equalsIgnoreCase(name, "city"))
+                        || StringUtils.equalsIgnoreCase(name, "city")
+                        || StringUtils.equalsIgnoreCase(name, "城市")
+                        || StringUtils.equalsIgnoreCase(name, "城市名称")
+                        || StringUtils.equalsIgnoreCase(name, "地市")
+                        || StringUtils.equalsIgnoreCase(name, "地市名称"))
                 .count() > 0;
     }
 
@@ -582,6 +587,7 @@ public class SqlBuilder {
         String exprPlusSql = "select " + expr + " from dual";
         SqlNode parsedNode = SqlParser.create(exprPlusSql).parseQuery();
         // 提取表达式部分
+        // 这里对内层sql的表达式做了别名，与外层的表达式保持一致，如果此处变动，外层表达式（getDimensionExpressions方法）也要变动
         if (parsedNode instanceof SqlSelect) {
             SqlSelect select = (SqlSelect) parsedNode;
             SqlNodeList selectList = select.getSelectList();

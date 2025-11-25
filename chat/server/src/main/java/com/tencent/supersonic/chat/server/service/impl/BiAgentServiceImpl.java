@@ -691,7 +691,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     dimension.setBizName(modelDimension.getColumnName());
                     dimension.setDefaultValues(
                             defaultValuesMap.getOrDefault(modelDimension.getName(), null));
-                    dimension.setDescription(modelDimension.getName());
+                    dimension.setDescription(name);
                     dimension.setIsCreateDimension(1);
                     dimensions.add(dimension);
                 }
@@ -728,7 +728,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                     }
                     if (custom.getType() == 2) {
                         Dimension dimension = new Dimension();
-                        dimension.setName(custom.getName());
+                        String name = getReplacedAll(custom.getName());
+                        dimension.setName(name);
                         if (dimensionNamesList.contains(custom.getName())) {
                             dimension.setHasDimValues(true);
                         }
@@ -744,7 +745,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimension.setExpr(custom.getColumnName());
                         dimension.setDefaultValues(
                                 defaultValuesMap.getOrDefault(custom.getName(), null));
-                        dimension.setDescription(custom.getName());
+                        dimension.setDescription(name);
                         dimension.setIsCreateDimension(1);
                         List<Dimension> dimensions = modelDetail.getDimensions();
                         if (dimensions == null) {
@@ -754,9 +755,10 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimensions.add(dimension);
                     } else if (custom.getType() == 1) {
                         Measure measure = new Measure();
-                        measure.setName(custom.getName());
+                        String name = getReplacedAll(custom.getName());
+                        measure.setName(name);
                         measure.setExpr(custom.getColumnName());
-                        measure.setBizName(custom.getName());
+                        measure.setBizName(name);
                         measure.setAgg(AggOperatorEnum.NONE.getOperator());
                         if (custom.getAggregationType() != null) {
                             AggOperatorEnum aggOperator =
@@ -819,7 +821,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                     dimension.setDefaultValues(
                             defaultValuesMap.getOrDefault(modelDimension.getName(), null));
                     dimension.setIsCreateDimension(1);
-                    dimension.setDescription(modelDimension.getName());
+                    dimension.setDescription(name);
                     dimensions.add(dimension);
                 }
             }

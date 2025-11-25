@@ -298,6 +298,23 @@ public class SqlSelectHelper {
                 results.stream().map(r -> r.replaceAll("`", "")).collect(Collectors.toList()));
     }
 
+    public static List<String> getAllSelectFieldsOnlyWhere(String sql) {
+        List<PlainSelect> plainSelects = getPlainSelects(getPlainSelect(sql));
+        Set<String> results = new HashSet<>();
+        Set<String> aliases = new HashSet<>();
+        for (PlainSelect plainSelect : plainSelects) {
+            List<String> fields = getFieldsByPlainSelectOnlyWhere(plainSelect);
+            Set<String> subaliases = getAliasFields(plainSelect);
+            subaliases.removeAll(fields);
+            results.addAll(fields);
+            aliases.addAll(subaliases);
+        }
+        // do not account in aliases
+        results.removeAll(aliases);
+        return new ArrayList<>(
+                results.stream().map(r -> r.replaceAll("`", "")).collect(Collectors.toList()));
+    }
+
     private static List<String> getFieldsByPlainSelect(PlainSelect plainSelect) {
         if (Objects.isNull(plainSelect)) {
             return new ArrayList<>();
@@ -328,12 +345,27 @@ public class SqlSelectHelper {
         lateralFields.removeAll(aliases);
 
         List<String> results = Lists.newArrayList();
-        // results.addAll(selectFields);
+        results.addAll(selectFields);
         // results.addAll(groupByFields);
         // results.addAll(orderByFields);
         results.addAll(whereFields);
         // results.addAll(havingFields);
         // results.addAll(lateralFields);
+        return new ArrayList<>(results);
+    }
+
+    private static List<String> getFieldsByPlainSelectOnlyWhere(PlainSelect plainSelect) {
+        if (Objects.isNull(plainSelect)) {
+            return new ArrayList<>();
+        }
+        List<PlainSelect> plainSelectList = new ArrayList<>();
+        plainSelectList.add(plainSelect);
+        Set<String> aliases = getAliasFields(plainSelect);
+        Set<String> whereFields = Sets.newHashSet();
+        getWhereFields(plainSelectList, whereFields);
+        whereFields.removeAll(aliases);
+        List<String> results = Lists.newArrayList();
+        results.addAll(whereFields);
         return new ArrayList<>(results);
     }
 
@@ -1038,5 +1070,6 @@ public class SqlSelectHelper {
 
         return !visitor.getFunctionNames().isEmpty();
     }
+
 
 }
