@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.headless.server.persistence.dataobject.BiReportConfigDO;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 
 import java.util.List;
 

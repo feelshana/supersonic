@@ -71,10 +71,10 @@ public class DimensionRepositoryImpl implements DimensionRepository {
             queryWrapper.lambda().in(DimensionDO::getModelId, dimensionFilter.getModelIds());
         }
         if (StringUtils.isNotBlank(dimensionFilter.getName())) {
-            queryWrapper.lambda().like(DimensionDO::getName, dimensionFilter.getName());
+            queryWrapper.lambda().eq(DimensionDO::getName, dimensionFilter.getName());
         }
-        if (StringUtils.isNotBlank(dimensionFilter.getId())) {
-            queryWrapper.lambda().like(DimensionDO::getBizName, dimensionFilter.getBizName());
+        if (StringUtils.isNotBlank(dimensionFilter.getBizName())) {
+            queryWrapper.lambda().eq(DimensionDO::getBizName, dimensionFilter.getBizName());
         }
         if (Objects.nonNull(dimensionFilter.getStatus())) {
             queryWrapper.lambda().eq(DimensionDO::getStatus, dimensionFilter.getStatus());

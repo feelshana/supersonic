@@ -3,9 +3,9 @@ package com.tencent.supersonic.headless.server.facade.service.impl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.tencent.supersonic.common.pojo.*;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
-import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
@@ -26,11 +26,9 @@ import com.tencent.supersonic.headless.core.pojo.StructQuery;
 import com.tencent.supersonic.headless.core.translator.SemanticTranslator;
 import com.tencent.supersonic.headless.core.translator.TranslatorConfig;
 import com.tencent.supersonic.headless.core.utils.ComponentFactory;
-import com.tencent.supersonic.headless.server.annotation.DefaultDimValueCheck;
 import com.tencent.supersonic.headless.server.annotation.S2DataPermission;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.manager.SemanticSchemaManager;
-import com.tencent.supersonic.headless.server.persistence.dataobject.BiReportConfigDO;
 import com.tencent.supersonic.headless.server.service.*;
 import com.tencent.supersonic.headless.server.utils.*;
 import lombok.SneakyThrows;
@@ -41,7 +39,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -100,10 +97,10 @@ public class S2SemanticLayerService implements SemanticLayerService {
     public SemanticTranslateResp translate(SemanticQueryReq queryReq, User user) throws Exception {
         QueryStatement queryStatement = buildQueryStatement(queryReq, user);
         queryStatement.setSegmentDimBizNames(queryReq.getSegmentDimBizNames());
-        List<String> dimensionRelationlist =
-                biReportConfigService.getDimRelations(queryReq.getRequestId());
-        if (CollectionUtils.isNotEmpty(dimensionRelationlist)) {
-            queryStatement.setDimensionRelations(dimensionRelationlist);
+        List<BiReportConfigDO> biReportConfigDOList =
+                biReportConfigService.getBiReportConfig(queryReq.getRequestId());
+        if (CollectionUtils.isNotEmpty(biReportConfigDOList)) {
+            queryStatement.setDimensionRelations(biReportConfigDOList);
         }
 
         semanticTranslator.translate(queryStatement);

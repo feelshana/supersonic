@@ -418,7 +418,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         return "";
     }
 
-    private PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
+    public PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
         DictValueReq dictValueReq = new DictValueReq();
         dictValueReq.setModelId(dimension.getModel());
         dictValueReq.setItemId(dimension.getId());

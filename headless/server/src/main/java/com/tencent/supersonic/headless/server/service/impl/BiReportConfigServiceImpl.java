@@ -1,10 +1,8 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.tencent.supersonic.headless.server.persistence.dataobject.BiReportConfigDO;
-import com.tencent.supersonic.headless.server.persistence.dataobject.DatabaseDO;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.headless.server.persistence.mapper.BiReportConfigMapper;
 import com.tencent.supersonic.headless.server.service.BiReportConfigService;
 import org.apache.commons.collections.CollectionUtils;

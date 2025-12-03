@@ -24,4 +24,6 @@ public interface AgentService {
     Agent getAgentDetail(Integer agentId, User user);
 
     String getAgentPrompt(Integer agentId, String queryText, User user);
+
+    String getAgentDataSetInfo(Integer agentId, String queryText, User user);
 }

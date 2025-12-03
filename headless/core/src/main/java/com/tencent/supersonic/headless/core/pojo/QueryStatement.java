@@ -1,5 +1,6 @@
 package com.tencent.supersonic.headless.core.pojo;
 
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.response.QueryState;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticSchemaResp;
@@ -28,7 +29,7 @@ public class QueryStatement {
     private Integer limit = 1000;
     private Boolean isTranslated = false;
     private User user;
-    private List<String> DimensionRelations;
+    private List<BiReportConfigDO> DimensionRelations;
     private List<String> segmentDimBizNames;
 
     public boolean isOk() {

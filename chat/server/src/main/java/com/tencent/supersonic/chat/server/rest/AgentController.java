@@ -69,6 +69,15 @@ public class AgentController {
         return agentService.getAgentPrompt(agentId, queryText, user);
     }
 
+    @GetMapping("/getAgentDataSetInfo")
+    public String getAgentDataSetInfo(
+            @RequestParam(value = "agentId", required = false) Integer agentId,
+            @RequestParam(value = "queryText", required = false) String queryText,
+            HttpServletRequest request, HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        return agentService.getAgentDataSetInfo(agentId, queryText, user);
+    }
+
     @RequestMapping("/getToolTypes")
     public Map<AgentToolType, String> getToolTypes() {
         return AgentToolType.getToolTypes();

@@ -23,6 +23,7 @@ import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageMetricReq;
@@ -43,6 +44,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -69,7 +71,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     private SchemaService schemaService;
     @Autowired
     private UserService userService;
-
+    @Autowired
+    private OnePassSCSqlGenStrategy onePassSCSqlGenStrategy;
     @Autowired
     @Qualifier("chatExecutor")
     private ThreadPoolExecutor executor;
@@ -208,6 +211,52 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         Prompt promptText = simpleStrategy.generateStreamPrompt(llmReq, semanticSchema);
         return promptText.text().replaceAll("\\n", "");
 
+    }
+
+    @Override
+    public String getAgentDataSetInfo(Integer agentId, String queryText, User user) {
+        Agent agent = convert(getById(agentId));
+        Set<Long> dataSetIds = agent.getDataSetIds();
+        SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
+        String currentDate = dateFormat.format(new Date());
+
+        Map<String, String> termsMap = semanticSchema.getTerms().stream()
+                .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
+
+        // 构建维度信息，包括维度值
+        StringBuilder dimensionsInfo = new StringBuilder();
+        for (SchemaElement dimension : semanticSchema.getDimensions()) {
+            dimensionsInfo.append("   - ").append(dimension.getName()).append("\n");
+
+            // 获取维度值
+            if (dimension.isHasDimValues()) {
+                PageInfo<DictValueDimResp> dimensionValuesFromDict =
+                        onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
+                List<DictValueDimResp> list = dimensionValuesFromDict.getList();
+                List<String> dimensionValues =
+                        list.stream().map(DictValueDimResp::getValue).toList();
+
+                // 限制最多显示50个维度值
+                if (!CollectionUtils.isEmpty(dimensionValues)) {
+                    int limit = Math.min(dimensionValues.size(), 50);
+                    dimensionsInfo.append("     维度值: ").append(dimensionValues.subList(0, limit)
+                            .stream().collect(Collectors.joining(", "))).append("\n");
+                }
+            }
+        }
+
+        String replyGuideline = "当前报表包含以下数据集信息：\n\n" + "1. 维度列表：\n" + dimensionsInfo.toString()
+                + "\n2. 指标列表：\n"
+                + semanticSchema.getMetrics().stream().map(m -> "   - " + m.getName())
+                        .collect(Collectors.joining("\n"))
+                + "\n\n3. 术语说明：\n"
+                + termsMap.entrySet().stream().map(e -> "   - " + e.getKey() + ": " + e.getValue())
+                        .collect(Collectors.joining("\n"))
+                + "\n\n4. 当前日期：" + currentDate;
+
+        return replyGuideline;
     }
 
     /**

@@ -5,6 +5,7 @@ import com.tencent.supersonic.common.calcite.Configuration;
 import com.tencent.supersonic.common.jsqlparser.FieldExpression;
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.pojo.enums.EngineType;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.Identify;
@@ -32,6 +33,7 @@ import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultUndirectedGraph;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -193,7 +195,7 @@ public class SqlBuilder {
 
     private TableView render(OntologyQuery ontologyQuery, Set<ModelResp> dataModels,
             SqlValidatorScope scope, S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
-            List<String> dimensionRelations) throws Exception {
+            List<BiReportConfigDO> dimensionRelations) throws Exception {
         SqlNode left = null;
         TableView leftTable = null;
         TableView outerTable = new TableView();
@@ -368,7 +370,7 @@ public class SqlBuilder {
     public static TableView renderOne(Set<MetricSchemaResp> queryMetrics,
             Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
             S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
-            List<String> dimensionRelations) {
+            List<BiReportConfigDO> dimensionRelations) {
         TableView tableView = new TableView();
         EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
         // Set<String> queryFields = tableView.getFields();
@@ -399,7 +401,7 @@ public class SqlBuilder {
     }
 
     private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema,
-            Set<DimSchemaResp> dimSchemaRespSet, List<String> dimensionRelations) {
+            Set<DimSchemaResp> dimSchemaRespSet, List<BiReportConfigDO> dimensionRelations) {
 
         // 获取所有有默认值的维度
         Map<String, String> defaultDimNameMap = semanticSchema.getDimensions().stream()
@@ -410,6 +412,25 @@ public class SqlBuilder {
         if (defaultDimNameMap.isEmpty()) {
             return null;
         }
+        List<String> childCondtionList = null;
+        List<String> siblingCondtionList = null;
+        if (CollectionUtils.isNotEmpty(dimensionRelations)) {
+            // 1.判断是否属于层级分类维度
+            BiReportConfigDO childCondtionConfigDO = dimensionRelations.stream()
+                    .filter(configDO -> configDO.getType() == 1).findFirst().orElse(null);
+            if (childCondtionConfigDO != null) {
+                childCondtionList =
+                        Arrays.asList(childCondtionConfigDO.getDimRelation().split(","));
+            }
+            // 2.判断是否存在同级维度
+            BiReportConfigDO siblingCondtionConfigDO = dimensionRelations.stream()
+                    .filter(configDO -> configDO.getType() == 2).findFirst().orElse(null);
+            if (siblingCondtionConfigDO != null) {
+                siblingCondtionList =
+                        Arrays.asList(siblingCondtionConfigDO.getDimRelation().split(","));
+            }
+        }
+
 
         // 当前查询涉及的维度
         Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
@@ -450,7 +471,9 @@ public class SqlBuilder {
             } else if ((!filterNameList.contains(defaultDimensionFiledName))
                     && !hasProvinceCityRelation(defaultDimensionFiledName, filterNameList)
                     && !hasChildCondtion(defaultDimensionFiledName, filterNameList,
-                            dimensionRelations)) {
+                            childCondtionList)
+                    && !hasSiblingCondition(defaultDimensionFiledName, filterNameList,
+                            siblingCondtionList)) {
 
                 SqlIdentifier column =
                         new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
@@ -465,6 +488,33 @@ public class SqlBuilder {
         return produceAndConditions(andConditions);
 
     }
+
+    private static boolean hasSiblingCondition(String defaultDimensionFiledName,
+            Set<String> filterNameList, List<String> siblingRelations) {
+        if (CollectionUtils.isEmpty(siblingRelations)) {
+            return false;
+        }
+
+        // 遍历所有同级维度关系配置
+        for (String relation : siblingRelations) {
+            // 按照 "/" 分割同级维度关系
+            List<String> relationDims = Arrays.asList(relation.split("/"));
+
+            // 如果当前维度在此关系中
+            if (relationDims.contains(defaultDimensionFiledName)) {
+                // 检查是否有其他同级维度出现在查询条件中
+                for (String siblingDim : relationDims) {
+                    if (!siblingDim.equals(defaultDimensionFiledName)
+                            && filterNameList.contains(siblingDim)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
 
     private static boolean isQuoteProvinceTop(String dimensionFiledName) {
         if (!dimensionFiledName.startsWith("province")) {
