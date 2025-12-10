@@ -231,7 +231,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         BiPageConfig pageConfig = config.getPageConfig();
 
         // 构建新的规则内容
-        String newRulesContent = buildNewRulesContent(pageConfig, config.getModel());
+        String newRulesContent = "";
 
         // 更新智能助理
         if (config.getAgentId() != null) {
@@ -242,7 +242,7 @@ public class BiAgentServiceImpl implements BiAgentService {
             log.info("更新主题域对应的智能助手, id: {}", uniqueAgent.getId());
             return updateExistingAgent(uniqueAgent, toolConfig, config, newRulesContent, user);
         }
-
+        newRulesContent = buildNewRulesContent(pageConfig, config.getModel());
         // 创建智能助理
         log.info("创建新智能助手");
         return createNewAgent(config, toolConfig, user, domainName, newRulesContent);
@@ -252,11 +252,16 @@ public class BiAgentServiceImpl implements BiAgentService {
      * 构建新的规则内容
      */
     private String buildNewRulesContent(BiPageConfig pageConfig, BiModelConfig model) {
-        StringBuilder newRules = new StringBuilder("Sql生成的限制条件：\n");
-        newRules.append(
-                "1.如果查询的问题是收入/销量相关的销售指标，需要通过sum进行累加聚合，比如对日表提问12月的订购收入，需要将12月的每一天的订购收入进行求和，形成一条值\n");
-        newRules.append(
-                "2.当查询的问题是用户/用户数相关指标时，禁止使用求和，比如对日表提问12月的活跃用户数，需要将12月每一天的活跃用户数查询出来，不进行求和，形成多条值");
+        StringBuilder newRules = new StringBuilder();
+        // index为编号，根据index进行排序
+        int index = 1;
+        newRules.append("Sql生成的限制条件：");
+        newRules.append("\n").append(index++)
+                .append(".若问题涉及用户数的指标（如活跃用户数、新增用户数），禁止使用 SUM()，应直接返回原始粒度或多维明细数据。");
+        newRules.append("\n").append("--")
+                .append("对于日表，当问某月数据时，查询日期范围内的多条日数据(例如：“12月的活跃用户数”应返回多条记录，每条对应一天)。");
+        newRules.append("\n").append("--")
+                .append("对于月表，当问某年数据时，查询日期范围内的多条月数据(例如：“2025年的活跃用户数”应返回多条记录，每条对应一个月)。");
         // if (!"1".equals(pageConfig.getIsGroupBy())) {
         // newRules.append("-这是一个统计结果表，查询禁止使用聚合，只需要SELECT.");
         // }
@@ -284,14 +289,30 @@ public class BiAgentServiceImpl implements BiAgentService {
             List<String> dimensionNames = new ArrayList<>();
             model.getDimensions().stream().filter(BiModelItem::isSelected)
                     .forEach(item -> dimensionNames.add(item.getName()));
+            // 生成select的字段必须包含以下维度的提示词
             if (!dimensionNames.isEmpty()) {
-                newRules.append("\n3. select的字段必须包含以下维度:");
-                newRules.append(String.join(",", dimensionNames));
-                newRules.append("\n4.select的指标字段：根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
-                newRules.append("\n5.涉及两组数据计算同环比，差值等时，必须通过left join实现");
+                newRules.append("\n").append(index++).append(".select的字段必须包含以下维度:");
+                newRules.append("\n").append(String.join(",", dimensionNames));
                 // newRules.append("\n当问题明确需要图形展示时，应优先选择适合图形展示的字段组合，而非固定维度字段的表格展示。");
             }
+            // 判断如果model.getDimensions()和model.getCustoms()集合中的维度对象中存在包含省份和城市的为维度，则进行省份和城市的提示词生成
+            ArrayList<BiModelItem> list = new ArrayList<>();
+            list.addAll(model.getDimensions());
+            list.addAll(model.getCustoms());
+
+            // 检查是否存在包含"省份"的维度 和 包含"市"的维度
+            boolean hasProvinceDimension =
+                    list.stream().anyMatch(item -> item.getName().contains("省份"));
+            boolean hasCityDimension = list.stream().anyMatch(item -> item.getName().contains("市"));
+
+            if (hasProvinceDimension && hasCityDimension) {
+                newRules.append("\n").append(index++).append(
+                        ".省份维度包含默认维度值全国，城市维度包含全省，其他维度包含全部，当用户问题需要查询各省，各市，各某维度，某维度topN情况等，需要排除默认值全国或全省或全部。");
+            }
         }
+        newRules.append("\n").append(index++).append(".select的指标字段：根据语义理解后进行筛选,除开维度值的查询，都应该包含指标");
+        newRules.append("\n").append(index++).append(".涉及两组数据计算同环比，差值等时，必须通过left join实现");
+
         return newRules.toString();
     }
 
@@ -304,12 +325,12 @@ public class BiAgentServiceImpl implements BiAgentService {
         agent.setAdmins(config.getAdmins());
         agent.setViewers(config.getViewers());
 
-        Map<String, ChatApp> chatAppConfig = agent.getChatAppConfig();
-        ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
-
-        if (chatApp != null) {
-            updatePromptWithNewRules(chatApp, newRulesContent);
-        }
+        // Map<String, ChatApp> chatAppConfig = agent.getChatAppConfig();
+        // ChatApp chatApp = chatAppConfig.get(OnePassSCSqlGenStrategy.APP_KEY);
+        //
+        // if (chatApp != null) {
+        //// updatePromptWithNewRules(chatApp, newRulesContent);
+        // }
 
         return agentService.updateAgent(agent, user);
     }
@@ -742,7 +763,9 @@ public class BiAgentServiceImpl implements BiAgentService {
                             dimension.setType(DimensionType.categorical);
                         }
                         dimension.setBizName(custom.getName());
-                        dimension.setExpr(custom.getColumnName());
+                        // 对columnName进行替换
+                        String replacedColumnName = getReplacedColumnName(custom.getColumnName());
+                        dimension.setExpr(replacedColumnName);
                         dimension.setDefaultValues(
                                 defaultValuesMap.getOrDefault(custom.getName(), null));
                         dimension.setDescription(name);
@@ -757,7 +780,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                         Measure measure = new Measure();
                         String name = getReplacedAll(custom.getName());
                         measure.setName(name);
-                        measure.setExpr(custom.getColumnName());
+                        String replacedColumnName = getReplacedColumnName(custom.getColumnName());
+                        measure.setExpr(replacedColumnName);
                         measure.setBizName(name);
                         measure.setAgg(AggOperatorEnum.NONE.getOperator());
                         if (custom.getAggregationType() != null) {
@@ -856,6 +880,38 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
         return modelResps;
     }
+
+    private String getReplacedColumnName(String columnName) {
+        // 检查columnName是否包含"left"，不包含则直接返回原字符串
+        if (columnName == null || !columnName.toLowerCase().contains("left")) {
+            return columnName;
+        }
+
+        // 处理LEFT函数到SUBSTRING的转换
+        // 匹配模式：left(string, length) → substring(string, 1, length)
+        Pattern pattern = Pattern.compile("(`?left`?)\\s*\\(\\s*([^,]+)\\s*,\\s*(\\d+)\\s*\\)",
+                Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(columnName);
+
+        StringBuffer result = new StringBuffer();
+        boolean found = false;
+        while (matcher.find()) {
+            found = true;
+            // 转换为SUBSTRING语法：SUBSTRING(string, 1, length)
+            String replacement = matcher.group(1).replace("left", "substring") + "("
+                    + matcher.group(2) + ", 1, " + matcher.group(3) + ")";
+            matcher.appendReplacement(result, replacement);
+        }
+
+        if (found) {
+            matcher.appendTail(result);
+            return result.toString();
+        } else {
+            // 如果包含"left"但没有匹配到函数调用模式，返回原字符串
+            return columnName;
+        }
+    }
+
 
     @NotNull
     private static String getReplacedAll(String name) {
