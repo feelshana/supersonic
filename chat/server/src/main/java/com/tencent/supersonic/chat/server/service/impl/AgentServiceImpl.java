@@ -37,6 +37,7 @@ import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
 import com.tencent.supersonic.headless.server.service.*;
 import dev.langchain4j.model.input.Prompt;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -228,8 +229,12 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         // 构建维度信息，包括维度值
         StringBuilder dimensionsInfo = new StringBuilder();
         for (SchemaElement dimension : semanticSchema.getDimensions()) {
-            dimensionsInfo.append("   - ").append(dimension.getName()).append("\n");
-
+            dimensionsInfo.append("   - ").append(dimension.getName());
+            // 筛选日期维度做单独说明
+            if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
+                dimensionsInfo.append(" FORMAT '").append(dimension.getTimeFormat()).append("'");
+            }
+            dimensionsInfo.append("\n");
             // 获取维度值
             if (dimension.isHasDimValues()) {
                 PageInfo<DictValueDimResp> dimensionValuesFromDict =
@@ -245,17 +250,29 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                             .stream().collect(Collectors.joining(", "))).append("\n");
                 }
             }
+
+
         }
 
-        String replyGuideline = "当前报表包含以下数据集信息：\n\n" + "1. 维度列表：\n" + dimensionsInfo.toString()
+        String replyGuideline = "当前报表包含以下数据集信息：\n" + "1. 维度列表：\n" + dimensionsInfo.toString()
                 + "\n2. 指标列表：\n"
                 + semanticSchema.getMetrics().stream().map(m -> "   - " + m.getName())
                         .collect(Collectors.joining("\n"))
-                + "\n\n3. 术语说明：\n"
+                + "\n3. 术语说明：\n"
                 + termsMap.entrySet().stream().map(e -> "   - " + e.getKey() + ": " + e.getValue())
                         .collect(Collectors.joining("\n"))
-                + "\n\n4. 当前日期：" + currentDate;
+                + "\n4. 当前日期：" + currentDate
+                // 增加日期格式说明，yyyyMMdd格式为日表，yyyyMM格式为月表
+                + "\n5. 当前数据集日期格式："
+                + semanticSchema.getDimensions().stream()
+                        .filter(d -> StringUtils.isNotEmpty(d.getTimeFormat()))
+                        .map(d -> d.getName() + " FORMAT '" + d.getTimeFormat() + "'")
+                        .collect(Collectors.joining("\n"));
 
+        // 还需要拼接上数据集的id和模型id
+        replyGuideline += "\n数据集ID："
+                + dataSetIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        replyGuideline += "\n模型ID：" + semanticSchema.getDimensions().getFirst().getModel();
         return replyGuideline;
     }
 
