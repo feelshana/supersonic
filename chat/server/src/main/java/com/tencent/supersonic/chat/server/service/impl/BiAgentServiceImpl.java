@@ -611,7 +611,6 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             modelService.deleteModel(model.getId(), user);
         }
-        dictTaskService.reloadDictWord();
     }
 
     private DataSetResp createDataSet(BiModelConfig config, User user, DomainResp domainResp,

@@ -20,19 +20,21 @@ import com.tencent.supersonic.common.config.GeneralManageConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
+import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.SchemaElement;
-import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.request.PageDimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageMetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.PageSchemaItemReq;
+import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.response.*;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import com.tencent.supersonic.headless.chat.parser.llm.SimpleStrategy;
 import com.tencent.supersonic.headless.chat.parser.llm.SqlGenStrategyFactory;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
+import com.tencent.supersonic.headless.server.facade.service.ChatLayerService;
 import com.tencent.supersonic.headless.server.pojo.DimensionsFilter;
 import com.tencent.supersonic.headless.server.service.*;
 import dev.langchain4j.model.input.Prompt;
@@ -46,6 +48,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -214,66 +218,119 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
     }
 
+    @Autowired
+    private ChatLayerService chatLayerService;
+
     @Override
     public String getAgentDataSetInfo(Integer agentId, String queryText, User user) {
         Agent agent = convert(getById(agentId));
+        if (agent == null || agent.getDataSetIds() == null) {
+            return "";
+        }
+
         Set<Long> dataSetIds = agent.getDataSetIds();
         SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
 
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy年MM月dd日");
-        String currentDate = dateFormat.format(new Date());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
+        String currentDate = LocalDate.now().format(formatter);
 
-        Map<String, String> termsMap = semanticSchema.getTerms().stream()
-                .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription));
-
+        Map<String, String> termsMap = new HashMap<>();
+        if (semanticSchema.getTerms() != null) {
+            termsMap = semanticSchema.getTerms().stream().collect(Collectors
+                    .toMap(SchemaElement::getName, SchemaElement::getDescription, (a, b) -> a));
+        }
         // 构建维度信息，包括维度值
         StringBuilder dimensionsInfo = new StringBuilder();
-        for (SchemaElement dimension : semanticSchema.getDimensions()) {
-            dimensionsInfo.append("   - ").append(dimension.getName());
-            // 筛选日期维度做单独说明
-            if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
-                dimensionsInfo.append(" FORMAT '").append(dimension.getTimeFormat()).append("'");
-            }
-            dimensionsInfo.append("\n");
-            // 获取维度值
-            if (dimension.isHasDimValues()) {
-                PageInfo<DictValueDimResp> dimensionValuesFromDict =
-                        onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
-                List<DictValueDimResp> list = dimensionValuesFromDict.getList();
-                List<String> dimensionValues =
-                        list.stream().map(DictValueDimResp::getValue).toList();
+        if (semanticSchema.getDimensions() != null) {
+            for (SchemaElement dimension : semanticSchema.getDimensions()) {
+                dimensionsInfo.append("   - ").append(dimension.getName());
+                if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
+                    dimensionsInfo.append(" FORMAT '").append(dimension.getTimeFormat())
+                            .append("'");
+                }
+                dimensionsInfo.append("\n");
 
-                // 限制最多显示50个维度值
-                if (!CollectionUtils.isEmpty(dimensionValues)) {
-                    int limit = Math.min(dimensionValues.size(), 50);
-                    dimensionsInfo.append("     维度值: ").append(dimensionValues.subList(0, limit)
-                            .stream().collect(Collectors.joining(", "))).append("\n");
+                if (Boolean.TRUE.equals(dimension.isHasDimValues())) {
+                    PageInfo<DictValueDimResp> pageInfo =
+                            onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
+                    if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
+                        List<String> dimensionValues =
+                                pageInfo.getList().stream().map(DictValueDimResp::getValue)
+                                        .limit(50).collect(Collectors.toList());
+                        if (!dimensionValues.isEmpty()) {
+                            dimensionsInfo.append("     维度值: ")
+                                    .append(String.join(", ", dimensionValues)).append("\n");
+                        }
+                    }
                 }
             }
+        }
+        QueryNLReq queryNLReq = new QueryNLReq();
+        queryNLReq.setQueryText(queryText);
+        queryNLReq.setAgentId(agentId);
+        queryNLReq.setDataSetIds(dataSetIds);
+        queryNLReq.setText2SQLType(Text2SQLType.NONE);
 
-
+        MapResp map;
+        try {
+            map = chatLayerService.map(queryNLReq);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to call chatLayerService.", e);
         }
 
-        String replyGuideline = "当前报表包含以下数据集信息：\n" + "1. 维度列表：\n" + dimensionsInfo.toString()
-                + "\n2. 指标列表：\n"
-                + semanticSchema.getMetrics().stream().map(m -> "   - " + m.getName())
-                        .collect(Collectors.joining("\n"))
-                + "\n3. 术语说明：\n"
-                + termsMap.entrySet().stream().map(e -> "   - " + e.getKey() + ": " + e.getValue())
-                        .collect(Collectors.joining("\n"))
-                + "\n4. 当前日期：" + currentDate
-                // 增加日期格式说明，yyyyMMdd格式为日表，yyyyMM格式为月表
-                + "\n5. 当前数据集日期格式："
-                + semanticSchema.getDimensions().stream()
-                        .filter(d -> StringUtils.isNotEmpty(d.getTimeFormat()))
-                        .map(d -> d.getName() + " FORMAT '" + d.getTimeFormat() + "'")
-                        .collect(Collectors.joining("\n"));
+        SchemaMapInfo mapInfo = map != null ? map.getMapInfo() : null;
+        List<SchemaElementMatch> schemaElementMatches = null;
 
-        // 还需要拼接上数据集的id和模型id
-        replyGuideline += "\n数据集ID："
-                + dataSetIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-        replyGuideline += "\n模型ID：" + semanticSchema.getDimensions().getFirst().getModel();
-        return replyGuideline;
+        if (mapInfo != null && mapInfo.getDataSetElementMatches() != null
+                && !dataSetIds.isEmpty()) {
+            Long firstDataSetId = dataSetIds.iterator().next();
+            schemaElementMatches = mapInfo.getDataSetElementMatches().get(firstDataSetId);
+        }
+
+        StringBuilder replyGuidelineBuilder = new StringBuilder();
+        replyGuidelineBuilder.append("当前报表包含以下数据集信息：\n").append("1. 维度列表：\n")
+                .append(dimensionsInfo.toString()).append("\n2. 指标列表：\n");
+
+        if (semanticSchema.getMetrics() != null) {
+            replyGuidelineBuilder.append(semanticSchema.getMetrics().stream()
+                    .map(m -> "   - " + m.getName()).collect(Collectors.joining("\n")));
+        }
+
+        replyGuidelineBuilder.append("\n3. 术语说明：\n");
+        replyGuidelineBuilder.append(
+                termsMap.entrySet().stream().map(e -> "   - " + e.getKey() + ": " + e.getValue())
+                        .collect(Collectors.joining("\n")));
+
+        replyGuidelineBuilder.append("\n4. 当前日期：").append(currentDate);
+
+        final String DAILY_FORMAT = "yyyyMMdd";
+        final String MONTHLY_FORMAT = "yyyyMM";
+
+        replyGuidelineBuilder.append("\n5. 当前数据集日期格式：\n");
+        if (semanticSchema.getDimensions() != null) {
+            replyGuidelineBuilder.append(semanticSchema.getDimensions().stream()
+                    .filter(d -> StringUtils.isNotEmpty(d.getTimeFormat())).map(d -> {
+                        String formatDesc = DAILY_FORMAT.equals(d.getTimeFormat()) ? "日表"
+                                : MONTHLY_FORMAT.equals(d.getTimeFormat()) ? "月表" : "";
+                        return d.getName() + " FORMAT '" + d.getTimeFormat() + "' " + formatDesc;
+                    }).collect(Collectors.joining("\n")));
+        }
+
+        replyGuidelineBuilder.append("\n6. 当前用户问题映射到的维度及其维度值：\n[");
+
+        if (!CollectionUtils.isEmpty(schemaElementMatches)) {
+            List<String> dimensionValuePairs = schemaElementMatches.stream()
+                    .filter(m -> Boolean.TRUE.equals(m.isFullMatched())
+                            && SchemaElementType.VALUE.equals(m.getElement().getType()))
+                    .map(m -> m.getElement().getName() + "：" + m.getWord())
+                    .collect(Collectors.toList());
+
+            replyGuidelineBuilder.append(String.join(",", dimensionValuePairs));
+        }
+
+        replyGuidelineBuilder.append("]");
+
+        return replyGuidelineBuilder.toString();
     }
 
     /**

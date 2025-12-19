@@ -58,7 +58,7 @@ public class MetaEmbeddingTask implements CommandLineRunner {
     }
 
     /** * reload meta embedding */
-    @Scheduled(cron = "${s2.reload.meta.embedding.corn:0 0 */2 * * ?}")
+    @Scheduled(cron = "${s2.reload.meta.embedding.corn:0 0 2 * * ?}")
     public void reloadMetaEmbedding() {
         long startTime = System.currentTimeMillis();
         try {

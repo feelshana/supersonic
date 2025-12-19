@@ -80,7 +80,15 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (dictItemResp.getLocked() == 1) {
             return 0L;
         }
-        return handleDictTaskByItemResp(dictItemResp, user);
+        Long dictTaskId = handleDictTaskByItemResp(dictItemResp, user);
+        // 统一执行一次词典加载
+        try {
+            dictWordService.loadDictWord();
+            log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
+        } catch (Exception e) {
+            log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+        }
+        return dictTaskId;
     }
 
     private Long handleDictTaskByItemResp(DictItemResp dictItemResp, User user) {
@@ -122,13 +130,13 @@ public class DictTaskServiceImpl implements DictTaskService {
 
         // 3.Change in-memory dictionary data in real time
         String status = TaskStatusEnum.SUCCESS.getStatus();
-        try {
-            dictWordService.loadDictWord();
-        } catch (Exception e) {
-            log.error("reloadCustomDictionary error", e);
-            status = TaskStatusEnum.ERROR.getStatus();
-            dictTaskDO.setDescription(e.toString());
-        }
+        // try {
+        // dictWordService.loadDictWord();
+        // } catch (Exception e) {
+        // log.error("reloadCustomDictionary error", e);
+        // status = TaskStatusEnum.ERROR.getStatus();
+        // dictTaskDO.setDescription(e.toString());
+        // }
         dictTaskDO.setStatus(status);
         dictTaskDO.setElapsedMs(DateUtils.calculateDiffMs(dictTaskDO.getCreatedAt()));
         dictRepository.editDictTask(dictTaskDO);
@@ -232,7 +240,16 @@ public class DictTaskServiceImpl implements DictTaskService {
         DictItemFilter filter =
                 DictItemFilter.builder().status(StatusEnum.ONLINE).locked(0).build();
         List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(filter);
-        dictItemRespList.stream().forEach(item -> handleDictTaskByItemResp(item, null));
+        dictItemRespList.forEach(item -> handleDictTaskByItemResp(item, null));
+
+        // 统一执行一次词典加载
+        try {
+            dictWordService.loadDictWord();
+            log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
+        } catch (Exception e) {
+            log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+        }
+
         log.info("[dailyDictTask] finish");
         return true;
     }
