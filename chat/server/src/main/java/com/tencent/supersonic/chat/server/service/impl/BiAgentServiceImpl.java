@@ -155,6 +155,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         List<ModelResp> modelResps =
                 createModel(modelConfig, pageConfig, dimAliasMap, oldDimDefaultValuesMap, user,
                         databaseResp, domainResp, config.getAdmins(), config.getViewers());
+        dictTaskService.reloadDictWord();
         // 创建数据集
         log.info("开始创建数据集");
         DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps,
@@ -977,7 +978,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 }
             }
         }
-        dictTaskService.reloadDictWord();
+
     }
 
     private List<BiModelItem> processCustom(List<BiModelItem> customs) {
