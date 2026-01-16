@@ -335,6 +335,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
         return replyGuidelineBuilder.toString();
     }
+
     private boolean isSkipDimension(SchemaElement dimension) {
         if (dimension == null) {
             return true;
@@ -342,10 +343,12 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         // 跳过省份、城市和日期维度
         String dimensionName = dimension.getName().toLowerCase();
         return dimensionName.contains("省份") || dimensionName.contains("城市")
-                || dimensionName.contains("日期") || dimensionName.contains("时间")
-                || dimensionName.contains("province") || dimensionName.contains("city")
-                || dimensionName.contains("date") || dimensionName.contains("time");
+                || dimensionName.contains("地市") || dimensionName.contains("日期")
+                || dimensionName.contains("时间") || dimensionName.contains("province")
+                || dimensionName.contains("city") || dimensionName.contains("date")
+                || dimensionName.contains("time");
     }
+
     /**
      * the example in the agent will be executed by default, if the result is correct, it will be
      * put into memory as a reference for LLM

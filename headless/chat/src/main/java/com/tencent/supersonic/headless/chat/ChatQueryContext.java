@@ -37,6 +37,7 @@ public class ChatQueryContext implements Serializable {
     private String requestId;
     private List<String> queryFilters;
     private List<String> segmentDimBizNames = new ArrayList<>();
+    private List<String> excludeDefaultDimNames = new ArrayList<>();
 
     public ChatQueryContext() {
         this(new QueryNLReq());

@@ -4,7 +4,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
-import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
 import com.tencent.supersonic.headless.api.pojo.request.QueryMapReq;
@@ -77,6 +76,9 @@ public class S2ChatLayerService implements ChatLayerService {
         if (CollectionUtils.isNotEmpty(queryCtx.getSegmentDimBizNames())) {
             queryNLReq.setSegmentDimBizNames(queryCtx.getSegmentDimBizNames());
         }
+        if (CollectionUtils.isNotEmpty(queryCtx.getExcludeDefaultDimNames())) {
+            queryNLReq.setExcludeDefaultDimNames(queryCtx.getExcludeDefaultDimNames());
+        }
         return parseResp;
     }
 
@@ -99,6 +101,7 @@ public class S2ChatLayerService implements ChatLayerService {
     private ChatQueryContext buildChatQueryContext(QueryNLReq queryNLReq) {
         ChatQueryContext queryCtx = new ChatQueryContext(queryNLReq);
         queryCtx.setSegmentDimBizNames(queryNLReq.getSegmentDimBizNames());
+        queryCtx.setExcludeDefaultDimNames(queryNLReq.getExcludeDefaultDimNames());
         SemanticSchema semanticSchema = schemaService.getSemanticSchema(queryNLReq.getDataSetIds());
         Map<Long, List<Long>> modelIdToDataSetIds = dataSetService.getModelIdToDataSetIds();
         queryCtx.setSemanticSchema(semanticSchema);

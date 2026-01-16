@@ -1,10 +1,8 @@
 package com.tencent.supersonic.chat.server.parser;
 
 import com.google.common.collect.Lists;
-import com.hankcs.hanlp.HanLP;
 import com.tencent.supersonic.chat.api.pojo.response.ChatParseResp;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDO;
 import com.tencent.supersonic.chat.server.pojo.ParseContext;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.ChatManageService;
@@ -18,13 +16,11 @@ import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.service.impl.ExemplarServiceImpl;
 import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
-import com.tencent.supersonic.headless.api.pojo.response.MapResp;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
 import com.tencent.supersonic.headless.api.pojo.response.QueryState;
 import com.tencent.supersonic.headless.chat.parser.ParserConfig;
@@ -32,9 +28,6 @@ import com.tencent.supersonic.headless.chat.service.RecommendedQuestionsService;
 import com.tencent.supersonic.headless.server.facade.service.ChatLayerService;
 import com.tencent.supersonic.headless.server.utils.ModelConfigHelper;
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.Content;
-import dev.langchain4j.memory.ChatMemory;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
@@ -42,7 +35,6 @@ import dev.langchain4j.model.output.Response;
 import dev.langchain4j.provider.ModelProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +42,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.headless.chat.parser.ParserConfig.*;
-import static dev.langchain4j.data.message.UserMessage.userMessage;
 
 @Slf4j
 public class NL2SQLParser implements ChatQueryParser {
@@ -98,6 +89,7 @@ public class NL2SQLParser implements ChatQueryParser {
             return;
         }
         Set<String> segmentDimBizNames = new HashSet<>();
+        Set<String> excludeDefaultDimNames = new HashSet<>();
         // first go with rule-based parsers unless the user has already selected one parse.
         if (Objects.isNull(parseContext.getRequest().getSelectedParse())) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
@@ -134,6 +126,7 @@ public class NL2SQLParser implements ChatQueryParser {
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
                 segmentDimBizNames.addAll(queryNLReq.getSegmentDimBizNames());
+                excludeDefaultDimNames.addAll(queryNLReq.getExcludeDefaultDimNames());
                 List<SchemaElementMatch> looseElementMatches =
                         parseResp.getSelectedParses().getFirst().getElementMatches();
                 looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
@@ -230,7 +223,7 @@ public class NL2SQLParser implements ChatQueryParser {
 
 
             queryNLReq.setSegmentDimBizNames(new ArrayList<>(segmentDimBizNames));
-
+            queryNLReq.setExcludeDefaultDimNames(new ArrayList<>(excludeDefaultDimNames));
 
             // // 2.fowShot召回，召唤记忆中启用的，RAG向量库中召回
             addDynamicExemplars(parseContext, queryNLReq);

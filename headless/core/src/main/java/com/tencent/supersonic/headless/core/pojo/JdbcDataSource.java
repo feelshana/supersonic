@@ -28,7 +28,7 @@ public class JdbcDataSource {
     @Getter
     protected Long lockTime;
 
-    @Value("${source.max-active:2}")
+    @Value("${source.max-active:20}")
     @Getter
     protected int maxActive;
 

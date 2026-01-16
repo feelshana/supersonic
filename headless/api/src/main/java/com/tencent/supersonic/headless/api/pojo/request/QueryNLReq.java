@@ -36,6 +36,7 @@ public class QueryNLReq extends SemanticQueryReq implements Serializable {
     private Integer agentId;
     private String requestId = "";
     private List<String> segmentDimBizNames = new ArrayList<>();
+    private List<String> excludeDefaultDimNames = new ArrayList<>();
 
     @Override
     public String toCustomizedString() {

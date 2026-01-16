@@ -5,11 +5,9 @@ import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
-import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.MapResult;
-import com.tencent.supersonic.headless.chat.parser.ParserConfig;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.input.Prompt;
@@ -24,35 +22,49 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_USE_LLM;
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MATCH_USE_LLM_WORDS_SEGMENT;
-import static com.tencent.supersonic.headless.chat.parser.ParserConfig.PARSER_FORMAT_JSON_TYPE;
 
 @Service
 @Slf4j
 public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchStrategy<T> {
 
     public static final String LLM_WORDS_SEGMENT_PROMPT = "任务描述：\n"
-            + "你是一个基于数据知识，进行用户意图识别的系统，理解用户的自然语言，结合数据的业务知识(维度/指标/业务含义)，形成数据查询任务，输出两部分结果：1.需要查询的维度与指标，2.维度的具体取值，请按照规定的工作步骤进行，并以JSON格式返回结果\n"
-            + "## 业务知识\n" + "- 维度列表\n" + "- 指标列表\n" + "- 业务含义\n" + "## 用户问题：需要分词的自然语言查询\n"
-            + "## 工作步骤\n"
-            + "-第一步：根据业务知识中的维度列表+指标列表+业务含义，理解用户问题，将用户的问题翻译为维度和指标的查询，作为输出的第一部分。请注意，第一部分中的内容必须来源于维度列表与指标列表\n"
-            + "-第二步：用户问题通过第一步提取后，剩余的词汇排除掉日期词汇，再排除掉排序和描述性词汇，只保留维度的取值作为输出的第二部分\n" + "## 输出格式要求\n"
-            + "-请严格按照JSON格式输出，格式为：{\"metaPart\":\"第一部分内容\",\"valuePart\":\"第二部分内容\"}\n"
-            + "-每个部分的多个词语之间，用英文逗号分隔\n" + "-如果某个部分没有相关内容，则对应字段为空字符串\n"
-            + "-直接返回JSON格式的结果，不要做任何说明或其他文本\n" + "-对于20250913,0824这种类似日期格式的词汇，视为日期维度的取值，不应放入第二部分\n"
-            + "## 示例\n" + "- 用户问题:国色芳华最近一周的播放次数是多少？\n" + "-维度列表：[剧集名称,日期]\n" + "-指标列表：[播放次数,播放人数]\n"
-            + "{\"metaPart\":\"日期,播放次数\",\"valuePart\":\"国色芳华\"}\n" + "- 用户问题:8月5日四川小屏场景的活跃用户数\n"
-            + "-维度列表：[省份名称,日期,一级场景分类,二级场景分类,三级场景分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数]\n"
-            + "{\"metaPart\":\"日期,活跃用户数\",\"valuePart\":\"四川,小屏\"}\n"
-            + "-用户问题:咪咕音乐20251011活跃用户排行前十的省份\n" + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
-            + "-指标列表：[活跃用户数,付费用户数]\n" + "{\"metaPart\":\"日期,省份名称,活跃用户数\",\"valuePart\":\"咪咕音乐\"}\n"
-            + "-用户问题:销量排行前十的城市\n" + "-维度列表：[省份名称,日期,一级分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
-            + "{\"metaPart\":\"\",\"valuePart\":\"订单数\"}\n" + "-用户问题:你能查什么数据\n"
-            + "-维度列表：[省份名称,日期,一级分类,产品名称]\n" + "-指标列表：[活跃用户数,付费用户数,订单数]\n"
-            + "{\"metaPart\":\"\",\"valuePart\":\"\"}\n" + "## 当前任务\n"
-            + "请处理以下用户问题，并严格按照JSON格式返回结果：\n" + "输入问题为:{{text}}\n" + "-维度列表：{{dimensionNames}}\n"
-            + "-指标列表：{{metricNames}}\n" + "-业务含义：{{termInfo}}\n";
+            + "你是一个基于数据知识进行用户意图识别的系统。你需要理解用户自然语言，结合业务知识(维度/指标/业务含义/维度扩展信息)，形成数据查询任务，并输出三部分结果：\n"
+            + "1) metaPart：需要查询的维度与指标（只允许来自维度列表与指标列表）；\n"
+            + "2) valuePart：维度的具体取值（只保留实体/取值，不要包含日期词汇/排序词/描述性词）；\n"
+            + "3) excludeDefaultDims：如果本问题属于分布/枚举/排名/排行/TopN类问题，请输出涉及的维度名（只输出维度名，必须来自维度列表；后续代码会基于这些维度做策略处理）。\n"
+            + "\n" + "## 业务知识\n" + "- 维度列表\n" + "- 指标列表\n" + "- 业务含义\n" + "\n" + "## 工作步骤\n"
+            + "- 第一步：根据维度列表+指标列表+业务含义，提取本次需要查询的维度与指标，作为 metaPart（必须来自维度列表与指标列表）。\n"
+            + "- 第二步：用户问题通过第一步提取后，剩余的词汇提取维度值作为 valuePart。剔除日期/时间词、排序词（如排名、前十、topN）、剔除描述性词汇，只保留实体/取值。\n"
+            + "- 第三步：判断是否为分布/枚举/排名/排行/TopN类问题（例如包含：各|每|按|分|排名|排行|名次|top|前N）。\n"
+            + "  - 如果是：输出本问题涉及的‘分组/枚举/排行’维度名到 excludeDefaultDims（多个用英文逗号分隔）。不要输出指标名，不要输出‘日期’这类时间维度。\n"
+            + "  - 如果不是：excludeDefaultDims 为空字符串。\n"
+            + "  - 注意：‘在全国的排名’中的‘全国’是范围描述，不是省份取值，不要把‘全国’放入 valuePart。\n" + "\n"
+            + "## 输出格式要求（非常重要）\n"
+            + "- 必须严格输出一个 JSON 对象，且必须包含 3 个 key：metaPart、valuePart、excludeDefaultDims。\n"
+            + "- 3 个字段的 value 都是字符串；多个词语之间用英文逗号分隔；如果为空则返回空字符串。\n"
+            + "- metaPart 中每个词必须来自维度列表或指标列表；excludeDefaultDims 中每个词必须来自维度列表（且不要输出日期/时间维度）。\n"
+            + "- valuePart 不要包含：全国/全省/全部，不要包含任何日期格式取值（如 20250913、0824），不要包含‘排名/前十/topN’等排序词。\n"
+            + "- 只返回 JSON，不要输出解释、不要加 markdown、不要输出多余文本。\n" + "\n" + "## 示例\n"
+            + "- 用户问题: 国色芳华最近一周的播放次数是多少？\n" + "- 维度列表：[剧集名称,日期]\n" + "- 指标列表：[播放次数,播放人数]\n"
+            + "{\"metaPart\":\"日期,播放次数\",\"valuePart\":\"国色芳华\",\"excludeDefaultDims\":\"\"}\n"
+            + "\n" + "- 用户问题: 昨日各省的活跃用户数\n" + "- 维度列表：[省份名称,日期]\n" + "- 指标列表：[活跃用户数]\n"
+            + "{\"metaPart\":\"日期,省份名称,活跃用户数\",\"valuePart\":\"\",\"excludeDefaultDims\":\"省份名称\"}\n"
+            + "- 用户问题:8月5日四川小屏场景的活跃用户数\n" + "-维度列表：[省份名称,日期,一级场景分类,二级场景分类,三级场景分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数]\n"
+            + "{\"metaPart\":\"日期,活跃用户数\",\"valuePart\":\"四川,小屏\",\"excludeDefaultDims\":\"\"}\n"
+            + "- 用户问题: 昨日四川省在订用户数在全国的排名\n" + "- 维度列表：[省份名称,日期]\n" + "- 指标列表：[在订用户数]\n"
+            + "{\"metaPart\":\"日期,在订用户数\",\"valuePart\":\"四川\",\"excludeDefaultDims\":\"省份名称\"}\n"
+            + "-用户问题:咪咕音乐20251011活跃用户前十的省份\n" + "-维度列表：[省份名称,日期,一级分类,产品名称]\n"
+            + "-指标列表：[活跃用户数,付费用户数]\n"
+            + "{\"metaPart\":\"日期,省份名称,活跃用户数\",\"valuePart\":\"咪咕音乐\",\"excludeDefaultDims\":\"省份名称\"}\n"
+            + "- 用户问题: 昨日全国的活跃用户数\n" + "- 维度列表：[省份名称,日期]\n" + "- 指标列表：[活跃用户数]\n"
+            + "{\"metaPart\":\"日期,活跃用户数\",\"valuePart\":\"\",\"excludeDefaultDims\":\"\"}\n" + "\n"
+            + "- 用户问题: 你能查什么数据\n" + "- 维度列表：[省份名称,日期,一级分类,产品名称]\n" + "- 指标列表：[活跃用户数,付费用户数,订单数]\n"
+            + "{\"metaPart\":\"\",\"valuePart\":\"\",\"excludeDefaultDims\":\"\"}\n" + "\n"
+            + "## 当前任务\n" + "请处理以下用户问题，并严格按照JSON格式返回结果：\n" + "输入问题为:{{text}}\n"
+            + "-维度列表：{{dimensionNames}}\n" + "-指标列表：{{metricNames}}\n" + "-业务含义：{{termInfo}}\n"
+            + "-维度扩展信息：{{dimensionDefaultValues}}\n";
 
 
 
@@ -109,6 +121,15 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         } else {
             variable.put("termInfo", "");
         }
+
+        // dimension -> defaultValues (optional context for LLM to decide excludeDefaultDims)
+        Map<String, List<String>> dimensionDefaultValues = semanticSchema.getDimensions().stream()
+                .filter(d -> d != null && StringUtils.isNotBlank(d.getName())
+                        && d.getDefaultValues() != null && !d.getDefaultValues().isEmpty())
+                .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDefaultValues,
+                        (v1, v2) -> v1, LinkedHashMap::new));
+        variable.put("dimensionDefaultValues", dimensionDefaultValues);
+
         ChatApp chatApp = chatQueryContext.getRequest().getChatAppConfig()
                 .get(OnePassSCSqlGenStrategy.APP_KEY);
 
@@ -128,6 +149,8 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                 Map<String, String> resultMap = JSON.parseObject(response, Map.class);
                 String metaPart = resultMap.getOrDefault("metaPart", "");
                 String valuePart = resultMap.getOrDefault("valuePart", "");
+                String excludeDefaultDims = resultMap.getOrDefault("excludeDefaultDims", "");
+
 
                 log.info("维度/指标分词结果:{}", metaPart);
                 log.info("维度值分词结果:{}", valuePart);
@@ -160,6 +183,20 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                                     && !"全省".equals(word) && !"全部".equals(word)).toList();
                     detectSegments.addAll(wordsArray);
                 }
+
+                if (StringUtils.isNotBlank(excludeDefaultDims) && CollectionUtils
+                        .isNotEmpty(Arrays.asList(excludeDefaultDims.split(",")))) {
+                    List<String> excludeDims = Arrays.stream(excludeDefaultDims.split(","))
+                            .map(String::trim).filter(StringUtils::isNotBlank).distinct().toList();
+
+                    // Keep only dimensions that exist in schema and have defaultValues
+                    Set<String> validDimNamesWithDefault = dimensionDefaultValues.keySet();
+                    excludeDims = excludeDims.stream().filter(validDimNamesWithDefault::contains)
+                            .toList();
+                    chatQueryContext.setExcludeDefaultDimNames(excludeDims);
+                    log.info("excludeDefaultDims from words segment: {}", excludeDims);
+                }
+
             } catch (Exception e) {
                 log.error("解析大模型分词结果失败，响应内容: {}", response, e);
             }

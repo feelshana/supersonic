@@ -3,8 +3,10 @@ package com.tencent.supersonic.headless.server.utils;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.*;
+import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
+import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
+import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
+import com.tencent.supersonic.headless.api.pojo.SqlInfo;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
@@ -17,19 +19,18 @@ import com.tencent.supersonic.headless.chat.mapper.SchemaMapper;
 import com.tencent.supersonic.headless.chat.parser.SemanticParser;
 import com.tencent.supersonic.headless.chat.query.QueryManager;
 import com.tencent.supersonic.headless.chat.query.SemanticQuery;
-import com.tencent.supersonic.headless.core.cache.QueryCache;
-import com.tencent.supersonic.headless.core.utils.ComponentFactory;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.aspectj.weaver.loadtime.Agent;
-import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -105,8 +106,10 @@ public class ChatWorkflowEngine {
                     List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
                             .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
                     parseResult.setSelectedParses(parseInfos);
+                    log.info("【大模型生成的sql】:\n{}", parseResult.getSelectedParses().getFirst()
+                            .getSqlInfo().getParsedS2SQL());
                     if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
-                            queryCtx.getSemanticSchema().getDataSets().get(0).getDataSetName(),
+                            queryCtx.getSemanticSchema().getDataSets().getFirst().getDataSetName(),
                             "直连模式")) {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
                     } else {
@@ -152,12 +155,13 @@ public class ChatWorkflowEngine {
                     break;
                 case S2SQL_CORRECTING:
                     performCorrecting(queryCtx);
+                    log.info("【校正大模型生成的sql后】:\n{}", queryCtx.getCandidateQueries().getFirst()
+                            .getParseInfo().getSqlInfo().getCorrectedS2SQL());
                     queryCtx.setChatWorkflowState(ChatWorkflowState.TRANSLATING);
                     break;
                 case TRANSLATING:
                     long start = System.currentTimeMillis();
-                    log.info("【大模型生成的sql】:\n{}",
-                            parseResult.getSelectedParses().get(0).getSqlInfo().getParsedS2SQL());
+
                     performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
