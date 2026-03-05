@@ -231,7 +231,7 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     @Override
-    @Scheduled(cron = "${knowledge.dimension.value.cron:0 0 0 * * ?}")
+    @Scheduled(cron = "${knowledge.dimension.value.cron:0 0 4 * * ?}")
     public Boolean dailyDictTask() {
         log.info("[dailyDictTask] start");
         if (!dictFlushDailyEnable) {

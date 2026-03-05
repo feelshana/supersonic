@@ -243,16 +243,16 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         StringBuilder dimensionsInfo = new StringBuilder();
         if (semanticSchema.getDimensions() != null) {
             for (SchemaElement dimension : semanticSchema.getDimensions()) {
-                if (isSkipDimension(dimension)) {
-                    continue;
-                }
+
                 dimensionsInfo.append("   - ").append(dimension.getName());
                 if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
                     dimensionsInfo.append(" FORMAT '").append(dimension.getTimeFormat())
                             .append("'");
                 }
                 dimensionsInfo.append("\n");
-
+                if (isSkipDimension(dimension)) {
+                    continue;
+                }
                 if (Boolean.TRUE.equals(dimension.isHasDimValues())) {
                     PageInfo<DictValueDimResp> pageInfo =
                             onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);

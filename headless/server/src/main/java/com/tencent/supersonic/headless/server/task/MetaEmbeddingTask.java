@@ -52,13 +52,13 @@ public class MetaEmbeddingTask implements CommandLineRunner {
         }
     }
 
-    @Scheduled(cron = "${s2.inMemoryEmbeddingStore.persist.cron:0 0 * * * ?}")
+    // @Scheduled(cron = "${s2.inMemoryEmbeddingStore.persist.cron:0 0 * * * ?}")
     public void executePersistFileTask() {
         embeddingStorePersistFile();
     }
 
     /** * reload meta embedding */
-    @Scheduled(cron = "${s2.reload.meta.embedding.corn:0 0 2 * * ?}")
+    // @Scheduled(cron = "${s2.reload.meta.embedding.corn:0 0 2 * * ?}")
     public void reloadMetaEmbedding() {
         long startTime = System.currentTimeMillis();
         try {

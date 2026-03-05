@@ -17,13 +17,13 @@ public class BiAgentTaskServiceImpl implements BiAgentTaskService {
     private BiAgentService biAgentService;
 
     @Autowired
-    @Qualifier("commonExecutor")
-    private ThreadPoolExecutor commonExecutor;
+    @Qualifier("biAgentExecutor")
+    private ThreadPoolExecutor biAgentExecutor;
 
     @Override
     public void addBiAgentTask(BiAgentConfig config) {
         BiAgentTask task = new BiAgentTask(biAgentService, config);
-        commonExecutor.execute(task);
+        biAgentExecutor.execute(task);
     }
 
 }

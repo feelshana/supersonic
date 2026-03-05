@@ -32,7 +32,7 @@ public class DictionaryReloadTask implements CommandLineRunner {
     }
 
     /** * reload knowledge task */
-    @Scheduled(cron = "${reload.knowledge.corn:0 0/1 * * * ?}")
+    // @Scheduled(cron = "${reload.knowledge.corn:0 0/1 * * * ?}")
     public void reloadKnowledge() {
         log.debug("reloadKnowledge start");
         try {

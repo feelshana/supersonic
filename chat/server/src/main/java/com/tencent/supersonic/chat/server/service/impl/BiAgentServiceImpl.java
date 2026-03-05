@@ -125,6 +125,11 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         // 判断是否唯一,如果存在多个同样的助理，清除多余的只保留一个agent
         Agent uniqueAgent = findUniqueAgent(agents, domains);
+        if (uniqueAgent != null) {
+            log.info("已存在同名的智能助手, agentId: {}, agentName: {}", uniqueAgent.getId(),
+                    uniqueAgent.getName());
+            return uniqueAgent;
+        }
         // 提取并删除主题域下的术语信息
         List<TermResp> termResps = clearOldTerms(domains);
         // 删除旧的模型和主题域
@@ -155,7 +160,7 @@ public class BiAgentServiceImpl implements BiAgentService {
         List<ModelResp> modelResps =
                 createModel(modelConfig, pageConfig, dimAliasMap, oldDimDefaultValuesMap, user,
                         databaseResp, domainResp, config.getAdmins(), config.getViewers());
-        dictTaskService.reloadDictWord();
+        // dictTaskService.reloadDictWord();
         // 创建数据集
         log.info("开始创建数据集");
         DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps,
