@@ -103,30 +103,44 @@ public class NL2SQLParser implements ChatQueryParser {
             Set<Long> requestedDatasets = queryNLReq.getDataSetIds();
             List<SemanticParseInfo> candidateParses = Lists.newArrayList();
             StringBuilder errMsg = new StringBuilder();
+
+            // 关闭keyword映射
+            boolean keywordMappingEnabled = false;
+
             for (Long datasetId : requestedDatasets) {
                 queryNLReq.setDataSetIds(Collections.singleton(datasetId));
                 ChatParseResp parseResp = new ChatParseResp(parseContext.getRequest().getQueryId());
-                queryNLReq.setMapModeEnum(MapModeEnum.MODERATE);
-                doParse(queryNLReq, parseResp);
+
                 List<SchemaElementMatch> keyWordsValues = new ArrayList<>();
-                if (!parseResp.getSelectedParses().isEmpty()) {
-                    keyWordsValues =
-                            parseResp.getSelectedParses().getFirst().getElementMatches().stream()
-                                    .filter(schemaElementMatch -> schemaElementMatch.getElement()
-                                            .getType() == SchemaElementType.VALUE
-                                            || schemaElementMatch.getElement()
-                                                    .getType() == SchemaElementType.TERM)
-                                    .peek(schemaElementMatch -> schemaElementMatch
-                                            .setMatchType(MatchType.KEYWORD.name()))
-                                    .toList();
-                    parseResp.getSelectedParses().clear();
+                if (keywordMappingEnabled) {
+                    queryNLReq.setMapModeEnum(MapModeEnum.MODERATE);
+                    doParse(queryNLReq, parseResp);
+                    keyWordsValues = new ArrayList<>();
+                    if (!parseResp.getSelectedParses().isEmpty()) {
+                        keyWordsValues =
+                                parseResp.getSelectedParses().getFirst().getElementMatches().stream()
+                                        .filter(schemaElementMatch -> schemaElementMatch.getElement()
+                                                .getType() == SchemaElementType.VALUE
+                                                || schemaElementMatch.getElement()
+                                                        .getType() == SchemaElementType.TERM)
+                                        .peek(schemaElementMatch -> schemaElementMatch
+                                                .setMatchType(MatchType.KEYWORD.name()))
+                                        .toList();
+                        parseResp.getSelectedParses().clear();
+                    }
                 }
 
 
                 queryNLReq.setMapModeEnum(MapModeEnum.LOOSE);
                 doParse(queryNLReq, parseResp);
+                if (parseResp.getSelectedParses().isEmpty()) {
+                    errMsg.append(parseResp.getErrorMsg());
+                    continue;
+                }
+
                 segmentDimBizNames.addAll(queryNLReq.getSegmentDimBizNames());
                 excludeDefaultDimNames.addAll(queryNLReq.getExcludeDefaultDimNames());
+
                 List<SchemaElementMatch> looseElementMatches =
                         parseResp.getSelectedParses().getFirst().getElementMatches();
                 looseElementMatches.removeIf(schemaElementMatch -> schemaElementMatch.getElement()
@@ -137,33 +151,40 @@ public class NL2SQLParser implements ChatQueryParser {
                             .setMatchType(MatchType.EMBEDDING.name()));
                 }
 
-                logMatchResult(keyWordsValues, "词典模式");
+                if (keywordMappingEnabled) {
+                    logMatchResult(keyWordsValues, "词典模式");
+                }
                 logMatchResult(looseElementMatches, "向量模式");
 
-                // List<SchemaElementMatch> merged = (List<SchemaElementMatch>) CollectionUtils
-                // .union(keyWordsValues, looseElementMatches);
-                List<SchemaElementMatch> distinctMerged = new ArrayList<>(keyWordsValues);
-                distinctMerged.addAll(looseElementMatches);
-                // 合并词典模式和向量模式的匹配结果，保留词典模式的匹配结果
-                List<SchemaElementMatch> merged = new ArrayList<>(distinctMerged.stream()
-                        .collect(Collectors.toMap(
-                                match -> String.format("%s|%s|%s|%s", match.getDetectWord(),
-                                        match.getWord(), match.getElement().getName(),
-                                        match.getElement().getBizName()),
-                                match -> match, (existing, replacement) -> {
-                                    String existingMatchType = existing.getMatchType();
-                                    if (existingMatchType != null
-                                            && existingMatchType.equals(MatchType.KEYWORD.name())) {
+
+                List<SchemaElementMatch> merged;
+                if (keywordMappingEnabled) {
+                    // 合并词典模式和向量模式的匹配结果，保留词典模式的匹配结果
+                    List<SchemaElementMatch> distinctMerged = new ArrayList<>(keyWordsValues);
+                    distinctMerged.addAll(looseElementMatches);
+                    merged = new ArrayList<>(distinctMerged.stream()
+                            .collect(Collectors.toMap(
+                                    match -> String.format("%s|%s|%s|%s", match.getDetectWord(),
+                                            match.getWord(), match.getElement().getName(),
+                                            match.getElement().getBizName()),
+                                    match -> match, (existing, replacement) -> {
+                                        String existingMatchType = existing.getMatchType();
+                                        if (existingMatchType != null && existingMatchType
+                                                .equals(MatchType.KEYWORD.name())) {
+                                            return existing;
+                                        }
+                                        String replacementMatchType = replacement.getMatchType();
+                                        if (replacementMatchType != null && replacementMatchType
+                                                .equals(MatchType.KEYWORD.name())) {
+                                            return replacement;
+                                        }
                                         return existing;
-                                    }
-                                    String replacementMatchType = replacement.getMatchType();
-                                    if (replacementMatchType != null && replacementMatchType
-                                            .equals(MatchType.KEYWORD.name())) {
-                                        return replacement;
-                                    }
-                                    return existing;
-                                }))
-                        .values());
+                                    }))
+                            .values());
+                } else {
+                    merged = new ArrayList<>(looseElementMatches);
+                }
+
                 // 过滤掉schemaElementMatch的word等于SchemaElement中的任何默认值的元素
                 merged = merged.stream().filter(schemaElementMatch -> {
                     List<String> defaultValues = schemaElementMatch.getElement().getDefaultValues();
@@ -183,18 +204,16 @@ public class NL2SQLParser implements ChatQueryParser {
                                     && (isCityDim(schemaElementMatch.getElement().getName()))))
                             .toList();
                 }
-                logMatchResult(merged, "融合模式");
+                logMatchResult(merged, keywordMappingEnabled ? "融合模式" : "向量模式(仅)");
 
                 parseResp.getSelectedParses().getFirst().getElementMatches().clear();
                 parseResp.getSelectedParses().getFirst().getElementMatches().addAll(merged);
-                if (parseResp.getSelectedParses().isEmpty()) {
-                    errMsg.append(parseResp.getErrorMsg());
-                    continue;
-                }
+
                 // for one dataset select the top 1 parse after sorting
                 SemanticParseInfo.sort(parseResp.getSelectedParses());
                 candidateParses.add(parseResp.getSelectedParses().get(0));
             }
+
             ParserConfig parserConfig = ContextUtils.getBean(ParserConfig.class);
             int parserShowCount =
                     Integer.parseInt(parserConfig.getParameterValue(PARSER_SHOW_COUNT));

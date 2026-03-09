@@ -109,6 +109,24 @@ public class EmbeddingServiceImpl implements EmbeddingService {
     }
 
     @Override
+    public void deleteByCondition(String collectionName, Map<String, Object> filterCondition) {
+        if (MapUtils.isEmpty(filterCondition)) {
+            return;
+        }
+        EmbeddingStore embeddingStore =
+                EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
+        try {
+            Filter filter = createCombinedFilter(filterCondition);
+            if (Objects.nonNull(filter)) {
+                embeddingStore.removeAll(filter);
+            }
+        } catch (Exception e) {
+            log.error("deleteByCondition error,collectionName:{},filterCondition:{}", collectionName,
+                    filterCondition, e);
+        }
+    }
+
+    @Override
     public List<RetrieveQueryResult> retrieveQuery(String collectionName,
             RetrieveQuery retrieveQuery, int num) {
         EmbeddingStore embeddingStore =
@@ -186,7 +204,8 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                     fieldFilter = (fieldFilter == null) ? equalToFilter
                             : Filter.or(fieldFilter, equalToFilter);
                 }
-            } else if (fieldValue instanceof String) {
+            } else if (fieldValue instanceof String || fieldValue instanceof Number
+                    || fieldValue instanceof Enum) {
                 // Create a simple equality filter
                 fieldFilter = new IsEqualTo(fieldName, fieldValue);
             }

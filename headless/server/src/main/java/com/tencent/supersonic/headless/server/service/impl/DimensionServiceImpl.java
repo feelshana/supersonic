@@ -8,12 +8,14 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.*;
 import com.tencent.supersonic.common.pojo.enums.DictWordType;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.pojo.exception.InvalidArgumentException;
+import com.tencent.supersonic.common.service.EmbeddingService;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.DimValueMap;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
@@ -73,9 +75,12 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
-    @Lazy
     @Autowired
-    private DictTaskServiceImpl dictTaskService;
+    private EmbeddingService embeddingService;
+
+    @Autowired
+    private EmbeddingConfig embeddingConfig;
+
 
     public DimensionServiceImpl(DimensionRepository dimensionRepository, ModelService modelService,
             AliasGenerateHelper aliasGenerateHelper, DatabaseService databaseService,
@@ -277,6 +282,7 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         modelService.deleteModelDetailByDimAndMetric(dimensionDOList.get(0).getModelId(),
                 dimensionDOList, null);
         sendEventBatch(dimensionDOList, EventType.DELETE);
+        deleteDimensionValue(dimensionDOList);
     }
 
     @Override
@@ -626,14 +632,18 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
     }
 
     private void deleteDimensionValue(List<DimensionDO> dimensionDOS) {
+        if (CollectionUtils.isEmpty(dimensionDOS)) {
+            return;
+        }
         dimensionDOS.forEach(dimensionDO -> {
-            DictItemResp dictItemResp = new DictItemResp();
-            dictItemResp.setModelId(dimensionDO.getModelId());
-            dictItemResp.setItemId(dimensionDO.getId());
-            dictItemResp.setType(TypeEnums.DIMENSION);
-            dictItemResp.setBizName(dimensionDO.getBizName());
-            String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + "txt";
-            dictTaskService.deleteEmbedding(dictItemResp, fileName);
+            if (Objects.isNull(dimensionDO) || Objects.isNull(dimensionDO.getId())) {
+                return;
+            }
+            Map<String, Object> filterCondition = new HashMap<>();
+            filterCondition.put("type", TypeEnums.VALUE.name());
+            filterCondition.put("dimId", dimensionDO.getId());
+            embeddingService.deleteByCondition(embeddingConfig.getMetaCollectionName(),
+                    filterCondition);
         });
     }
 }

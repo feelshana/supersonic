@@ -20,11 +20,7 @@ import com.tencent.supersonic.common.bi.BiPageConfig;
 import com.tencent.supersonic.common.bi.BiTable;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.User;
-import com.tencent.supersonic.common.pojo.enums.AggOperatorEnum;
-import com.tencent.supersonic.common.pojo.enums.AppModule;
-import com.tencent.supersonic.common.pojo.enums.EngineType;
-import com.tencent.supersonic.common.pojo.enums.StatusEnum;
-import com.tencent.supersonic.common.pojo.enums.TypeEnums;
+import com.tencent.supersonic.common.pojo.enums.*;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.common.util.HttpUtils;
@@ -41,6 +37,7 @@ import com.tencent.supersonic.headless.api.pojo.enums.ModelDefineType;
 import com.tencent.supersonic.headless.api.pojo.request.*;
 import com.tencent.supersonic.headless.api.pojo.response.*;
 import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
+import com.tencent.supersonic.headless.server.persistence.dataobject.DimensionValueDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
 import com.tencent.supersonic.headless.server.service.*;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +73,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     private Integer chatModelId;
     @Value("${s2.bi.url}")
     private String biUrl;
-
+    @Value("${s2.dictionary.enabled:false}")
+    private Boolean dictionaryEnabled;
     @Autowired
     private DatabaseService databaseService;
     @Autowired
@@ -125,11 +123,6 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         // 判断是否唯一,如果存在多个同样的助理，清除多余的只保留一个agent
         Agent uniqueAgent = findUniqueAgent(agents, domains);
-        if (uniqueAgent != null) {
-            log.info("已存在同名的智能助手, agentId: {}, agentName: {}", uniqueAgent.getId(),
-                    uniqueAgent.getName());
-            return uniqueAgent;
-        }
         // 提取并删除主题域下的术语信息
         List<TermResp> termResps = clearOldTerms(domains);
         // 删除旧的模型和主题域
@@ -596,13 +589,15 @@ public class BiAgentServiceImpl implements BiAgentService {
                         dimAliasMap.put(item.getName(), dimValueMaps);
                     }
 
-                    // 删除旧维度对应的词典文件
-                    DictSingleTaskReq deleteTaskReq = DictSingleTaskReq.builder()
-                            .type(TypeEnums.DIMENSION).itemId(item.getId()).build();
-                    try {
-                        dictTaskService.deleteDictTaskForBI(deleteTaskReq, user);
-                    } catch (Exception e) {
-                        log.warn("删除维度词典文件失败, dimensionId: {}", item.getId(), e);
+                    // 删除旧维度对应的词典文件（词典禁用时跳过，避免文件IO/重载开销）
+                    if (Boolean.TRUE.equals(dictionaryEnabled)) {
+                        DictSingleTaskReq deleteTaskReq = DictSingleTaskReq.builder()
+                                .type(TypeEnums.DIMENSION).itemId(item.getId()).build();
+                        try {
+                            dictTaskService.deleteDictTaskForBI(deleteTaskReq, user);
+                        } catch (Exception e) {
+                            log.warn("删除维度词典文件失败, dimensionId: {}", item.getId(), e);
+                        }
                     }
                 });
                 List<Long> dimensionIds =
@@ -954,36 +949,91 @@ public class BiAgentServiceImpl implements BiAgentService {
         filter.setModelIds(Collections.singletonList(modelId));
         for (BiDimensionCofig dimensionConfig : dimensionConfigs) {
             List<String> values = dimensionConfig.getValues();
-            if (!CollectionUtils.isEmpty(values)) {
-                filter.setName(dimensionConfig.getName());
-                List<DimensionResp> resps = dimensionService.getDimensions(filter);
-                if (resps == null || resps.size() != 1) {
-                    continue;
-                }
-                DimensionResp resp = resps.getFirst();
-                DictItemReq dictItemReq = new DictItemReq();
-                dictItemReq.setType(TypeEnums.DIMENSION);
-                dictItemReq.setItemId(resp.getId());
-                // 导入的维度值锁定不允许刷新
-                dictItemReq.setStatus(StatusEnum.ONLINE);
-                dictItemReq.setLocked(1);
-                DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
-                String nature = dictItemResp.getNature();
-                List<String> lines = values.stream().map(value -> {
-                    if (!StringUtils.isEmpty(value)) {
-                        value = value.replace(SPACE, POUND);
-                    }
-                    return value;
-                }).filter(value -> !value.equals("全国"))
-                        .map(value -> String.format("%s %s %s", value, nature, 1L)).toList();
-                dictTaskService.importDictData(dictItemResp, lines, user);
-                List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
-                if (alias != null) {
-                    dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
-                }
+            if (CollectionUtils.isEmpty(values)) {
+                continue;
+            }
+            filter.setName(dimensionConfig.getName());
+            List<DimensionResp> resps = dimensionService.getDimensions(filter);
+            if (resps == null || resps.size() != 1) {
+                continue;
+            }
+            DimensionResp resp = resps.getFirst();
+            //停用原有加入词典的逻辑
+//            DictItemReq dictItemReq = new DictItemReq();
+//            dictItemReq.setType(TypeEnums.DIMENSION);
+//            dictItemReq.setItemId(resp.getId());
+//            // 导入的维度值锁定不允许刷新
+//            dictItemReq.setStatus(StatusEnum.ONLINE);
+//            dictItemReq.setLocked(1);
+//            DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
+//            String nature = dictItemResp.getNature();
+//            List<String> lines = values.stream().map(value -> {
+//                        if (!StringUtils.isEmpty(value)) {
+//                            value = value.replace(SPACE, POUND);
+//                        }
+//                        return value;
+//                    }).filter(value -> !value.equals("全国"))
+//                    .map(value -> String.format("%s %s %s", value, nature, 1L)).toList();
+//            dictTaskService.importDictData(dictItemResp, lines, user);
+//            List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
+//            if (alias != null) {
+//                dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
+//            }
+            List<String> normalizedValues = values.stream().filter(StringUtils::isNotBlank)
+                    .map(String::trim).filter(value -> !"全国".equals(value)).distinct().toList();
+            if (CollectionUtils.isEmpty(normalizedValues)) {
+                continue;
+            }
+            // 全量维度值写入向量库
+            List<DimensionValueDO> dimensionValueDOS = normalizedValues.stream().map(value -> {
+                DimensionValueDO dimensionValueDO = new DimensionValueDO();
+                dimensionValueDO.setModelId(modelId);
+                dimensionValueDO.setDimId(resp.getId());
+                dimensionValueDO.setDimName(resp.getName());
+                dimensionValueDO.setDimBizName(resp.getBizName());
+                dimensionValueDO.setDimValue(value);
+                dimensionValueDO.setFrequency(1L);
+                return dimensionValueDO;
+            }).toList();
+            dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
+
+            // 仅保存前50个维度值到dim_value_maps，供提示词和背景信息使用
+            List<DimValueMap> oldAlias = dimAliasMap == null ? Collections.emptyList()
+                    : dimAliasMap.getOrDefault(dimensionConfig.getName(), Collections.emptyList());
+            List<DimValueMap> previewDimValueMaps =
+                    buildPreviewDimValueMaps(normalizedValues, oldAlias);
+            if (!CollectionUtils.isEmpty(previewDimValueMaps)) {
+                dimensionService.updateDimValueAliasBatch(resp.getId(), previewDimValueMaps, user);
             }
         }
 
+    }
+    private List<DimValueMap> buildPreviewDimValueMaps(List<String> normalizedValues,
+                                                       List<DimValueMap> oldAlias) {
+        Map<String, DimValueMap> aliasByValue = oldAlias == null ? Collections.emptyMap()
+                : oldAlias.stream().filter(Objects::nonNull)
+                .filter(item -> StringUtils.isNotBlank(item.getValue())).collect(
+                        Collectors.toMap(DimValueMap::getValue, item -> item, (a, b) -> a));
+
+        List<DimValueMap> preview = new ArrayList<>();
+        normalizedValues.stream().filter(value -> StringUtils.length(value) <= 20).limit(50)
+                .forEach(value -> {
+                    DimValueMap dimValueMap = new DimValueMap();
+                    dimValueMap.setValue(value);
+                    dimValueMap.setTechName(value);
+                    if (!CollectionUtils.isEmpty(aliasByValue) && aliasByValue.containsKey(value)) {
+                        DimValueMap oldMap = aliasByValue.get(value);
+                        if (!CollectionUtils.isEmpty(oldMap.getAlias())) {
+                            dimValueMap.setAlias(oldMap.getAlias());
+                        }
+                        if (StringUtils.isNotBlank(oldMap.getBizName())
+                                && !StringUtils.equals(oldMap.getBizName(), value)) {
+                            dimValueMap.setBizName(oldMap.getBizName());
+                        }
+                    }
+                    preview.add(dimValueMap);
+                });
+        return preview;
     }
 
     private List<BiModelItem> processCustom(List<BiModelItem> customs) {

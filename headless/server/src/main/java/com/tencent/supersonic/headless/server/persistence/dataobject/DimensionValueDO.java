@@ -28,6 +28,10 @@ public class DimensionValueDO {
     private Long frequency;
 
     public String getId() {
-        return dimId + "_" + dimValue;
+        if (dimValue == null) {
+            return dimId + "_";
+        }
+        // keep embedding text (dimValue) unchanged, only sanitize id
+        return dimId + "_" + dimValue.replace(" ", "#");
     }
 }
