@@ -2,11 +2,14 @@ package com.tencent.supersonic.headless.server.service.impl;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
+import com.tencent.supersonic.common.pojo.enums.TypeEnums;
+import com.tencent.supersonic.common.service.EmbeddingService;
 import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.headless.api.pojo.DimValueMap;
@@ -42,7 +45,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DictTaskServiceImpl implements DictTaskService {
 
-    @Value("${dict.flush.enable:true}")
+    @Value("${dict.flush.enable:false}")
     private Boolean dictFlushEnable;
 
     @Value("${dict.flush.daily.enable:true}")
@@ -50,6 +53,10 @@ public class DictTaskServiceImpl implements DictTaskService {
 
     @Value("${dict.file.type:txt}")
     private String dictFileType;
+
+    @Value("${s2.dictionary.enabled:true}")
+    private Boolean dictionaryEnabled;
+
 
     private String dimValue = "DimValue_%d_%d";
 
@@ -59,16 +66,21 @@ public class DictTaskServiceImpl implements DictTaskService {
     private final FileHandler fileHandler;
     private final DictWordService dictWordService;
     private final DimensionService dimensionService;
+    private final EmbeddingService embeddingService;
+    private final EmbeddingConfig embeddingConfig;
 
     public DictTaskServiceImpl(DictRepository dictRepository, DictUtils dictConverter,
-            DictUtils dictUtils, FileHandler fileHandler, DictWordService dictWordService,
-            DimensionService dimensionService) {
+                               DictUtils dictUtils, FileHandler fileHandler, DictWordService dictWordService,
+                               DimensionService dimensionService, EmbeddingService embeddingService,
+                               EmbeddingConfig embeddingConfig) {
         this.dictRepository = dictRepository;
         this.dictConverter = dictConverter;
         this.dictUtils = dictUtils;
         this.fileHandler = fileHandler;
         this.dictWordService = dictWordService;
         this.dimensionService = dimensionService;
+        this.embeddingService = embeddingService;
+        this.embeddingConfig = embeddingConfig;
     }
 
     @Override
@@ -77,16 +89,20 @@ public class DictTaskServiceImpl implements DictTaskService {
             return 0L;
         }
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
-        if (dictItemResp.getLocked() == 1) {
+        if (Objects.isNull(dictItemResp) || Integer.valueOf(1).equals(dictItemResp.getLocked())) {
             return 0L;
         }
+
         Long dictTaskId = handleDictTaskByItemResp(dictItemResp, user);
+
         // 统一执行一次词典加载
-        try {
-            dictWordService.loadDictWord();
-            log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
-        } catch (Exception e) {
-            log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            try {
+                dictWordService.loadDictWord();
+                log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
+            } catch (Exception e) {
+                log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+            }
         }
         return dictTaskId;
     }
@@ -107,9 +123,24 @@ public class DictTaskServiceImpl implements DictTaskService {
                 .type(taskReq.getType()).build();
         List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(dictItemFilter);
         if (!CollectionUtils.isEmpty(dictItemRespList)) {
-            return dictItemRespList.get(0);
+            dictItemRespList.getFirst().setLocked(1);
+            return dictItemRespList.getFirst();
         }
-        return null;
+        if (!TypeEnums.DIMENSION.equals(taskReq.getType())) {
+            return null;
+        }
+        DimensionResp dimensionResp = dimensionService.getDimension(taskReq.getItemId());
+        if (Objects.isNull(dimensionResp)) {
+            return null;
+        }
+        DictItemResp fallback = new DictItemResp();
+        fallback.setModelId(dimensionResp.getModelId());
+        fallback.setBizName(dimensionResp.getBizName());
+        fallback.setType(TypeEnums.DIMENSION);
+        fallback.setItemId(dimensionResp.getId());
+        fallback.setStatus(StatusEnum.ONLINE);
+        fallback.setLocked(1);
+        return fallback;
     }
 
     private void runDictTask(DictItemResp dictItemResp, User user) {
@@ -125,8 +156,11 @@ public class DictTaskServiceImpl implements DictTaskService {
         List<String> data = dictUtils.fetchItemValue(dictItemResp);
 
         // 2.Change dictionary file
-        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
-        fileHandler.writeFile(data, fileName, false);
+
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+            fileHandler.writeFile(data, fileName, false);
+        }
 
         // 3.Change in-memory dictionary data in real time
         String status = TaskStatusEnum.SUCCESS.getStatus();
@@ -172,13 +206,20 @@ public class DictTaskServiceImpl implements DictTaskService {
     @Override
     public Long deleteDictTask(DictSingleTaskReq taskReq, User user) {
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
-        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
-        deleteEmbedding(dictItemResp, fileName);
-        fileHandler.deleteDictFile(fileName);
-        try {
-            dictWordService.loadDictWord();
-        } catch (Exception e) {
-            log.error("reloadCustomDictionary error", e);
+        if (Objects.isNull(dictItemResp)) {
+            return 0L;
+        }
+        deleteAllDimensionValueEmbedding(dictItemResp);
+        clearDimensionValueMaps(dictItemResp, user);
+
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+            fileHandler.deleteDictFile(fileName);
+            try {
+                dictWordService.loadDictWord();
+            } catch (Exception e) {
+                log.error("reloadCustomDictionary error", e);
+            }
         }
         // Add a clear dictionary file record
         DictTaskDO dictTaskDO =
@@ -187,6 +228,36 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictRepository.addDictTask(dictTaskDO);
         return 0L;
     }
+    private void deleteAllDimensionValueEmbedding(DictItemResp dictItemResp) {
+        if (Objects.isNull(dictItemResp) || !TypeEnums.DIMENSION.equals(dictItemResp.getType())
+                || Objects.isNull(dictItemResp.getItemId())) {
+            return;
+        }
+        try {
+            Map<String, Object> filterCondition = new HashMap<>();
+            filterCondition.put("type", TypeEnums.VALUE.name());
+            filterCondition.put("dimId", dictItemResp.getItemId());
+            embeddingService.deleteByCondition(embeddingConfig.getMetaCollectionName(),
+                    filterCondition);
+        } catch (Exception e) {
+            log.warn("deleteAllDimensionValueEmbedding error,dimId:{}", dictItemResp.getItemId(),
+                    e);
+        }
+    }
+
+    private void clearDimensionValueMaps(DictItemResp dictItemResp, User user) {
+        if (Objects.isNull(dictItemResp) || !TypeEnums.DIMENSION.equals(dictItemResp.getType())
+                || Objects.isNull(dictItemResp.getItemId()) || Objects.isNull(user)) {
+            return;
+        }
+        try {
+            dimensionService.updateDimValueAliasBatch(dictItemResp.getItemId(), new ArrayList<>(),
+                    user);
+        } catch (Exception e) {
+            log.warn("clearDimensionValueMaps error,dimId:{}", dictItemResp.getItemId(), e);
+        }
+    }
+
 
     @Override
     public Long deleteDictTaskForBI(DictSingleTaskReq taskReq, User user) {
@@ -194,9 +265,14 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (Objects.isNull(dictItemResp)) {
             return 0L;
         }
-        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
-        deleteEmbedding(dictItemResp, fileName);
-        fileHandler.deleteDictFile(fileName);
+
+        deleteAllDimensionValueEmbedding(dictItemResp);
+        clearDimensionValueMaps(dictItemResp, user);
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+            fileHandler.deleteDictFile(fileName);
+        }
+
 
         // Add a clear dictionary file record
         DictTaskDO dictTaskDO =
@@ -208,6 +284,9 @@ public class DictTaskServiceImpl implements DictTaskService {
 
     @Override
     public void reloadDictWord() {
+        if (Boolean.FALSE.equals(dictionaryEnabled)) {
+            return;
+        }
         try {
             dictWordService.loadDictWord();
         } catch (Exception e) {
@@ -234,8 +313,10 @@ public class DictTaskServiceImpl implements DictTaskService {
     @Scheduled(cron = "${knowledge.dimension.value.cron:0 0 4 * * ?}")
     public Boolean dailyDictTask() {
         log.info("[dailyDictTask] start");
-        if (!dictFlushDailyEnable) {
-            log.info("dictFlushDailyEnable is false, now finish dailyDictTask");
+        if (!dictFlushDailyEnable || Boolean.FALSE.equals(dictionaryEnabled)) {
+            log.info("dailyDictTask skipped (dictFlushDailyEnable={}, dictionaryEnabled={})",
+                    dictFlushDailyEnable, dictionaryEnabled);
+            return true;
         }
         DictItemFilter filter =
                 DictItemFilter.builder().status(StatusEnum.ONLINE).locked(0).build();
@@ -243,11 +324,13 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictItemRespList.forEach(item -> handleDictTaskByItemResp(item, null));
 
         // 统一执行一次词典加载
-        try {
-            dictWordService.loadDictWord();
-            log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
-        } catch (Exception e) {
-            log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            try {
+                dictWordService.loadDictWord();
+                log.info("[dailyDictTask] Dictionary loaded successfully after batch processing.");
+            } catch (Exception e) {
+                log.error("[dailyDictTask] Failed to load dictionary after batch processing.", e);
+            }
         }
 
         log.info("[dailyDictTask] finish");
@@ -270,14 +353,55 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dictTaskRespPageInfo;
     }
 
+//    @Override
+//    public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
+//        // todo 优化读取内存结构
+//        // return getDictValuePageFromMemory(dictValueReq);
+//        return getDictValuePageFromFile(dictValueReq);
+//    }
+
     @Override
     public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
-        // todo 优化读取内存结构
-        // return getDictValuePageFromMemory(dictValueReq);
+        if (TypeEnums.DIMENSION.equals(dictValueReq.getType())) {
+            return getDictValuePageFromMaps(dictValueReq);
+        }
         return getDictValuePageFromFile(dictValueReq);
     }
 
+    private PageInfo<DictValueDimResp> getDictValuePageFromMaps(DictValueReq dictValueReq) {
+        PageInfo<DictValueDimResp> pageInfo = new PageInfo<>();
+        DimensionResp dimResp = dimensionService.getDimension(dictValueReq.getItemId());
+        if (Objects.isNull(dimResp) || CollectionUtils.isEmpty(dimResp.getDimValueMaps())) {
+            pageInfo.setList(new ArrayList<>());
+            pageInfo.setTotal(0);
+            pageInfo.setPageNum(dictValueReq.getCurrent());
+            pageInfo.setPageSize(dictValueReq.getPageSize());
+            return pageInfo;
+        }
+
+        List<DictValueDimResp> values = dimResp.getDimValueMaps().stream().filter(Objects::nonNull)
+                .map(this::convert2DictValueInternal).filter(Objects::nonNull)
+                .filter(resp -> StringUtils.isBlank(dictValueReq.getKeyValue())
+                        || StringUtils.containsIgnoreCase(resp.getValue(),
+                        dictValueReq.getKeyValue()))
+                .collect(Collectors.toList());
+
+        Integer pageSize = dictValueReq.getPageSize();
+        Integer current = dictValueReq.getCurrent();
+        int startIndex = Math.max((current - 1) * pageSize, 0);
+        int endIndex = Math.min(startIndex + pageSize, values.size());
+        List<DictValueDimResp> paged = startIndex >= values.size() ? new ArrayList<>()
+                : values.subList(startIndex, endIndex);
+
+        pageInfo.setList(paged);
+        pageInfo.setTotal(values.size());
+        pageInfo.setPageNum(current);
+        pageInfo.setPageSize(pageSize);
+        return pageInfo;
+    }
+
     private PageInfo<DictValueDimResp> getDictValuePageFromFile(DictValueReq dictValueReq) {
+
         String fileName = String.format("dic_value_%d_%s_%s", dictValueReq.getModelId(),
                 dictValueReq.getType().name(), dictValueReq.getItemId()) + Constants.DOT
                 + dictFileType;
@@ -354,6 +478,23 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dictValueDimResp;
     }
 
+    private DictValueDimResp convert2DictValueInternal(DimValueMap dimValueMap) {
+        if (Objects.isNull(dimValueMap)) {
+            return null;
+        }
+        String value = StringUtils.defaultIfBlank(dimValueMap.getValue(), dimValueMap.getTechName());
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        DictValueDimResp dictValueDimResp = new DictValueDimResp();
+        dictValueDimResp.setValue(value);
+        dictValueDimResp.setBizName(dimValueMap.getBizName());
+        if (!CollectionUtils.isEmpty(dimValueMap.getAlias())) {
+            dictValueDimResp.setAlias(dimValueMap.getAlias());
+        }
+        return dictValueDimResp;
+    }
+
     private PageInfo<DictValueDimResp> getDictValuePageFromMemory(DictValueReq dictValueReq) {
         PageInfo<DictValueDimResp> dictValueRespPageInfo = new PageInfo<>();
         Set<Long> dimSet = new HashSet<>();
@@ -393,8 +534,10 @@ public class DictTaskServiceImpl implements DictTaskService {
     @Override
     public void importDictData(DictItemResp dictItemResp, List<String> data, User user) {
         // Change dictionary file
-        String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
-        fileHandler.writeFile(data, fileName, false);
+        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+            String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
+            fileHandler.writeFile(data, fileName, false);
+        }
 
         if (!data.isEmpty() && user != null) {
             // 维度值存向量库

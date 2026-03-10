@@ -37,6 +37,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -53,7 +54,7 @@ public class S2SemanticLayerService implements SemanticLayerService {
     private final SchemaService schemaService;
     private final SemanticTranslator semanticTranslator;
     private final MetricDrillDownChecker metricDrillDownChecker;
-    private final KnowledgeBaseService knowledgeBaseService;
+//    private final KnowledgeBaseService knowledgeBaseService;
     private final MetricService metricService;
     private final DomainService domainService;
     private final DimensionService dimensionService;
@@ -62,12 +63,12 @@ public class S2SemanticLayerService implements SemanticLayerService {
     private final List<QueryExecutor> queryExecutors = ComponentFactory.getQueryExecutors();
     @Autowired
     private BiReportConfigService biReportConfigService;
-
+    @Value("${s2.dimension.value.db.fallback.enabled:false}")
+    private Boolean dimensionValueDbFallbackEnabled;
     public S2SemanticLayerService(StatUtils statUtils, QueryUtils queryUtils,
             SemanticSchemaManager semanticSchemaManager, DataSetService dataSetService,
             SchemaService schemaService, SemanticTranslator semanticTranslator,
-            MetricDrillDownChecker metricDrillDownChecker,
-            KnowledgeBaseService knowledgeBaseService, MetricService metricService,
+            MetricDrillDownChecker metricDrillDownChecker, MetricService metricService,
             DimensionService dimensionService, DomainService domainService,
             TranslatorConfig translatorConfig) {
         this.statUtils = statUtils;
@@ -77,7 +78,6 @@ public class S2SemanticLayerService implements SemanticLayerService {
         this.schemaService = schemaService;
         this.semanticTranslator = semanticTranslator;
         this.metricDrillDownChecker = metricDrillDownChecker;
-        this.knowledgeBaseService = knowledgeBaseService;
         this.metricService = metricService;
         this.dimensionService = dimensionService;
         this.domainService = domainService;
@@ -262,24 +262,55 @@ public class S2SemanticLayerService implements SemanticLayerService {
         }
     }
 
+//    @Override
+//    public SemanticQueryResp queryDimensionValue(DimensionValueReq dimensionValueReq, User user) {
+//        SemanticQueryResp semanticQueryResp = new SemanticQueryResp();
+//        DimensionResp dimensionResp = getDimension(dimensionValueReq);
+//        Set<Long> dataSetIds = dimensionValueReq.getDataSetIds();
+//        dimensionValueReq.setModelId(dimensionResp.getModelId());
+//        if (StringUtils.isNotBlank(dimensionValueReq.getValue())) {
+//            if (!checkDimValueParam(dimensionValueReq, user)) {
+//                throw new RuntimeException("参数有误");
+//            }
+//        }
+//        List<String> dimensionValues = getDimensionValuesFromDict(dimensionValueReq, dataSetIds);
+//
+////         try to query dimensionValue from the database.
+////         维度值只查询词典
+//         if (CollectionUtils.isEmpty(dimensionValues)) {
+//         return getDimensionValuesFromDb(dimensionValueReq, user);
+//         }
+//
+//        List<QueryColumn> columns = createQueryColumns(dimensionValueReq);
+//        List<Map<String, Object>> resultList = createResultList(dimensionValueReq, dimensionValues);
+//
+//        semanticQueryResp.setColumns(columns);
+//        semanticQueryResp.setResultList(resultList);
+//        return semanticQueryResp;
+//    }
+
     @Override
     public SemanticQueryResp queryDimensionValue(DimensionValueReq dimensionValueReq, User user) {
         SemanticQueryResp semanticQueryResp = new SemanticQueryResp();
         DimensionResp dimensionResp = getDimension(dimensionValueReq);
-        Set<Long> dataSetIds = dimensionValueReq.getDataSetIds();
+        if (dimensionResp == null) {
+            throw new RuntimeException("维度不存在");
+        }
         dimensionValueReq.setModelId(dimensionResp.getModelId());
-        if (StringUtils.isNotBlank(dimensionValueReq.getValue())) {
+
+        if (StringUtils.isNotBlank(dimensionValueReq.getValue())
+                && Boolean.TRUE.equals(dimensionValueDbFallbackEnabled)) {
             if (!checkDimValueParam(dimensionValueReq, user)) {
                 throw new RuntimeException("参数有误");
             }
         }
-        List<String> dimensionValues = getDimensionValuesFromDict(dimensionValueReq, dataSetIds);
+        List<String> dimensionValues = getDimensionValuesFromMaps(dimensionValueReq);
 
-        // try to query dimensionValue from the database.
-        // 维度值只查询词典
-        // if (CollectionUtils.isEmpty(dimensionValues)) {
-        // return getDimensionValuesFromDb(dimensionValueReq, user);
-        // }
+
+        if (CollectionUtils.isEmpty(dimensionValues)
+                && Boolean.TRUE.equals(dimensionValueDbFallbackEnabled)) {
+            return getDimensionValuesFromDb(dimensionValueReq, user);
+        }
 
         List<QueryColumn> columns = createQueryColumns(dimensionValueReq);
         List<Map<String, Object>> resultList = createResultList(dimensionValueReq, dimensionValues);
@@ -289,6 +320,21 @@ public class S2SemanticLayerService implements SemanticLayerService {
         return semanticQueryResp;
     }
 
+
+    private List<String> getDimensionValuesFromMaps(DimensionValueReq dimensionValueReq) {
+        DimensionResp dimensionResp = getDimension(dimensionValueReq);
+        if (Objects.isNull(dimensionResp) || CollectionUtils.isEmpty(dimensionResp.getDimValueMaps())) {
+            return new ArrayList<>();
+        }
+        String value = dimensionValueReq.getValue();
+        return dimensionResp.getDimValueMaps().stream().filter(Objects::nonNull)
+                .map(dimValueMap -> StringUtils.defaultIfBlank(dimValueMap.getValue(),
+                        dimValueMap.getTechName()))
+                .filter(StringUtils::isNotBlank)
+                .filter(dimValue -> StringUtils.isBlank(value)
+                        || StringUtils.containsIgnoreCase(dimValue, value))
+                .distinct().collect(Collectors.toList());
+    }
     /**
      * distinct返查库中的值是否包含在value中
      * 
@@ -311,24 +357,24 @@ public class S2SemanticLayerService implements SemanticLayerService {
         return true;
     }
 
-    private List<String> getDimensionValuesFromDict(DimensionValueReq dimensionValueReq,
-            Set<Long> dataSetIds) {
-        if (StringUtils.isBlank(dimensionValueReq.getValue())) {
-            return SearchService.getDimensionValue(dimensionValueReq);
-        }
-        Map<Long, List<Long>> modelIdToDataSetIds = new HashMap<>();
-        modelIdToDataSetIds.put(dimensionValueReq.getModelId(), new ArrayList<>(dataSetIds));
-
-        List<HanlpMapResult> hanlpMapResultList = knowledgeBaseService
-                .prefixSearch(dimensionValueReq.getValue(), 2000, modelIdToDataSetIds, dataSetIds);
-
-        HanlpHelper.transLetterOriginal(hanlpMapResultList);
-
-        return hanlpMapResultList.stream()
-                .filter(o -> o.getNatures().stream().map(NatureHelper::getElementID)
-                        .anyMatch(elementID -> dimensionValueReq.getElementID().equals(elementID)))
-                .map(MapResult::getName).collect(Collectors.toList());
-    }
+//    private List<String> getDimensionValuesFromDict(DimensionValueReq dimensionValueReq,
+//            Set<Long> dataSetIds) {
+//        if (StringUtils.isBlank(dimensionValueReq.getValue())) {
+//            return SearchService.getDimensionValue(dimensionValueReq);
+//        }
+//        Map<Long, List<Long>> modelIdToDataSetIds = new HashMap<>();
+//        modelIdToDataSetIds.put(dimensionValueReq.getModelId(), new ArrayList<>(dataSetIds));
+//
+//        List<HanlpMapResult> hanlpMapResultList = knowledgeBaseService
+//                .prefixSearch(dimensionValueReq.getValue(), 2000, modelIdToDataSetIds, dataSetIds);
+//
+//        HanlpHelper.transLetterOriginal(hanlpMapResultList);
+//
+//        return hanlpMapResultList.stream()
+//                .filter(o -> o.getNatures().stream().map(NatureHelper::getElementID)
+//                        .anyMatch(elementID -> dimensionValueReq.getElementID().equals(elementID)))
+//                .map(MapResult::getName).collect(Collectors.toList());
+//    }
 
     private SemanticQueryResp getDimensionValuesFromDb(DimensionValueReq queryDimValueReq,
             User user) {

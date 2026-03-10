@@ -53,6 +53,10 @@ public class KeywordMapper extends BaseMapper {
 
     @Override
     protected boolean accept(ChatQueryContext chatQueryContext) {
+        boolean dictionaryEnabled = false;
+        if (!dictionaryEnabled) {
+            return false;
+        }
         return !chatQueryContext.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE);
     }
 

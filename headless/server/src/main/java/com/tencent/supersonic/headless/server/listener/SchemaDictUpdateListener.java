@@ -9,6 +9,7 @@ import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.headless.chat.knowledge.DictWord;
 import com.tencent.supersonic.headless.chat.knowledge.helper.HanlpHelper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -17,10 +18,14 @@ import org.springframework.util.CollectionUtils;
 @Component
 @Slf4j
 public class SchemaDictUpdateListener {
-
+    @Value("${s2.dictionary.enabled:false}")
+    private Boolean dictionaryEnabled;
     @Async("eventExecutor")
     @EventListener
     public void onApplicationEvent(DataEvent dataEvent) {
+        if (Boolean.FALSE.equals(dictionaryEnabled)) {
+            return;
+        }
         if (CollectionUtils.isEmpty(dataEvent.getDataItems())) {
             return;
         }

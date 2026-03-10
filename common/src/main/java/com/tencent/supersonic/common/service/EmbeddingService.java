@@ -20,4 +20,6 @@ public interface EmbeddingService {
             int num);
 
     void removeAll();
+
+    void deleteByCondition(String collectionName, java.util.Map<String, Object> filterCondition);
 }

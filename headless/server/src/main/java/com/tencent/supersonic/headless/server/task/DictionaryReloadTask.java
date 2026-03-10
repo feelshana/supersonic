@@ -1,6 +1,7 @@
 package com.tencent.supersonic.headless.server.task;
 
 import com.tencent.supersonic.headless.server.service.impl.DictWordService;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -16,12 +17,22 @@ public class DictionaryReloadTask implements CommandLineRunner {
     @Autowired
     private DictWordService dictWordService;
 
+    @Value("${s2.dictionary.enabled:false}")
+    private Boolean dictionaryEnabled;
+
     @Override
     public void run(String... args) {
+        if (Boolean.FALSE.equals(dictionaryEnabled)) {
+            log.info("DictionaryReloadTask skipped because s2.dictionary.enabled=false");
+            return;
+        }
         updateKnowledgeDimValue();
     }
 
     public void updateKnowledgeDimValue() {
+        if (Boolean.FALSE.equals(dictionaryEnabled)) {
+            return;
+        }
         try {
             log.debug("ApplicationStartedInit start");
             dictWordService.loadDictWord();
@@ -34,6 +45,9 @@ public class DictionaryReloadTask implements CommandLineRunner {
     /** * reload knowledge task */
     // @Scheduled(cron = "${reload.knowledge.corn:0 0/1 * * * ?}")
     public void reloadKnowledge() {
+        if (Boolean.FALSE.equals(dictionaryEnabled)) {
+            return;
+        }
         log.debug("reloadKnowledge start");
         try {
             dictWordService.reloadDictWord();

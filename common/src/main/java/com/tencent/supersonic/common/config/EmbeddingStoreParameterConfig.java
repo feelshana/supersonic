@@ -39,7 +39,7 @@ public class EmbeddingStoreParameterConfig extends ParameterConfig {
             new Parameter("s2.embedding.store.timeout", "60", "超时时间(秒)", "", "number", MODULE_NAME);
 
     public static final Parameter EMBEDDING_STORE_DIMENSION =
-            new Parameter("s2.embedding.store.dimension", "", "向量维度", "", "number", MODULE_NAME,
+            new Parameter("s2.embedding.store.dimension", "1024", "向量维度", "", "number", MODULE_NAME,
                     null, getDimensionDependency());
     public static final Parameter EMBEDDING_STORE_DATABASE_NAME =
             new Parameter("s2.embedding.store.databaseName", "", "DatabaseName", "", "string",

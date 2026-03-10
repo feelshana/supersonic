@@ -82,7 +82,8 @@ s2:
   bi:
     model-id: 5
     url: http://10.193.131.27:7888
-
+  dictionary:
+    enabled: false
 crab:
   api:
     appId: qjt2geuo
