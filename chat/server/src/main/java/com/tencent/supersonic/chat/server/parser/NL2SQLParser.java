@@ -117,15 +117,15 @@ public class NL2SQLParser implements ChatQueryParser {
                     doParse(queryNLReq, parseResp);
                     keyWordsValues = new ArrayList<>();
                     if (!parseResp.getSelectedParses().isEmpty()) {
-                        keyWordsValues =
-                                parseResp.getSelectedParses().getFirst().getElementMatches().stream()
-                                        .filter(schemaElementMatch -> schemaElementMatch.getElement()
-                                                .getType() == SchemaElementType.VALUE
-                                                || schemaElementMatch.getElement()
-                                                        .getType() == SchemaElementType.TERM)
-                                        .peek(schemaElementMatch -> schemaElementMatch
-                                                .setMatchType(MatchType.KEYWORD.name()))
-                                        .toList();
+                        keyWordsValues = parseResp.getSelectedParses().getFirst()
+                                .getElementMatches().stream()
+                                .filter(schemaElementMatch -> schemaElementMatch.getElement()
+                                        .getType() == SchemaElementType.VALUE
+                                        || schemaElementMatch.getElement()
+                                                .getType() == SchemaElementType.TERM)
+                                .peek(schemaElementMatch -> schemaElementMatch
+                                        .setMatchType(MatchType.KEYWORD.name()))
+                                .toList();
                         parseResp.getSelectedParses().clear();
                     }
                 }

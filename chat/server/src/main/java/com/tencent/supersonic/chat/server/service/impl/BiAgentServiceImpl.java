@@ -958,27 +958,27 @@ public class BiAgentServiceImpl implements BiAgentService {
                 continue;
             }
             DimensionResp resp = resps.getFirst();
-            //停用原有加入词典的逻辑
-//            DictItemReq dictItemReq = new DictItemReq();
-//            dictItemReq.setType(TypeEnums.DIMENSION);
-//            dictItemReq.setItemId(resp.getId());
-//            // 导入的维度值锁定不允许刷新
-//            dictItemReq.setStatus(StatusEnum.ONLINE);
-//            dictItemReq.setLocked(1);
-//            DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
-//            String nature = dictItemResp.getNature();
-//            List<String> lines = values.stream().map(value -> {
-//                        if (!StringUtils.isEmpty(value)) {
-//                            value = value.replace(SPACE, POUND);
-//                        }
-//                        return value;
-//                    }).filter(value -> !value.equals("全国"))
-//                    .map(value -> String.format("%s %s %s", value, nature, 1L)).toList();
-//            dictTaskService.importDictData(dictItemResp, lines, user);
-//            List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
-//            if (alias != null) {
-//                dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
-//            }
+            // 停用原有加入词典的逻辑
+            // DictItemReq dictItemReq = new DictItemReq();
+            // dictItemReq.setType(TypeEnums.DIMENSION);
+            // dictItemReq.setItemId(resp.getId());
+            // // 导入的维度值锁定不允许刷新
+            // dictItemReq.setStatus(StatusEnum.ONLINE);
+            // dictItemReq.setLocked(1);
+            // DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
+            // String nature = dictItemResp.getNature();
+            // List<String> lines = values.stream().map(value -> {
+            // if (!StringUtils.isEmpty(value)) {
+            // value = value.replace(SPACE, POUND);
+            // }
+            // return value;
+            // }).filter(value -> !value.equals("全国"))
+            // .map(value -> String.format("%s %s %s", value, nature, 1L)).toList();
+            // dictTaskService.importDictData(dictItemResp, lines, user);
+            // List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
+            // if (alias != null) {
+            // dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
+            // }
             List<String> normalizedValues = values.stream().filter(StringUtils::isNotBlank)
                     .map(String::trim).filter(value -> !"全国".equals(value)).distinct().toList();
             if (CollectionUtils.isEmpty(normalizedValues)) {
@@ -1008,12 +1008,13 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
 
     }
+
     private List<DimValueMap> buildPreviewDimValueMaps(List<String> normalizedValues,
-                                                       List<DimValueMap> oldAlias) {
+            List<DimValueMap> oldAlias) {
         Map<String, DimValueMap> aliasByValue = oldAlias == null ? Collections.emptyMap()
                 : oldAlias.stream().filter(Objects::nonNull)
-                .filter(item -> StringUtils.isNotBlank(item.getValue())).collect(
-                        Collectors.toMap(DimValueMap::getValue, item -> item, (a, b) -> a));
+                        .filter(item -> StringUtils.isNotBlank(item.getValue())).collect(
+                                Collectors.toMap(DimValueMap::getValue, item -> item, (a, b) -> a));
 
         List<DimValueMap> preview = new ArrayList<>();
         normalizedValues.stream().filter(value -> StringUtils.length(value) <= 20).limit(50)

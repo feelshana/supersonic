@@ -121,8 +121,8 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 embeddingStore.removeAll(filter);
             }
         } catch (Exception e) {
-            log.error("deleteByCondition error,collectionName:{},filterCondition:{}", collectionName,
-                    filterCondition, e);
+            log.error("deleteByCondition error,collectionName:{},filterCondition:{}",
+                    collectionName, filterCondition, e);
         }
     }
 
@@ -162,7 +162,6 @@ public class EmbeddingServiceImpl implements EmbeddingService {
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
                 .queryEmbedding(embeddedText).filter(filter).maxResults(num).build();
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
-
         List<Retrieval> retrievals = result.matches().stream().map(this::convertToRetrieval)
                 .sorted(Comparator.comparingDouble(Retrieval::getSimilarity).reversed()).limit(num)
                 .collect(Collectors.toList());
