@@ -24,6 +24,7 @@ import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Date;
+import java.util.Map;
 import java.util.Objects;
 
 public class SqlExecutor implements ChatQueryExecutor {
@@ -90,6 +91,16 @@ public class SqlExecutor implements ChatQueryExecutor {
                 || StringUtils.isBlank(parseInfo.getSqlInfo().getCorrectedS2SQL())) {
             return null;
         }
+        // 将setSchemaValueMaps的维度值信息清理了，减少Context数据存储
+        parseInfo.getDimensions().forEach(schemaElement -> schemaElement.setSchemaValueMaps(null));
+        if (parseInfo.getElementMatches() != null && !parseInfo.getElementMatches().isEmpty()) {
+            parseInfo.getElementMatches().forEach(schemaElementMatch -> {
+                if (schemaElementMatch.getElement() != null) {
+                    schemaElementMatch.getElement().setSchemaValueMaps(null);
+                }
+            });
+        }
+        Map<String, Object> properties = parseInfo.getProperties();
 
         // 使用querySQL，它已经包含了所有修正（包括物理SQL修正）
         String finalSql = StringUtils.isNotBlank(parseInfo.getSqlInfo().getQuerySQL())
@@ -111,23 +122,27 @@ public class SqlExecutor implements ChatQueryExecutor {
             queryResult.setTextResult(parseInfo.getSqlInfo().getCorrectedS2SQL());
             return queryResult;
         }
-        SemanticQueryResp queryResp =
-                semanticLayer.queryBySchemaStrValues(sqlReq, executeContext.getRequest().getUser());
-        queryResult.setQueryTimeCost(System.currentTimeMillis() - startTime);
-        if (queryResp != null) {
-            queryResult.setQueryAuthorization(queryResp.getQueryAuthorization());
-            queryResult.setQuerySql(finalSql);
-            queryResult.setQueryResults(queryResp.getResultList());
-            queryResult.setQueryColumns(queryResp.getColumns());
-            queryResult.setQueryState(QueryState.SUCCESS);
-            queryResult.setErrorMsg(queryResp.getErrorMsg());
-            queryResult.setResultType(queryResp.getResultType());
-            chatCtx.setParseInfo(parseInfo);
-            chatContextService.updateContext(chatCtx);
-        } else {
-            queryResult.setQueryState(QueryState.INVALID);
+        parseInfo.setProperties(null);
+        try {
+            SemanticQueryResp queryResp = semanticLayer.queryBySchemaStrValues(sqlReq,
+                    executeContext.getRequest().getUser());
+            queryResult.setQueryTimeCost(System.currentTimeMillis() - startTime);
+            if (queryResp != null) {
+                queryResult.setQueryAuthorization(queryResp.getQueryAuthorization());
+                queryResult.setQuerySql(finalSql);
+                queryResult.setQueryResults(queryResp.getResultList());
+                queryResult.setQueryColumns(queryResp.getColumns());
+                queryResult.setQueryState(QueryState.SUCCESS);
+                queryResult.setErrorMsg(queryResp.getErrorMsg());
+                queryResult.setResultType(queryResp.getResultType());
+                chatCtx.setParseInfo(parseInfo);
+                chatContextService.updateContext(chatCtx);
+            } else {
+                queryResult.setQueryState(QueryState.INVALID);
+            }
+        } finally {
+            parseInfo.setProperties(properties);
         }
-
         return queryResult;
     }
 }

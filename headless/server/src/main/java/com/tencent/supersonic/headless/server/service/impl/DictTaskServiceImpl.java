@@ -70,9 +70,9 @@ public class DictTaskServiceImpl implements DictTaskService {
     private final EmbeddingConfig embeddingConfig;
 
     public DictTaskServiceImpl(DictRepository dictRepository, DictUtils dictConverter,
-                               DictUtils dictUtils, FileHandler fileHandler, DictWordService dictWordService,
-                               DimensionService dimensionService, EmbeddingService embeddingService,
-                               EmbeddingConfig embeddingConfig) {
+            DictUtils dictUtils, FileHandler fileHandler, DictWordService dictWordService,
+            DimensionService dimensionService, EmbeddingService embeddingService,
+            EmbeddingConfig embeddingConfig) {
         this.dictRepository = dictRepository;
         this.dictConverter = dictConverter;
         this.dictUtils = dictUtils;
@@ -228,6 +228,7 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictRepository.addDictTask(dictTaskDO);
         return 0L;
     }
+
     private void deleteAllDimensionValueEmbedding(DictItemResp dictItemResp) {
         if (Objects.isNull(dictItemResp) || !TypeEnums.DIMENSION.equals(dictItemResp.getType())
                 || Objects.isNull(dictItemResp.getItemId())) {
@@ -353,12 +354,12 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dictTaskRespPageInfo;
     }
 
-//    @Override
-//    public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
-//        // todo 优化读取内存结构
-//        // return getDictValuePageFromMemory(dictValueReq);
-//        return getDictValuePageFromFile(dictValueReq);
-//    }
+    // @Override
+    // public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
+    // // todo 优化读取内存结构
+    // // return getDictValuePageFromMemory(dictValueReq);
+    // return getDictValuePageFromFile(dictValueReq);
+    // }
 
     @Override
     public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
@@ -381,9 +382,8 @@ public class DictTaskServiceImpl implements DictTaskService {
 
         List<DictValueDimResp> values = dimResp.getDimValueMaps().stream().filter(Objects::nonNull)
                 .map(this::convert2DictValueInternal).filter(Objects::nonNull)
-                .filter(resp -> StringUtils.isBlank(dictValueReq.getKeyValue())
-                        || StringUtils.containsIgnoreCase(resp.getValue(),
-                        dictValueReq.getKeyValue()))
+                .filter(resp -> StringUtils.isBlank(dictValueReq.getKeyValue()) || StringUtils
+                        .containsIgnoreCase(resp.getValue(), dictValueReq.getKeyValue()))
                 .collect(Collectors.toList());
 
         Integer pageSize = dictValueReq.getPageSize();
@@ -482,7 +482,8 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (Objects.isNull(dimValueMap)) {
             return null;
         }
-        String value = StringUtils.defaultIfBlank(dimValueMap.getValue(), dimValueMap.getTechName());
+        String value =
+                StringUtils.defaultIfBlank(dimValueMap.getValue(), dimValueMap.getTechName());
         if (StringUtils.isBlank(value)) {
             return null;
         }

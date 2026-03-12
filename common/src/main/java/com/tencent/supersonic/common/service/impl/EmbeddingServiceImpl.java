@@ -121,8 +121,8 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 embeddingStore.removeAll(filter);
             }
         } catch (Exception e) {
-            log.error("deleteByCondition error,collectionName:{},filterCondition:{}", collectionName,
-                    filterCondition, e);
+            log.error("deleteByCondition error,collectionName:{},filterCondition:{}",
+                    collectionName, filterCondition, e);
         }
     }
 
