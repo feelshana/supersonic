@@ -587,6 +587,15 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         return true;
     }
 
+    @Override
+    public Boolean updateDimValueMapsOnlyBatch(Long dimId, List<DimValueMap> valueMaps, User user) {
+        DimensionDO dimensionDO = getById(dimId);
+        dimensionDO.setDimValueMaps(JsonUtil.toString(valueMaps));
+        updateById(dimensionDO);
+        return true;
+    }
+
+
     private DataItem getDataItem(DimensionDO dimensionDO) {
         ModelResp modelResp = modelService.getModel(dimensionDO.getModelId());
         DimensionResp dimensionResp = DimensionConverter.convert2DimensionResp(dimensionDO,
