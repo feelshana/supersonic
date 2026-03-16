@@ -1040,6 +1040,71 @@ public class BiAgentServiceImpl implements BiAgentService {
                 : oldAlias.stream().filter(Objects::nonNull)
                 .filter(item -> StringUtils.isNotBlank(item.getValue())).collect(
                         Collectors.toMap(DimValueMap::getValue, item -> item, (a, b) -> a));
+            if (CollectionUtils.isEmpty(values)) {
+                continue;
+            }
+            filter.setName(dimensionConfig.getName());
+            List<DimensionResp> resps = dimensionService.getDimensions(filter);
+            if (resps == null || resps.size() != 1) {
+                continue;
+            }
+            DimensionResp resp = resps.getFirst();
+            //停用原有加入词典的逻辑
+//            DictItemReq dictItemReq = new DictItemReq();
+//            dictItemReq.setType(TypeEnums.DIMENSION);
+//            dictItemReq.setItemId(resp.getId());
+//            // 导入的维度值锁定不允许刷新
+//            dictItemReq.setStatus(StatusEnum.ONLINE);
+//            dictItemReq.setLocked(1);
+//            DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
+//            String nature = dictItemResp.getNature();
+//            List<String> lines = values.stream().map(value -> {
+//                        if (!StringUtils.isEmpty(value)) {
+//                            value = value.replace(SPACE, POUND);
+//                        }
+//                        return value;
+//                    }).filter(value -> !value.equals("全国"))
+//                    .map(value -> String.format("%s %s %s", value, nature, 1L)).toList();
+//            dictTaskService.importDictData(dictItemResp, lines, user);
+//            List<DimValueMap> alias = dimAliasMap.get(dimensionConfig.getName());
+//            if (alias != null) {
+//                dimensionService.updateDimValueAliasBatch(resp.getId(), alias, user);
+//            }
+            List<String> normalizedValues = values.stream().filter(StringUtils::isNotBlank)
+                    .map(String::trim).filter(value -> !"全国".equals(value)).distinct().toList();
+            if (CollectionUtils.isEmpty(normalizedValues)) {
+                continue;
+            }
+            // 全量维度值写入向量库
+            List<DimensionValueDO> dimensionValueDOS = normalizedValues.stream().map(value -> {
+                DimensionValueDO dimensionValueDO = new DimensionValueDO();
+                dimensionValueDO.setModelId(modelId);
+                dimensionValueDO.setDimId(resp.getId());
+                dimensionValueDO.setDimName(resp.getName());
+                dimensionValueDO.setDimBizName(resp.getBizName());
+                dimensionValueDO.setDimValue(value);
+                dimensionValueDO.setFrequency(1L);
+                return dimensionValueDO;
+            }).toList();
+            dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
+
+            // 仅保存前50个维度值到dim_value_maps，供提示词和背景信息使用
+            List<DimValueMap> oldAlias = dimAliasMap == null ? Collections.emptyList()
+                    : dimAliasMap.getOrDefault(dimensionConfig.getName(), Collections.emptyList());
+            List<DimValueMap> previewDimValueMaps =
+                    buildPreviewDimValueMaps(normalizedValues, oldAlias);
+            if (!CollectionUtils.isEmpty(previewDimValueMaps)) {
+                dimensionService.updateDimValueAliasBatch(resp.getId(), previewDimValueMaps, user);
+            }
+        }
+
+    }
+    private List<DimValueMap> buildPreviewDimValueMaps(List<String> normalizedValues,
+                                                       List<DimValueMap> oldAlias) {
+        Map<String, DimValueMap> aliasByValue = oldAlias == null ? Collections.emptyMap()
+                : oldAlias.stream().filter(Objects::nonNull)
+                .filter(item -> StringUtils.isNotBlank(item.getValue())).collect(
+                        Collectors.toMap(DimValueMap::getValue, item -> item, (a, b) -> a));
 
         List<DimValueMap> preview = new ArrayList<>();
         normalizedValues.stream().filter(value -> StringUtils.length(value) <= 20).limit(50)
