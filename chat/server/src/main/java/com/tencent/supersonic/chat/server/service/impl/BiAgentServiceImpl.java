@@ -535,17 +535,20 @@ public class BiAgentServiceImpl implements BiAgentService {
 
 
     @Override
-    public void biAgentCallback(Agent agent, BiAgentConfig config) {
+    public boolean biAgentCallback(Agent agent, BiAgentConfig config) {
         try {
             String url = biUrl + "/report/trainingCallback";
             String body = "reportId=%s&agentId=%s&agentName=%s".formatted(config.getReportId(),
                     agent.getId(), agent.getName());
             String result = HttpUtils.post(url, body);
             log.info("回调BI成功：{}", result);
+            return true;
         } catch (Exception e) {
             log.error("回调BI出错", e);
+            return false;
         }
     }
+
 
 
 

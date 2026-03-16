@@ -17,9 +17,10 @@ public class BiAgentController {
     private BiAgentTaskService biAgentTaskService;
 
     @PostMapping
-    public String createAgent(@RequestBody BiAgentConfig config) throws Exception {
+    public String createAgent(@RequestBody BiAgentConfig config) {
         biAgentTaskService.addBiAgentTask(config);
         return "success";
     }
+
 
 }

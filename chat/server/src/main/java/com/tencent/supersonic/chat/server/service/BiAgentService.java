@@ -7,6 +7,6 @@ public interface BiAgentService {
 
     Agent createBiAgent(BiAgentConfig config) throws Exception;
 
-    void biAgentCallback(Agent agent, BiAgentConfig config);
+    boolean biAgentCallback(Agent agent, BiAgentConfig config);
 
 }
