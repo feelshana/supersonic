@@ -39,6 +39,7 @@ import com.tencent.supersonic.headless.server.service.*;
 import com.tencent.supersonic.headless.server.utils.AliasGenerateHelper;
 import com.tencent.supersonic.headless.server.utils.DimensionConverter;
 import com.tencent.supersonic.headless.server.utils.NameCheckUtils;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -540,6 +541,9 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
             // 新增
             if (!valeAndMapInfo.containsKey(value)) {
                 dimValueMapList.add(dimValueMaps);
+                List<DimensionValueDO>   dimensionValueDOS=  insertDimValueAliasInVector(req.getId(),
+                        dimensionDO, dimValueMaps);
+                sendDimensionValueAliasEventBatch(dimensionValueDOS, EventType.ADD);
             } else {
                 // 更新
                 dimValueMapList.forEach(map -> {
@@ -549,19 +553,9 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                         if (!CollectionUtils.isEmpty(dimValueMaps.getAlias())) {
                             // 先删除之前的
                             deleteDimValueAlias(req.getId(), value);
-                            List<DimensionValueDO> dimensionValueDOS = dimValueMaps.getAlias().stream().map(tAlias -> {
-                                DimensionValueDO dimensionValueDO = new DimensionValueDO();
-                                // 设置维度值的别名进去
-                                dimensionValueDO.setAlias(tAlias);
-                                dimensionValueDO.setModelId(dimensionDO.getModelId());
-                                // 这是维度别名
-                                dimensionValueDO.setDimId(req.getId());
-                                dimensionValueDO.setDimName(dimensionDO.getName());
-                                dimensionValueDO.setDimBizName(dimValueMaps.getBizName());
-                                //这是维度值
-                                dimensionValueDO.setDimValue(dimValueMaps.getTechName());
-                                return dimensionValueDO;
-                            }).toList();
+                            // 新增向量入库
+                            List<DimensionValueDO>   dimensionValueDOS=  insertDimValueAliasInVector(req.getId(),
+                                    dimensionDO, dimValueMaps);
                             sendDimensionValueAliasEventBatch(dimensionValueDOS, EventType.ADD);
                         }
                     }
@@ -722,4 +716,32 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                 .dimValue(dimensionValueDO.getDimValue())
                 .dimValueAlis(dimensionValueDO.getAlias()).build();
     }
+
+    /**
+     *  插入维度别名向量
+     * @param dimId 维度主键
+     * @param dimensionDO 维度信息
+     * @param dimValueMaps 前端传入的维度值别名
+     * @return 插入的维度别名向量对象集合
+     */
+    private List<DimensionValueDO> insertDimValueAliasInVector(Long dimId,
+                                                               DimensionDO dimensionDO,
+                                                               DimValueMap dimValueMaps) {
+
+        return dimValueMaps.getAlias()
+                .stream().map(tAlias -> {
+                    DimensionValueDO dimensionValueDO = new DimensionValueDO();
+                    // 设置维度值的别名进去
+                    dimensionValueDO.setAlias(tAlias);
+                    dimensionValueDO.setModelId(dimensionDO.getModelId());
+                    // 这是维度别名
+                    dimensionValueDO.setDimId(dimId);
+                    dimensionValueDO.setDimName(dimensionDO.getName());
+                    dimensionValueDO.setDimBizName(dimValueMaps.getBizName());
+                    //这是维度值
+                    dimensionValueDO.setDimValue(dimValueMaps.getTechName());
+                    return dimensionValueDO;
+                }).toList();
+    }
+
 }
