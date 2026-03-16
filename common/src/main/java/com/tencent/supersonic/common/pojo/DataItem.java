@@ -28,6 +28,8 @@ public class DataItem {
 
     private Long dimId;
 
+    private String dimValueAlis;
+
     public String getNewName() {
         return newName == null ? name : newName;
     }

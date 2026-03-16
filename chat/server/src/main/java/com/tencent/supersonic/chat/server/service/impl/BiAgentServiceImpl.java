@@ -996,6 +996,32 @@ public class BiAgentServiceImpl implements BiAgentService {
                 return dimensionValueDO;
             }).toList();
             dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
+            // 维度值别名处理判断是否有别名，直接入库
+
+            if (!CollectionUtils.isEmpty(dimAliasMap)) {
+                // 记录维度值别名集合
+                List<DimensionValueDO> dimensionValueAliasList = new ArrayList<>();
+                dimAliasMap.getOrDefault(resp.getName(), Collections.emptyList()).forEach(dimValues -> {
+                            // 获取别名
+                            List<String> alias = dimValues.getAlias();
+                            if (!CollectionUtils.isEmpty(alias)){
+                                alias.forEach(tAlias -> {
+                                    DimensionValueDO dimensionValueDO = new DimensionValueDO();
+                                    // 设置维度值的别名进去
+                                    dimensionValueDO.setAlias(tAlias);
+                                    dimensionValueDO.setModelId(modelId);
+                                    // 这是维度别名
+                                    dimensionValueDO.setDimId(resp.getId());
+                                    dimensionValueDO.setDimName(resp.getName());
+                                    dimensionValueDO.setDimBizName(resp.getBizName());
+                                    //这是维度值
+                                    dimensionValueDO.setDimValue(dimValues.getTechName());
+                                    dimensionValueAliasList.add(dimensionValueDO);
+                                });
+                            }
+                        });
+                dimensionService.sendDimensionValueAliasEventBatch(dimensionValueAliasList, EventType.ADD);
+            }
 
             // 仅保存前50个维度值到dim_value_maps，供提示词和背景信息使用
             List<DimValueMap> oldAlias = dimAliasMap == null ? Collections.emptyList()

@@ -1,6 +1,7 @@
 package com.tencent.supersonic.headless.server.persistence.dataobject;
 
 import lombok.Data;
+import org.springframework.util.StringUtils;
 
 @Data
 public class DimensionValueDO {
@@ -30,6 +31,10 @@ public class DimensionValueDO {
     public String getId() {
         if (dimValue == null) {
             return dimId + "_";
+        }
+        // 处理维度值别名逻辑
+        if (StringUtils.hasLength(dimValue) && StringUtils.hasLength(alias)) {
+            return dimId + "_" + dimValue.replace(" ", "#") + "_" + alias;
         }
         // keep embedding text (dimValue) unchanged, only sanitize id
         return dimId + "_" + dimValue.replace(" ", "#");
