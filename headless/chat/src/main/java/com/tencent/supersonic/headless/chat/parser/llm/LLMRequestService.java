@@ -9,6 +9,7 @@ import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMResp;
 import com.tencent.supersonic.headless.chat.utils.ComponentFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,11 @@ import static com.tencent.supersonic.headless.chat.parser.ParserConfig.*;
 @Service
 public class LLMRequestService {
 
+    private static final int MAX_PROMPT_TERMS = 10;
+
     @Autowired
     private ParserConfig parserConfig;
+
 
     public Long getDataSetId(ChatQueryContext queryCtx) {
         DataSetResolver dataSetResolver = ComponentFactory.getModelResolver();
@@ -84,22 +88,105 @@ public class LLMRequestService {
     }
 
     protected List<LLMReq.Term> getMappedTerms(ChatQueryContext queryCtx, Long dataSetId) {
+        Map<Long, SchemaElement> selectedTerms = new LinkedHashMap<>();
+
         List<SchemaElementMatch> matchedElements =
                 queryCtx.getMapInfo().getMatchedElements(dataSetId);
-        if (CollectionUtils.isEmpty(matchedElements)) {
-            return new ArrayList<>();
+        if (!CollectionUtils.isEmpty(matchedElements)) {
+            matchedElements.stream().map(SchemaElementMatch::getElement).filter(Objects::nonNull)
+                    .filter(element -> SchemaElementType.TERM.equals(element.getType()))
+                    .forEach(element -> selectedTerms.putIfAbsent(element.getId(), element));
         }
-        return matchedElements.stream().filter(schemaElementMatch -> {
-            SchemaElementType elementType = schemaElementMatch.getElement().getType();
-            return SchemaElementType.TERM.equals(elementType);
-        }).map(schemaElementMatch -> {
-            LLMReq.Term term = new LLMReq.Term();
-            term.setName(schemaElementMatch.getElement().getName());
-            term.setDescription(schemaElementMatch.getElement().getDescription());
-            term.setAlias(schemaElementMatch.getElement().getAlias());
-            return term;
-        }).collect(Collectors.toList());
+
+        if (selectedTerms.isEmpty()) {
+            Map<Long, SchemaElement> allTermsById = getAllTermsById(queryCtx, dataSetId);
+            if (!allTermsById.isEmpty()) {
+                String queryText = StringUtils.defaultString(queryCtx.getRequest().getQueryText());
+                allTermsById.values().stream().filter(term -> isExactTermMatched(queryText, term))
+                        .sorted(Comparator.comparingInt(term -> getTermMatchScore(queryText, (SchemaElement)term))
+                                .reversed())
+                        .limit(MAX_PROMPT_TERMS)
+                        .forEach(term -> selectedTerms.putIfAbsent(term.getId(), term));
+            }
+        }
+
+        return selectedTerms.values().stream().limit(MAX_PROMPT_TERMS).map(this::convertToReqTerm)
+                .collect(Collectors.toList());
     }
+
+
+
+    private Map<Long, SchemaElement> getAllTermsById(ChatQueryContext queryCtx, Long dataSetId) {
+        SemanticSchema semanticSchema = queryCtx.getSemanticSchema();
+        if (Objects.isNull(semanticSchema)
+                || Objects.isNull(semanticSchema.getDataSetSchemaMap())) {
+            return Collections.emptyMap();
+        }
+        DataSetSchema dataSetSchema = semanticSchema.getDataSetSchemaMap().get(dataSetId);
+        if (Objects.isNull(dataSetSchema) || CollectionUtils.isEmpty(dataSetSchema.getTerms())) {
+            return Collections.emptyMap();
+        }
+        return dataSetSchema.getTerms().stream().filter(Objects::nonNull).collect(Collectors
+                .toMap(SchemaElement::getId, term -> term, (t1, t2) -> t1, LinkedHashMap::new));
+    }
+
+    private boolean isExactTermMatched(String queryText, SchemaElement term) {
+        if (StringUtils.isBlank(queryText) || Objects.isNull(term)) {
+            return false;
+        }
+        String normalizedQueryText = queryText.toLowerCase();
+        if (StringUtils.isNotBlank(term.getName())
+                && normalizedQueryText.contains(term.getName().toLowerCase())) {
+            return true;
+        }
+        if (CollectionUtils.isEmpty(term.getAlias())) {
+            return false;
+        }
+        return term.getAlias().stream().filter(StringUtils::isNotBlank).map(String::toLowerCase)
+                .anyMatch(normalizedQueryText::contains);
+    }
+
+    private int getTermMatchScore(String queryText, SchemaElement term) {
+        if (StringUtils.isBlank(queryText) || Objects.isNull(term)) {
+            return 0;
+        }
+        String normalizedQueryText = queryText.toLowerCase();
+        int score = 0;
+
+        String name = StringUtils.trimToEmpty(term.getName()).toLowerCase();
+        if (StringUtils.isNotBlank(name)) {
+            if (normalizedQueryText.equals(name)) {
+                score += 1000;
+            } else if (normalizedQueryText.contains(name)) {
+                score += 500 + name.length();
+            }
+        }
+
+        if (!CollectionUtils.isEmpty(term.getAlias())) {
+            for (String alias : term.getAlias()) {
+                String normalizedAlias = StringUtils.trimToEmpty(alias).toLowerCase();
+                if (StringUtils.isBlank(normalizedAlias)) {
+                    continue;
+                }
+                if (normalizedQueryText.equals(normalizedAlias)) {
+                    score += 400;
+                } else if (normalizedQueryText.contains(normalizedAlias)) {
+                    score += 200 + normalizedAlias.length();
+                }
+            }
+        }
+        return score;
+    }
+
+
+    private LLMReq.Term convertToReqTerm(SchemaElement schemaElement) {
+        LLMReq.Term term = new LLMReq.Term();
+        term.setName(schemaElement.getName());
+        term.setDescription(schemaElement.getDescription());
+        term.setAlias(schemaElement.getAlias());
+        return term;
+    }
+
 
     protected List<LLMReq.ElementValue> getMappedValues(@NotNull ChatQueryContext queryCtx,
             Long dataSetId) {

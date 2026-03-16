@@ -395,7 +395,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             if (!dimension.isHasDimValues()) {
                 continue;
             }
-            PageInfo<DictValueDimResp> dimensionValuesFromDict = getDimensionValuesFromDict(dimension);
+            PageInfo<DictValueDimResp> dimensionValuesFromDict =
+                    getDimensionValuesFromDict(dimension);
             List<DictValueDimResp> list = dimensionValuesFromDict.getList();
             List<String> dimensionValues = list.stream().map(DictValueDimResp::getValue).toList();
             // 筛选条件4：跳过维度值数量为0和数量大于等于50的维度
@@ -415,49 +416,52 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         return "";
     }
 
-//    public PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
-//        DictValueReq dictValueReq = new DictValueReq();
-//        dictValueReq.setModelId(dimension.getModel());
-//        dictValueReq.setItemId(dimension.getId());
-//        dictValueReq.setType(TypeEnums.DIMENSION);
-//        dictValueReq.setPageSize(50);
-//        dictValueReq.setCurrent(1);
-//        String fileName = String.format("dic_value_%d_%s_%s", dictValueReq.getModelId(),
-//                dictValueReq.getType().name(), dictValueReq.getItemId()) + Constants.DOT + "txt";
-//        PageInfo<DictValueResp> dictValueRespList =
-//                fileHandler.queryDictValue(fileName, dictValueReq);
-//        PageInfo<DictValueDimResp> result = convert2DictValueDimRespPage(dictValueRespList);
-//        fillDimMapInfo(result.getList(), dimension);
-//        return result;
-//    }
-    //暂停使用词典获取维度值，使用维度值映射表获取
+    // public PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
+    // DictValueReq dictValueReq = new DictValueReq();
+    // dictValueReq.setModelId(dimension.getModel());
+    // dictValueReq.setItemId(dimension.getId());
+    // dictValueReq.setType(TypeEnums.DIMENSION);
+    // dictValueReq.setPageSize(50);
+    // dictValueReq.setCurrent(1);
+    // String fileName = String.format("dic_value_%d_%s_%s", dictValueReq.getModelId(),
+    // dictValueReq.getType().name(), dictValueReq.getItemId()) + Constants.DOT + "txt";
+    // PageInfo<DictValueResp> dictValueRespList =
+    // fileHandler.queryDictValue(fileName, dictValueReq);
+    // PageInfo<DictValueDimResp> result = convert2DictValueDimRespPage(dictValueRespList);
+    // fillDimMapInfo(result.getList(), dimension);
+    // return result;
+    // }
+    // 暂停使用词典获取维度值，使用维度值映射表获取
     public PageInfo<DictValueDimResp> getDimensionValuesFromDict(SchemaElement dimension) {
         return getDimensionValues(dimension);
     }
+
     public PageInfo<DictValueDimResp> getDimensionValues(SchemaElement dimension) {
         return getDimensionValuesFromMaps(dimension);
     }
+
     private PageInfo<DictValueDimResp> getDimensionValuesFromMaps(SchemaElement dimension) {
         PageInfo<DictValueDimResp> pageInfo = new PageInfo<>();
         if (dimension == null || CollectionUtils.isEmpty(dimension.getSchemaValueMaps())) {
             pageInfo.setList(new ArrayList<>());
             return pageInfo;
         }
-        List<DictValueDimResp> list =
-                dimension.getSchemaValueMaps().stream().filter(Objects::nonNull).map(dimValueMap -> {
-                            DictValueDimResp resp = new DictValueDimResp();
-                            resp.setValue(dimValueMap.getValue());
-                            resp.setBizName(dimValueMap.getBizName());
-                            resp.setAlias(dimValueMap.getAlias());
-                            return resp;
-                        }).filter(resp -> StringUtils.isNotBlank(resp.getValue())).limit(50)
-                        .collect(Collectors.toList());
+        List<DictValueDimResp> list = dimension.getSchemaValueMaps().stream()
+                .filter(Objects::nonNull).map(dimValueMap -> {
+                    DictValueDimResp resp = new DictValueDimResp();
+                    resp.setValue(dimValueMap.getValue());
+                    resp.setBizName(dimValueMap.getBizName());
+                    resp.setAlias(dimValueMap.getAlias());
+                    return resp;
+                }).filter(resp -> StringUtils.isNotBlank(resp.getValue())).limit(50)
+                .collect(Collectors.toList());
         pageInfo.setList(list);
         pageInfo.setTotal(list.size());
         pageInfo.setPageNum(1);
         pageInfo.setPageSize(50);
         return pageInfo;
     }
+
     private void fillDimMapInfo(List<DictValueDimResp> list, SchemaElement dimension) {
 
         if (CollectionUtils.isEmpty(dimension.getDimValueMaps())) {

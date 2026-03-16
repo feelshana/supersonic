@@ -28,7 +28,7 @@ public class DictConfServiceImpl implements DictConfService {
     private final DimensionService dimensionService;
 
     public DictConfServiceImpl(DictRepository dictRepository, DictUtils dictConverter,
-                               DimensionService dimensionService) {
+            DimensionService dimensionService) {
         this.dictRepository = dictRepository;
         this.dictConverter = dictConverter;
         this.dimensionService = dimensionService;
@@ -97,17 +97,20 @@ public class DictConfServiceImpl implements DictConfService {
                 || dictItemFilter.getItemId() == null) {
             return null;
         }
-        if (dictItemFilter.getStatus() != null && !StatusEnum.ONLINE.equals(dictItemFilter.getStatus())) {
+        if (dictItemFilter.getStatus() != null
+                && !StatusEnum.ONLINE.equals(dictItemFilter.getStatus())) {
             return null;
         }
-        if (dictItemFilter.getLocked() != null && !Integer.valueOf(1).equals(dictItemFilter.getLocked())) {
+        if (dictItemFilter.getLocked() != null
+                && !Integer.valueOf(1).equals(dictItemFilter.getLocked())) {
             return null;
         }
 
         DimensionResp dimensionResp = dimensionService.getDimension(dictItemFilter.getItemId());
         if (dimensionResp == null || dimensionResp.getModelId() == null
                 || dimensionResp.getBizName() == null || dimensionResp.getId() == null
-                || dimensionResp.getDimValueMaps() == null || dimensionResp.getDimValueMaps().isEmpty()) {
+                || dimensionResp.getDimValueMaps() == null
+                || dimensionResp.getDimValueMaps().isEmpty()) {
             return null;
         }
 
