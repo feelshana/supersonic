@@ -16,10 +16,12 @@ public interface BiAgentTaskMapper extends BaseMapper<BiAgentTaskDO> {
             + "WHERE id = #{taskId} "
             + "AND status = #{pendingStatus} "
             + "AND NOT EXISTS ("
-            + "    SELECT 1 FROM s2_bi_agent_task t "
-            + "    WHERE t.report_id = #{reportId} "
-            + "      AND t.status = #{runningStatus} "
-            + "      AND t.id <> #{taskId}"
+            + "    SELECT 1 FROM ("
+            + "        SELECT id FROM s2_bi_agent_task t "
+            + "        WHERE t.report_id = #{reportId} "
+            + "          AND t.status = #{runningStatus} "
+            + "          AND t.id <> #{taskId}"
+            + "    ) running_task"
             + ")")
     int tryMarkTaskRunning(@Param("taskId") Long taskId,
                            @Param("reportId") String reportId,
