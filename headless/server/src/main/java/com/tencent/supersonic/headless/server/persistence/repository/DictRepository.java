@@ -18,6 +18,9 @@ public interface DictRepository {
 
     List<DictItemResp> queryDictConf(DictItemFilter dictItemFilter);
 
+    List<DictConfDO> queryDictConfDOList(DictItemFilter dictItemFilter);
+
+
     Long addDictTask(DictTaskDO dictTaskDO);
 
     Long editDictTask(DictTaskDO dictTaskDO);

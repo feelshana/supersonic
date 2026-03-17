@@ -16,19 +16,24 @@ import com.tencent.supersonic.headless.api.pojo.DimValueMap;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
+import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.request.ValueTaskQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictTaskResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictValueDimResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictValueResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
+import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
+import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
 import com.tencent.supersonic.headless.chat.knowledge.DictWord;
 import com.tencent.supersonic.headless.chat.knowledge.file.FileHandler;
+import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DictTaskDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DimensionValueDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DictRepository;
 import com.tencent.supersonic.headless.server.service.DictTaskService;
 import com.tencent.supersonic.headless.server.service.DimensionService;
+import com.tencent.supersonic.headless.server.service.ModelService;
 import com.tencent.supersonic.headless.server.utils.DictUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -45,7 +50,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DictTaskServiceImpl implements DictTaskService {
 
-    @Value("${dict.flush.enable:false}")
+    @Value("${dict.flush.enable:true}")
     private Boolean dictFlushEnable;
 
     @Value("${dict.flush.daily.enable:true}")
@@ -68,11 +73,14 @@ public class DictTaskServiceImpl implements DictTaskService {
     private final DimensionService dimensionService;
     private final EmbeddingService embeddingService;
     private final EmbeddingConfig embeddingConfig;
+    private final SemanticLayerService queryService;
+    private final ModelService modelService;
 
     public DictTaskServiceImpl(DictRepository dictRepository, DictUtils dictConverter,
             DictUtils dictUtils, FileHandler fileHandler, DictWordService dictWordService,
             DimensionService dimensionService, EmbeddingService embeddingService,
-            EmbeddingConfig embeddingConfig) {
+            EmbeddingConfig embeddingConfig, SemanticLayerService queryService,
+            ModelService modelService) {
         this.dictRepository = dictRepository;
         this.dictConverter = dictConverter;
         this.dictUtils = dictUtils;
@@ -81,17 +89,17 @@ public class DictTaskServiceImpl implements DictTaskService {
         this.dimensionService = dimensionService;
         this.embeddingService = embeddingService;
         this.embeddingConfig = embeddingConfig;
+        this.queryService = queryService;
+        this.modelService = modelService;
     }
 
     @Override
     public Long addDictTask(DictSingleTaskReq taskReq, User user) {
-        if (!dictFlushEnable) {
-            return 0L;
-        }
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
-        if (Objects.isNull(dictItemResp) || Integer.valueOf(1).equals(dictItemResp.getLocked())) {
+        if (Objects.isNull(dictItemResp)) {
             return 0L;
         }
+
 
         Long dictTaskId = handleDictTaskByItemResp(dictItemResp, user);
 
@@ -157,7 +165,7 @@ public class DictTaskServiceImpl implements DictTaskService {
 
         // 2.Change dictionary file
 
-        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+        if (Boolean.TRUE.equals(dictFlushEnable) && Boolean.TRUE.equals(dictionaryEnabled)) {
             String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
             fileHandler.writeFile(data, fileName, false);
         }
@@ -175,20 +183,18 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictTaskDO.setElapsedMs(DateUtils.calculateDiffMs(dictTaskDO.getCreatedAt()));
         dictRepository.editDictTask(dictTaskDO);
 
-
-        if (!data.isEmpty() && user != null) {
-            // 维度值存向量库
-            List<DimensionValueDO> dimensionValueDOS;
-            dimensionValueDOS = data.stream().map(this::convert2DimValueDO)
-                    .filter(line -> Objects.nonNull(line)).toList();
-            dimensionValueDOS.forEach(dimensionValueDO -> {
-                dimensionValueDO.setDimBizName(dictItemResp.getBizName());
-                dimensionValueDO.setModelId(dictItemResp.getModelId());
-                dimensionValueDO.setDimId(dictItemResp.getItemId());
-            });
+        // 4. 全量刷新维度值向量（先清后写）并更新预览 dimValueMaps
+        deleteAllDimensionValueEmbedding(dictItemResp);
+        List<DimensionValueDO> dimensionValueDOS = buildDimensionValueDOS(data, dictItemResp);
+        if (!CollectionUtils.isEmpty(dimensionValueDOS)) {
             dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
         }
+        List<DimValueMap> previewDimValueMaps = buildPreviewDimValueMaps(dimensionValueDOS,
+                dictItemResp.getItemId());
+        dimensionService.updateDimValueMapsOnlyBatch(dictItemResp.getItemId(), previewDimValueMaps,
+                user);
     }
+
 
     private DimensionValueDO convert2DimValueDO(String lineStr) {
         DimensionValueDO dimensionValueDO = new DimensionValueDO();
@@ -203,8 +209,80 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dimensionValueDO;
     }
 
+    private List<DimensionValueDO> buildDimensionValueDOS(List<String> data, DictItemResp dictItemResp) {
+        if (CollectionUtils.isEmpty(data) || Objects.isNull(dictItemResp)
+                || Objects.isNull(dictItemResp.getItemId()) || Objects.isNull(dictItemResp.getModelId())) {
+            return new ArrayList<>();
+        }
+        Map<String, DimensionValueDO> valueMap = new LinkedHashMap<>();
+        for (String line : data) {
+            DimensionValueDO parsed = convert2DimValueDO(line);
+            if (Objects.isNull(parsed) || StringUtils.isBlank(parsed.getDimValue())) {
+                continue;
+            }
+            String dimValue = parsed.getDimValue().trim();
+            if (StringUtils.isBlank(dimValue)) {
+                continue;
+            }
+            parsed.setDimValue(dimValue);
+            parsed.setDimBizName(dictItemResp.getBizName());
+            parsed.setModelId(dictItemResp.getModelId());
+            parsed.setDimId(dictItemResp.getItemId());
+            parsed.setFrequency(Objects.isNull(parsed.getFrequency()) ? 1L : parsed.getFrequency());
+            valueMap.merge(dimValue, parsed, (oldV, newV) -> {
+                oldV.setFrequency(Math.max(oldV.getFrequency(), newV.getFrequency()));
+                if (StringUtils.isBlank(oldV.getNature())) {
+                    oldV.setNature(newV.getNature());
+                }
+                return oldV;
+            });
+        }
+        return new ArrayList<>(valueMap.values());
+    }
+
+    private List<DimValueMap> buildPreviewDimValueMaps(List<DimensionValueDO> dimensionValueDOS,
+            Long dimId) {
+        if (CollectionUtils.isEmpty(dimensionValueDOS) || Objects.isNull(dimId)) {
+            return new ArrayList<>();
+        }
+        DimensionResp dimensionResp = dimensionService.getDimension(dimId);
+        List<DimValueMap> oldMaps = Objects.isNull(dimensionResp) || CollectionUtils
+                .isEmpty(dimensionResp.getDimValueMaps()) ? new ArrayList<>()
+                        : dimensionResp.getDimValueMaps();
+        Map<String, DimValueMap> oldMapByValue = oldMaps.stream().filter(Objects::nonNull)
+                .filter(map -> StringUtils.isNotBlank(
+                        StringUtils.defaultIfBlank(map.getValue(), map.getTechName())))
+                .collect(Collectors.toMap(
+                        map -> StringUtils.defaultIfBlank(map.getValue(), map.getTechName()),
+                        map -> map, (a, b) -> a));
+
+        return dimensionValueDOS.stream()
+                .sorted(Comparator.comparing(
+                        (DimensionValueDO v) -> Optional.ofNullable(v.getFrequency()).orElse(0L))
+                        .reversed().thenComparing(DimensionValueDO::getDimValue))
+                .filter(v -> StringUtils.isNotBlank(v.getDimValue()))
+                .filter(v -> StringUtils.length(v.getDimValue()) <= 20).limit(50).map(v -> {
+                    String value = v.getDimValue();
+                    DimValueMap dimValueMap = new DimValueMap();
+                    dimValueMap.setValue(value);
+                    dimValueMap.setTechName(value);
+                    DimValueMap old = oldMapByValue.get(value);
+                    if (Objects.nonNull(old)) {
+                        if (!CollectionUtils.isEmpty(old.getAlias())) {
+                            dimValueMap.setAlias(old.getAlias());
+                        }
+                        if (StringUtils.isNotBlank(old.getBizName())
+                                && !StringUtils.equals(old.getBizName(), value)) {
+                            dimValueMap.setBizName(old.getBizName());
+                        }
+                    }
+                    return dimValueMap;
+                }).collect(Collectors.toList());
+    }
+
     @Override
     public Long deleteDictTask(DictSingleTaskReq taskReq, User user) {
+
         DictItemResp dictItemResp = fetchDictItemResp(taskReq);
         if (Objects.isNull(dictItemResp)) {
             return 0L;
@@ -363,11 +441,48 @@ public class DictTaskServiceImpl implements DictTaskService {
 
     @Override
     public PageInfo<DictValueDimResp> queryDictValue(DictValueReq dictValueReq, User user) {
-        if (TypeEnums.DIMENSION.equals(dictValueReq.getType())) {
-            return getDictValuePageFromMaps(dictValueReq);
+        if (!TypeEnums.DIMENSION.equals(dictValueReq.getType())) {
+            return emptyDictValuePage(dictValueReq);
         }
-        return getDictValuePageFromFile(dictValueReq);
+        if (!isDictVisibleEnabled(dictValueReq)) {
+            return emptyDictValuePage(dictValueReq);
+        }
+        if (!isLatestTaskSuccess(dictValueReq)) {
+            return emptyDictValuePage(dictValueReq);
+        }
+        return getDictValuePageFromDb(dictValueReq, user);
     }
+
+    private boolean isDictVisibleEnabled(DictValueReq dictValueReq) {
+        DictItemFilter filter = DictItemFilter.builder().itemId(dictValueReq.getItemId())
+                .type(dictValueReq.getType()).build();
+        List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(filter);
+        if (CollectionUtils.isEmpty(dictItemRespList)) {
+            return false;
+        }
+        DictItemResp dictItemResp = dictItemRespList.getFirst();
+        return StatusEnum.ONLINE.equals(dictItemResp.getStatus());
+    }
+
+    private boolean isLatestTaskSuccess(DictValueReq dictValueReq) {
+        DictSingleTaskReq taskReq = DictSingleTaskReq.builder().itemId(dictValueReq.getItemId())
+                .type(dictValueReq.getType()).build();
+        DictTaskResp latestTask = dictRepository.queryLatestDictTask(taskReq);
+        if (Objects.isNull(latestTask) || StringUtils.isBlank(latestTask.getTaskStatus())) {
+            return false;
+        }
+        return TaskStatusEnum.SUCCESS.getStatus().equals(latestTask.getTaskStatus());
+    }
+
+    private PageInfo<DictValueDimResp> emptyDictValuePage(DictValueReq dictValueReq) {
+        PageInfo<DictValueDimResp> empty = new PageInfo<>();
+        empty.setList(new ArrayList<>());
+        empty.setTotal(0);
+        empty.setPageNum(dictValueReq.getCurrent());
+        empty.setPageSize(dictValueReq.getPageSize());
+        return empty;
+    }
+
 
     private PageInfo<DictValueDimResp> getDictValuePageFromMaps(DictValueReq dictValueReq) {
         PageInfo<DictValueDimResp> pageInfo = new PageInfo<>();
@@ -398,6 +513,106 @@ public class DictTaskServiceImpl implements DictTaskService {
         pageInfo.setPageNum(current);
         pageInfo.setPageSize(pageSize);
         return pageInfo;
+    }
+
+    private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq, User user) {
+        PageInfo<DictValueDimResp> empty = new PageInfo<>();
+        empty.setList(new ArrayList<>());
+        empty.setTotal(0);
+        empty.setPageNum(dictValueReq.getCurrent());
+        empty.setPageSize(dictValueReq.getPageSize());
+
+        try {
+            DimensionResp dimResp = dimensionService.getDimension(dictValueReq.getItemId());
+            if (Objects.isNull(dimResp) || Objects.isNull(dimResp.getModelId())) {
+                return empty;
+            }
+
+            ModelResp modelResp = modelService.getModel(dimResp.getModelId());
+            if (Objects.isNull(modelResp) || Objects.isNull(modelResp.getModelDetail())) {
+                return empty;
+            }
+
+            String dimBizName = dimResp.getBizName();
+            if (StringUtils.isBlank(dimBizName)) {
+                return empty;
+            }
+
+            String tableStr = StringUtils.isNotBlank(modelResp.getModelDetail().getTableQuery())
+                    ? modelResp.getModelDetail().getTableQuery()
+                    : "(" + modelResp.getModelDetail().getSqlQuery() + ") AS t";
+            String escapedKey = StringUtils.defaultString(dictValueReq.getKeyValue()).replace("'", "''");
+            String whereClause = String.format(" where %s is not null", dimBizName);
+            if (StringUtils.isNotBlank(escapedKey)) {
+                whereClause += String.format(" and %s like '%%%s%%'", dimBizName, escapedKey);
+            }
+
+            String countSql = String.format(
+                    "select count(1) total from (select distinct %s from %s %s) dim_values", dimBizName,
+                    tableStr, whereClause);
+            QuerySqlReq countReq = QuerySqlReq.builder().sql(countSql).build();
+            countReq.addModelId(dimResp.getModelId());
+            SemanticQueryResp countResp = queryService.queryByReq(countReq, user);
+            long total = extractTotal(countResp);
+            if (total <= 0) {
+                return empty;
+            }
+
+            Integer current = dictValueReq.getCurrent();
+            Integer pageSize = dictValueReq.getPageSize();
+            int offset = Math.max((current - 1) * pageSize, 0);
+            String dataSql = String.format(
+                    "select distinct %s as value from %s %s order by value limit %d offset %d",
+                    dimBizName, tableStr, whereClause, pageSize, offset);
+            QuerySqlReq dataReq = QuerySqlReq.builder().sql(dataSql).build();
+            dataReq.addModelId(dimResp.getModelId());
+            SemanticQueryResp dataResp = queryService.queryByReq(dataReq, user);
+
+            List<DictValueDimResp> list = new ArrayList<>();
+            if (Objects.nonNull(dataResp) && !CollectionUtils.isEmpty(dataResp.getResultList())) {
+                for (Map<String, Object> row : dataResp.getResultList()) {
+                    if (CollectionUtils.isEmpty(row)) {
+                        continue;
+                    }
+                    Object valueObj = row.get("value");
+                    if (Objects.isNull(valueObj)) {
+                        valueObj = row.values().stream().findFirst().orElse(null);
+                    }
+                    if (Objects.isNull(valueObj) || StringUtils.isBlank(valueObj.toString())) {
+                        continue;
+                    }
+                    DictValueDimResp resp = new DictValueDimResp();
+                    resp.setValue(valueObj.toString());
+                    list.add(resp);
+                }
+            }
+
+            fillDimMapInfo(list, dictValueReq.getItemId());
+            empty.setList(list);
+            empty.setTotal(total);
+            return empty;
+        } catch (Exception e) {
+            log.warn("query dict value from db fallback error, req:{}", dictValueReq, e);
+            return empty;
+        }
+    }
+
+    private long extractTotal(SemanticQueryResp semanticQueryResp) {
+        if (Objects.isNull(semanticQueryResp) || CollectionUtils.isEmpty(semanticQueryResp.getResultList())) {
+            return 0L;
+        }
+        Map<String, Object> first = semanticQueryResp.getResultList().get(0);
+        if (CollectionUtils.isEmpty(first)) {
+            return 0L;
+        }
+        Object totalObj = first.get("total");
+        if (Objects.isNull(totalObj)) {
+            totalObj = first.values().stream().findFirst().orElse(0L);
+        }
+        if (Objects.isNull(totalObj)) {
+            return 0L;
+        }
+        return Long.parseLong(totalObj.toString());
     }
 
     private PageInfo<DictValueDimResp> getDictValuePageFromFile(DictValueReq dictValueReq) {
@@ -535,10 +750,11 @@ public class DictTaskServiceImpl implements DictTaskService {
     @Override
     public void importDictData(DictItemResp dictItemResp, List<String> data, User user) {
         // Change dictionary file
-        if (Boolean.TRUE.equals(dictionaryEnabled)) {
+        if (Boolean.TRUE.equals(dictFlushEnable) && Boolean.TRUE.equals(dictionaryEnabled)) {
             String fileName = dictItemResp.fetchDictFileName() + Constants.DOT + dictFileType;
             fileHandler.writeFile(data, fileName, false);
         }
+
 
         if (!data.isEmpty() && user != null) {
             // 维度值存向量库

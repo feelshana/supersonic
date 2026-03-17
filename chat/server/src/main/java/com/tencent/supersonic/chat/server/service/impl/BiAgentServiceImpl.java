@@ -88,7 +88,8 @@ public class BiAgentServiceImpl implements BiAgentService {
     private MetricService metricService;
     @Autowired
     private AgentService agentService;
-
+    @Autowired
+    private DictConfService dictConfService;
     @Autowired
     private DictTaskService dictTaskService;
     @Autowired
@@ -1068,13 +1069,14 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             DimensionResp resp = resps.getFirst();
             // 停用原有加入词典的逻辑
-            // DictItemReq dictItemReq = new DictItemReq();
-            // dictItemReq.setType(TypeEnums.DIMENSION);
-            // dictItemReq.setItemId(resp.getId());
-            // // 导入的维度值锁定不允许刷新
-            // dictItemReq.setStatus(StatusEnum.ONLINE);
-            // dictItemReq.setLocked(1);
-            // DictItemResp dictItemResp = dictConfService.addDictConf(dictItemReq, user);
+             DictItemReq dictItemReq = new DictItemReq();
+             dictItemReq.setType(TypeEnums.DIMENSION);
+             dictItemReq.setItemId(resp.getId());
+             // 导入的维度值锁定不允许刷新
+             dictItemReq.setStatus(StatusEnum.ONLINE);
+             dictItemReq.setLocked(1);
+             ensureDictConf(dictItemReq, user, resp.getId());
+
             // String nature = dictItemResp.getNature();
             // List<String> lines = values.stream().map(value -> {
             // if (!StringUtils.isEmpty(value)) {
@@ -1163,8 +1165,22 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     }
 
+    private void ensureDictConf(DictItemReq dictItemReq, User user, Long dimId) {
+        try {
+            dictConfService.addDictConf(dictItemReq, user);
+        } catch (RuntimeException e) {
+            if (StringUtils.containsIgnoreCase(e.getMessage(), "dictConf is existed")) {
+                log.info("dictConf已存在，改为更新, dimId:{}", dimId);
+                dictConfService.editDictConf(dictItemReq, user);
+                return;
+            }
+            throw e;
+        }
+    }
+
     private boolean isDimensionValuesUnchanged(DimensionResp dimensionResp,
             List<String> normalizedValues, List<DimValueMap> previewDimValueMaps) {
+
         List<DimValueMap> existingMaps = dimensionResp.getDimValueMaps() == null ? Collections.emptyList()
                 : dimensionResp.getDimValueMaps();
         Set<String> existingValues = existingMaps.stream().filter(Objects::nonNull)
