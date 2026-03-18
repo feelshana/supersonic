@@ -362,7 +362,22 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     @Override
+    public Long addSuccessTaskForBI(DictSingleTaskReq taskReq, User user) {
+        DictItemResp dictItemResp = fetchDictItemResp(taskReq);
+        if (Objects.isNull(dictItemResp)) {
+            return 0L;
+        }
+        DictTaskDO dictTaskDO =
+                dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.SUCCESS);
+        log.info("[addDictTask] dictTaskDO:{}", dictTaskDO);
+        dictTaskDO.setElapsedMs(DateUtils.calculateDiffMs(dictTaskDO.getCreatedAt()));
+        dictRepository.addDictTask(dictTaskDO);
+        return dictTaskDO.getId();
+    }
+
+    @Override
     public void reloadDictWord() {
+
         if (Boolean.FALSE.equals(dictionaryEnabled)) {
             return;
         }
