@@ -1100,9 +1100,13 @@ public class BiAgentServiceImpl implements BiAgentService {
                     buildPreviewDimValueMaps(normalizedValues, oldAlias);
 
             if (isDimensionValuesUnchanged(resp, normalizedValues, previewDimValueMaps)) {
+                DictSingleTaskReq successTaskReq = DictSingleTaskReq.builder()
+                        .type(TypeEnums.DIMENSION).itemId(resp.getId()).build();
+                dictTaskService.addSuccessTaskForBI(successTaskReq, user);
                 log.info("维度值无变化，跳过更新, dimId: {}, dimName: {}", resp.getId(), resp.getName());
                 continue;
             }
+
 
             // 清理该维度旧向量和旧dimValueMaps，避免历史值残留
             DictSingleTaskReq deleteTaskReq =
@@ -1160,8 +1164,12 @@ public class BiAgentServiceImpl implements BiAgentService {
                 //原本调用updateDimValueAliasBatch方法改为updateDimValueMapsOnlyBatch，因为词典已取消，无需缓存别名到内存。
                 dimensionService.updateDimValueMapsOnlyBatch(resp.getId(), previewDimValueMaps, user);
             }
+            DictSingleTaskReq successTaskReq = DictSingleTaskReq.builder()
+                    .type(TypeEnums.DIMENSION).itemId(resp.getId()).build();
+            dictTaskService.addSuccessTaskForBI(successTaskReq, user);
 
         }
+
 
     }
 
