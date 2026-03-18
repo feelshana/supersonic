@@ -23,11 +23,16 @@ public class BiAgentTask implements Runnable {
             log.info("开始执行BI助手任务：{}", config.getReportId());
             Agent agent = service.createBiAgent(config);
             log.info("执行BI助手任务完成：{}", config.getReportId());
-            service.biAgentCallback(agent, config);
-            log.info("BI助手回调完成：{}", config.getReportId());
+            boolean callbackSuccess = service.biAgentCallback(agent, config);
+            if (!callbackSuccess) {
+                log.warn("BI助手回调失败：{}", config.getReportId());
+            } else {
+                log.info("BI助手回调完成：{}", config.getReportId());
+            }
         } catch (Exception e) {
             log.error("创建BI助手失败", e);
         }
     }
+
 
 }

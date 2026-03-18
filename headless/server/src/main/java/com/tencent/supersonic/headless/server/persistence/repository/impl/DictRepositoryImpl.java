@@ -149,6 +149,12 @@ public class DictRepositoryImpl implements DictRepository {
         return dictConverter.dictDOList2Req(dictConfDOList);
     }
 
+    @Override
+    public List<DictConfDO> queryDictConfDOList(DictItemFilter dictItemFilter) {
+        return getDictConfDOList(dictItemFilter);
+    }
+
+
     private List<DictConfDO> getDictConfDOList(DictItemFilter dictItemFilter) {
         QueryWrapper<DictConfDO> wrapper = new QueryWrapper<>();
         if (Objects.nonNull(dictItemFilter.getId())) {

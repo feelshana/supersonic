@@ -35,6 +35,12 @@ public class TextSegmentConvert {
                 text = item.getDimValue();
                 newItem.setDimId(item.getDimId());
             }
+            // 如果是向量值别名，那就把别名进行向量化处理
+            if (item.getType() == TypeEnums.DIMENSION_VALUE_ALIAS) {
+                newItem.setDimValue(item.getDimValue());
+                text = item.getDimValueAlis();
+                newItem.setDimId(item.getDimId());
+            }
             Map meta = JSONObject.parseObject(JSONObject.toJSONString(newItem), Map.class);
             TextSegment textSegment = TextSegment.from(text, new Metadata(meta));
             addQueryId(textSegment, newItem.getId() + newItem.getType().name().toLowerCase());

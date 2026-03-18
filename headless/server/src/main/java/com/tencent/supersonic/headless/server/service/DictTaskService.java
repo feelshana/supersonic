@@ -31,6 +31,9 @@ public interface DictTaskService {
 
     Long deleteDictTaskForBI(DictSingleTaskReq deleteTaskReq, User user);
 
+    Long addSuccessTaskForBI(DictSingleTaskReq taskReq, User user);
+
     void reloadDictWord();
+
 
 }

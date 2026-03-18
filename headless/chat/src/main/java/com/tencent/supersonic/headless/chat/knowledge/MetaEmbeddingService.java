@@ -3,6 +3,7 @@ package com.tencent.supersonic.headless.chat.knowledge;
 import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.enums.DictWordType;
+import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.service.EmbeddingService;
 import com.tencent.supersonic.headless.chat.knowledge.helper.NatureHelper;
 import dev.langchain4j.store.embedding.Retrieval;
@@ -14,11 +15,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,7 +40,8 @@ public class MetaEmbeddingService {
                             .collect(Collectors.toList()));
             retrieveQuery.setFilterCondition(filterCondition);
             // 只召回维度值。维度/指标全部给大模型
-            filterCondition.put("type", "VALUE");
+            filterCondition.put("type",
+                    Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
         }
 
         String collectionName = embeddingConfig.getMetaCollectionName();

@@ -3,10 +3,7 @@ package com.tencent.supersonic.headless.chat.mapper;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.SchemaElement;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
-import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.EmbeddingResult;
@@ -14,9 +11,11 @@ import com.tencent.supersonic.headless.chat.knowledge.builder.BaseWordBuilder;
 import com.tencent.supersonic.headless.chat.knowledge.helper.HanlpHelper;
 import dev.langchain4j.store.embedding.Retrieval;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -71,6 +70,9 @@ public class EmbeddingMapper extends BaseMapper {
                     .word(matchResult.getName()).similarity(matchResult.getSimilarity())
                     .detectWord(matchResult.getDetectWord()).build();
             schemaElementMatch.setLlmMatched(matchResult.isLlmMatched());
+            // 转化一下,判断一下type为DIMENSION_VALUE_ALIAS
+            doDimValueAliasLogic(schemaElementMatch, matchResult.getMetadata(),
+                    chatQueryContext.getSemanticSchema().getDimensionValues(), elementType);
 
             // 3. Add SchemaElementMatch to mapInfo
             addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
@@ -116,5 +118,42 @@ public class EmbeddingMapper extends BaseMapper {
     @Override
     protected boolean acceptFilter() {
         return false;
+    }
+
+
+
+    private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch,
+            Map<String, String> dimValueAlias, List<SchemaElement> dimensionValues,
+            SchemaElementType elementType) {
+        SchemaElement element = schemaElementMatch.getElement();
+        boolean matched = false;
+        if (SchemaElementType.DIMENSION_VALUE_ALIAS.equals(elementType)) {
+            Long dimId = element.getId();
+            String word = schemaElementMatch.getWord();
+            if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word)
+                    && dimValueAlias.containsKey(dimId.toString())) {
+                String id = dimValueAlias.get("id");
+                if (Objects.nonNull(id) && id.contains(word)) {
+                    String wordTech = dimValueAlias.get("dimValue");
+                    schemaElementMatch.setWord(wordTech);
+                    matched = true;
+                }
+            }
+            if (!matched) {
+                SchemaElement dimensionValue =
+                        dimensionValues.stream().filter(dimValue -> dimId.equals(dimValue.getId()))
+                                .findFirst().orElse(null);
+                if (dimensionValue != null) {
+                    SchemaValueMap dimValue = dimensionValue.getSchemaValueMaps().stream().filter(
+                            schemaValueMap -> StringUtils.equals(schemaValueMap.getBizName(), word)
+                                    || schemaValueMap.getAlias().contains(word))
+                            .findFirst().orElse(null);
+                    if (dimValue != null) {
+                        schemaElementMatch.setWord(dimValue.getTechName());
+                    }
+                }
+            }
+
+        }
     }
 }

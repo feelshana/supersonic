@@ -42,7 +42,7 @@ public class DataSetSchema implements Serializable {
             case DIMENSION:
                 element = dimensions.stream().filter(e -> e.getId() == elementID).findFirst();
                 break;
-            case VALUE:
+            case VALUE, DIMENSION_VALUE_ALIAS:
                 element = dimensionValues.stream().filter(e -> e.getId() == elementID).findFirst();
                 break;
             case TAG:

@@ -57,12 +57,10 @@ public class DictConfServiceImpl implements DictConfService {
         DictItemFilter filter = DictItemFilter.builder().build();
         BeanUtils.copyProperties(itemValueReq, filter);
         filter.setStatus(null);
-        Optional<DictItemResp> dictItemResp = queryDictConf(filter, user).stream().findFirst();
-        if (dictItemResp.isPresent()) {
-            return true;
-        }
-        return false;
+        List<DictConfDO> dictConfDOS = dictRepository.queryDictConfDOList(filter);
+        return !dictConfDOS.isEmpty();
     }
+
 
     @Override
     public DictItemResp editDictConf(DictItemReq itemValueReq, User user) {

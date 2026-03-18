@@ -6,4 +6,12 @@ public interface BiAgentTaskService {
 
     void addBiAgentTask(BiAgentConfig config);
 
+    void dispatchPendingTasks();
+
+    void markTimeoutRunningTasks();
+
+    void cleanHistoryNonFailedTasks();
+
+    void cleanHistoryFailedTasks();
+
 }

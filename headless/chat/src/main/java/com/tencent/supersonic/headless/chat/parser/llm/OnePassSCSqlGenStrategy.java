@@ -166,6 +166,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         for (List<Text2SQLExemplar> exemplars : exemplarsList) {
             llmReq.setDynamicExemplars(exemplars);
             Prompt prompt = generatePrompt(llmReq, llmResp, chatApp);
+            // log.info("生成提示词{}",prompt.text());
             prompt2Exemplar.put(prompt, exemplars);
         }
 
@@ -379,7 +380,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         // 提取Values中matchTpye不为空的且类型为keyword的维度名称
         Set<String> matchedDimensionNames = llmReq.getSchema().getValues().stream()
                 .filter(elementValue -> StringUtils.isNotBlank(elementValue.getMatchType())
-                        && elementValue.getMatchType().equals(MatchType.KEYWORD.name()))
+                        && elementValue.getMatchType().equals(MatchType.EMBEDDING.name()))
                 .map(LLMReq.ElementValue::getFieldValue).collect(Collectors.toSet());
         for (SchemaElement dimension : dimensions) {
             // 筛选条件1：跳过已经匹配到的维度
