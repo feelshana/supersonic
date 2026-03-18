@@ -15,5 +15,3 @@ public interface BiAgentTaskService {
     void cleanHistoryFailedTasks();
 
 }
-
-

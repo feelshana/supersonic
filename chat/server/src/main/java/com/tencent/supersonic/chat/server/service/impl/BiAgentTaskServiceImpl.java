@@ -16,7 +16,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -72,11 +71,11 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
     @Override
     public void dispatchPendingTasks() {
         java.sql.Date taskDay = java.sql.Date.valueOf(LocalDate.now());
-        List<BiAgentTaskDO> pendingTasks = baseMapper.selectList(new LambdaQueryWrapper<BiAgentTaskDO>()
-                .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.PENDING.getStatus())
-                .eq(BiAgentTaskDO::getTaskDay, taskDay)
-                .orderByAsc(BiAgentTaskDO::getId)
-                .last("limit " + Math.max(1, dispatchBatchSize)));
+        List<BiAgentTaskDO> pendingTasks =
+                baseMapper.selectList(new LambdaQueryWrapper<BiAgentTaskDO>()
+                        .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.PENDING.getStatus())
+                        .eq(BiAgentTaskDO::getTaskDay, taskDay).orderByAsc(BiAgentTaskDO::getId)
+                        .last("limit " + Math.max(1, dispatchBatchSize)));
         if (CollectionUtils.isEmpty(pendingTasks)) {
             return;
         }
@@ -100,30 +99,28 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
                 .lt(BiAgentTaskDO::getStartedAt, cutoffTime)
                 .set(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus())
                 .set(BiAgentTaskDO::getErrorMsg, "task running timeout")
-                .set(BiAgentTaskDO::getFinishedAt, now)
-                .set(BiAgentTaskDO::getUpdatedAt, now));
+                .set(BiAgentTaskDO::getFinishedAt, now).set(BiAgentTaskDO::getUpdatedAt, now));
 
         int timeoutByUpdatedAt = baseMapper.update(null, new LambdaUpdateWrapper<BiAgentTaskDO>()
                 .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.RUNNING.getStatus())
-                .isNull(BiAgentTaskDO::getStartedAt)
-                .lt(BiAgentTaskDO::getUpdatedAt, cutoffTime)
+                .isNull(BiAgentTaskDO::getStartedAt).lt(BiAgentTaskDO::getUpdatedAt, cutoffTime)
                 .set(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus())
                 .set(BiAgentTaskDO::getErrorMsg, "task running timeout")
-                .set(BiAgentTaskDO::getFinishedAt, now)
-                .set(BiAgentTaskDO::getUpdatedAt, now));
+                .set(BiAgentTaskDO::getFinishedAt, now).set(BiAgentTaskDO::getUpdatedAt, now));
 
         int totalTimeout = timeoutByStartedAt + timeoutByUpdatedAt;
         if (totalTimeout > 0) {
-            log.warn("处理超时RUNNING的BI训练任务完成, timeoutCount: {}, cutoffTime: {}", totalTimeout, cutoffTime);
+            log.warn("处理超时RUNNING的BI训练任务完成, timeoutCount: {}, cutoffTime: {}", totalTimeout,
+                    cutoffTime);
         }
     }
 
     @Override
     public void cleanHistoryNonFailedTasks() {
         java.sql.Date cutoffDate = java.sql.Date.valueOf(LocalDate.now().minusDays(7));
-        int removed = baseMapper.delete(new LambdaQueryWrapper<BiAgentTaskDO>()
-                .lt(BiAgentTaskDO::getTaskDay, cutoffDate)
-                .ne(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus()));
+        int removed = baseMapper.delete(
+                new LambdaQueryWrapper<BiAgentTaskDO>().lt(BiAgentTaskDO::getTaskDay, cutoffDate)
+                        .ne(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus()));
         if (removed > 0) {
             log.info("清理历史非失败BI训练任务完成, removed: {}, cutoffDate: {}", removed, cutoffDate);
         }
@@ -133,9 +130,9 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
     @Override
     public void cleanHistoryFailedTasks() {
         java.sql.Date cutoffDate = java.sql.Date.valueOf(LocalDate.now().minusDays(30));
-        int removed = baseMapper.delete(new LambdaQueryWrapper<BiAgentTaskDO>()
-                .lt(BiAgentTaskDO::getTaskDay, cutoffDate)
-                .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus()));
+        int removed = baseMapper.delete(
+                new LambdaQueryWrapper<BiAgentTaskDO>().lt(BiAgentTaskDO::getTaskDay, cutoffDate)
+                        .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus()));
         if (removed > 0) {
             log.info("清理历史失败BI训练任务完成, removed: {}, cutoffDate: {}", removed, cutoffDate);
         }
@@ -174,7 +171,8 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
             Agent agent = biAgentService.createBiAgent(config);
             boolean callbackSuccess = biAgentService.biAgentCallback(agent, config);
             if (!callbackSuccess) {
-                log.warn("BI训练任务回调失败，但训练已完成, taskId: {}, reportId: {}", taskDO.getId(), config.getReportId());
+                log.warn("BI训练任务回调失败，但训练已完成, taskId: {}, reportId: {}", taskDO.getId(),
+                        config.getReportId());
             }
             markTaskSuccess(taskId, agent);
             log.info("BI训练任务执行成功, taskId: {}, reportId: {}", taskDO.getId(), config.getReportId());
@@ -193,8 +191,7 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
                 .set(BiAgentTaskDO::getStatus, TaskStatusEnum.SUCCESS.getStatus())
                 .set(BiAgentTaskDO::getAgentId, agent == null ? null : agent.getId())
                 .set(BiAgentTaskDO::getAgentName, agent == null ? null : agent.getName())
-                .set(BiAgentTaskDO::getFinishedAt, now)
-                .set(BiAgentTaskDO::getUpdatedAt, now)
+                .set(BiAgentTaskDO::getFinishedAt, now).set(BiAgentTaskDO::getUpdatedAt, now)
                 .set(BiAgentTaskDO::getErrorMsg, null);
         baseMapper.update(null, updateWrapper);
     }
@@ -206,8 +203,7 @@ public class BiAgentTaskServiceImpl extends ServiceImpl<BiAgentTaskMapper, BiAge
                 .eq(BiAgentTaskDO::getStatus, TaskStatusEnum.RUNNING.getStatus())
                 .set(BiAgentTaskDO::getStatus, TaskStatusEnum.ERROR.getStatus())
                 .set(BiAgentTaskDO::getErrorMsg, StringUtils.left(errorMsg, MAX_ERROR_MSG_LENGTH))
-                .set(BiAgentTaskDO::getFinishedAt, now)
-                .set(BiAgentTaskDO::getUpdatedAt, now);
+                .set(BiAgentTaskDO::getFinishedAt, now).set(BiAgentTaskDO::getUpdatedAt, now);
         baseMapper.update(null, updateWrapper);
     }
 

@@ -65,5 +65,6 @@ public interface DimensionService {
 
     Boolean updateDimValueMapsOnlyBatch(Long dimId, List<DimValueMap> valueMaps, User user);
 
-    void sendDimensionValueAliasEventBatch(List<DimensionValueDO> dimensionValueAliasList, EventType eventType);
+    void sendDimensionValueAliasEventBatch(List<DimensionValueDO> dimensionValueAliasList,
+            EventType eventType);
 }

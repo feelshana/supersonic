@@ -20,6 +20,7 @@ import org.springframework.util.CollectionUtils;
 public class SchemaDictUpdateListener {
     @Value("${s2.dictionary.enabled:false}")
     private Boolean dictionaryEnabled;
+
     @Async("eventExecutor")
     @EventListener
     public void onApplicationEvent(DataEvent dataEvent) {

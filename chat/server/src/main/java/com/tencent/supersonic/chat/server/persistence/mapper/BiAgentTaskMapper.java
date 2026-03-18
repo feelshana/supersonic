@@ -13,19 +13,12 @@ public interface BiAgentTaskMapper extends BaseMapper<BiAgentTaskDO> {
 
     @Update("UPDATE s2_bi_agent_task "
             + "SET status = #{runningStatus}, started_at = #{now}, updated_at = #{now}, error_msg = NULL "
-            + "WHERE id = #{taskId} "
-            + "AND status = #{pendingStatus} "
-            + "AND NOT EXISTS ("
-            + "    SELECT 1 FROM ("
-            + "        SELECT id FROM s2_bi_agent_task t "
+            + "WHERE id = #{taskId} " + "AND status = #{pendingStatus} " + "AND NOT EXISTS ("
+            + "    SELECT 1 FROM (" + "        SELECT id FROM s2_bi_agent_task t "
             + "        WHERE t.report_id = #{reportId} "
-            + "          AND t.status = #{runningStatus} "
-            + "          AND t.id <> #{taskId}"
-            + "    ) running_task"
-            + ")")
-    int tryMarkTaskRunning(@Param("taskId") Long taskId,
-                           @Param("reportId") String reportId,
-                           @Param("pendingStatus") String pendingStatus,
-                           @Param("runningStatus") String runningStatus,
-                           @Param("now") Date now);
+            + "          AND t.status = #{runningStatus} " + "          AND t.id <> #{taskId}"
+            + "    ) running_task" + ")")
+    int tryMarkTaskRunning(@Param("taskId") Long taskId, @Param("reportId") String reportId,
+            @Param("pendingStatus") String pendingStatus,
+            @Param("runningStatus") String runningStatus, @Param("now") Date now);
 }

@@ -40,7 +40,8 @@ public class MetaEmbeddingService {
                             .collect(Collectors.toList()));
             retrieveQuery.setFilterCondition(filterCondition);
             // 只召回维度值。维度/指标全部给大模型
-            filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(),TypeEnums.DIMENSION_VALUE_ALIAS.name()));
+            filterCondition.put("type",
+                    Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
         }
 
         String collectionName = embeddingConfig.getMetaCollectionName();

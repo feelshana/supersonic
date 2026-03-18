@@ -166,7 +166,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         for (List<Text2SQLExemplar> exemplars : exemplarsList) {
             llmReq.setDynamicExemplars(exemplars);
             Prompt prompt = generatePrompt(llmReq, llmResp, chatApp);
-            log.info("生成提示词{}",prompt.text());
+            // log.info("生成提示词{}",prompt.text());
             prompt2Exemplar.put(prompt, exemplars);
         }
 

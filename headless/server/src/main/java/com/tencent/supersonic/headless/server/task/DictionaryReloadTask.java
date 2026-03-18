@@ -1,7 +1,6 @@
 package com.tencent.supersonic.headless.server.task;
 
 import com.tencent.supersonic.headless.server.service.impl.DictWordService;
-import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

@@ -103,7 +103,9 @@ public class LLMRequestService {
             if (!allTermsById.isEmpty()) {
                 String queryText = StringUtils.defaultString(queryCtx.getRequest().getQueryText());
                 allTermsById.values().stream().filter(term -> isExactTermMatched(queryText, term))
-                        .sorted(Comparator.comparingInt(term -> getTermMatchScore(queryText, (SchemaElement)term))
+                        .sorted(Comparator
+                                .comparingInt(
+                                        term -> getTermMatchScore(queryText, (SchemaElement) term))
                                 .reversed())
                         .limit(MAX_PROMPT_TERMS)
                         .forEach(term -> selectedTerms.putIfAbsent(term.getId(), term));

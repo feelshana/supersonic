@@ -189,8 +189,8 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (!CollectionUtils.isEmpty(dimensionValueDOS)) {
             dimensionService.sendDimensionValueEventBatch(dimensionValueDOS, EventType.ADD);
         }
-        List<DimValueMap> previewDimValueMaps = buildPreviewDimValueMaps(dimensionValueDOS,
-                dictItemResp.getItemId());
+        List<DimValueMap> previewDimValueMaps =
+                buildPreviewDimValueMaps(dimensionValueDOS, dictItemResp.getItemId());
         dimensionService.updateDimValueMapsOnlyBatch(dictItemResp.getItemId(), previewDimValueMaps,
                 user);
     }
@@ -209,9 +209,11 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dimensionValueDO;
     }
 
-    private List<DimensionValueDO> buildDimensionValueDOS(List<String> data, DictItemResp dictItemResp) {
+    private List<DimensionValueDO> buildDimensionValueDOS(List<String> data,
+            DictItemResp dictItemResp) {
         if (CollectionUtils.isEmpty(data) || Objects.isNull(dictItemResp)
-                || Objects.isNull(dictItemResp.getItemId()) || Objects.isNull(dictItemResp.getModelId())) {
+                || Objects.isNull(dictItemResp.getItemId())
+                || Objects.isNull(dictItemResp.getModelId())) {
             return new ArrayList<>();
         }
         Map<String, DimensionValueDO> valueMap = new LinkedHashMap<>();
@@ -246,20 +248,19 @@ public class DictTaskServiceImpl implements DictTaskService {
             return new ArrayList<>();
         }
         DimensionResp dimensionResp = dimensionService.getDimension(dimId);
-        List<DimValueMap> oldMaps = Objects.isNull(dimensionResp) || CollectionUtils
-                .isEmpty(dimensionResp.getDimValueMaps()) ? new ArrayList<>()
+        List<DimValueMap> oldMaps = Objects.isNull(dimensionResp)
+                || CollectionUtils.isEmpty(dimensionResp.getDimValueMaps()) ? new ArrayList<>()
                         : dimensionResp.getDimValueMaps();
         Map<String, DimValueMap> oldMapByValue = oldMaps.stream().filter(Objects::nonNull)
-                .filter(map -> StringUtils.isNotBlank(
-                        StringUtils.defaultIfBlank(map.getValue(), map.getTechName())))
+                .filter(map -> StringUtils
+                        .isNotBlank(StringUtils.defaultIfBlank(map.getValue(), map.getTechName())))
                 .collect(Collectors.toMap(
                         map -> StringUtils.defaultIfBlank(map.getValue(), map.getTechName()),
                         map -> map, (a, b) -> a));
 
-        return dimensionValueDOS.stream()
-                .sorted(Comparator.comparing(
-                        (DimensionValueDO v) -> Optional.ofNullable(v.getFrequency()).orElse(0L))
-                        .reversed().thenComparing(DimensionValueDO::getDimValue))
+        return dimensionValueDOS.stream().sorted(Comparator
+                .comparing((DimensionValueDO v) -> Optional.ofNullable(v.getFrequency()).orElse(0L))
+                .reversed().thenComparing(DimensionValueDO::getDimValue))
                 .filter(v -> StringUtils.isNotBlank(v.getDimValue()))
                 .filter(v -> StringUtils.length(v.getDimValue()) <= 20).limit(50).map(v -> {
                     String value = v.getDimValue();
@@ -541,7 +542,8 @@ public class DictTaskServiceImpl implements DictTaskService {
         return pageInfo;
     }
 
-    private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq, User user) {
+    private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq,
+            User user) {
         PageInfo<DictValueDimResp> empty = new PageInfo<>();
         empty.setList(new ArrayList<>());
         empty.setTotal(0);
@@ -567,15 +569,16 @@ public class DictTaskServiceImpl implements DictTaskService {
             String tableStr = StringUtils.isNotBlank(modelResp.getModelDetail().getTableQuery())
                     ? modelResp.getModelDetail().getTableQuery()
                     : "(" + modelResp.getModelDetail().getSqlQuery() + ") AS t";
-            String escapedKey = StringUtils.defaultString(dictValueReq.getKeyValue()).replace("'", "''");
+            String escapedKey =
+                    StringUtils.defaultString(dictValueReq.getKeyValue()).replace("'", "''");
             String whereClause = String.format(" where %s is not null", dimBizName);
             if (StringUtils.isNotBlank(escapedKey)) {
                 whereClause += String.format(" and %s like '%%%s%%'", dimBizName, escapedKey);
             }
 
             String countSql = String.format(
-                    "select count(1) total from (select distinct %s from %s %s) dim_values", dimBizName,
-                    tableStr, whereClause);
+                    "select count(1) total from (select distinct %s from %s %s) dim_values",
+                    dimBizName, tableStr, whereClause);
             QuerySqlReq countReq = QuerySqlReq.builder().sql(countSql).build();
             countReq.addModelId(dimResp.getModelId());
             SemanticQueryResp countResp = queryService.queryByReq(countReq, user);
@@ -624,7 +627,8 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     private long extractTotal(SemanticQueryResp semanticQueryResp) {
-        if (Objects.isNull(semanticQueryResp) || CollectionUtils.isEmpty(semanticQueryResp.getResultList())) {
+        if (Objects.isNull(semanticQueryResp)
+                || CollectionUtils.isEmpty(semanticQueryResp.getResultList())) {
             return 0L;
         }
         Map<String, Object> first = semanticQueryResp.getResultList().get(0);

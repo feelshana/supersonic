@@ -132,8 +132,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         // 创建或更新主题域
         log.info("开始创建或更新主题域");
-        DomainResp domainResp = upsertDomain(keepDomain, domainName, domainBizName, config.getAdmins(),
-                config.getViewers(), user);
+        DomainResp domainResp = upsertDomain(keepDomain, domainName, domainBizName,
+                config.getAdmins(), config.getViewers(), user);
 
         // 加载已有模型中的维度别名/默认值，用于后续保留
         Map<String, Object> existingModelMeta = loadExistingModelMeta(domainResp.getId());
@@ -150,8 +150,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         // 创建数据集
         log.info("开始创建数据集");
-        DataSetResp dataSetResp = createDataSet(modelConfig, user, domainResp, modelResps,
-                config.getAdmins());
+        DataSetResp dataSetResp =
+                createDataSet(modelConfig, user, domainResp, modelResps, config.getAdmins());
         // 工具配置
         ToolConfig toolConfig = createToolConfig(dataSetResp);
 
@@ -258,7 +258,6 @@ public class BiAgentServiceImpl implements BiAgentService {
             log.info("已清理冗余主题域及关联资源, domainId: {}", domainId);
         }
     }
-
 
 
 
@@ -524,7 +523,8 @@ public class BiAgentServiceImpl implements BiAgentService {
             return null;
         }
 
-        List<Agent> uniqueAgents = matchedAgents.stream().sorted(Comparator.comparingInt(Agent::getId)).toList();
+        List<Agent> uniqueAgents =
+                matchedAgents.stream().sorted(Comparator.comparingInt(Agent::getId)).toList();
         if (uniqueAgents.size() > 1) {
             log.info("存在{}个同名智能助手，将删除冗余助理", uniqueAgents.size());
             for (int i = 1; i < uniqueAgents.size(); i++) {
@@ -549,7 +549,6 @@ public class BiAgentServiceImpl implements BiAgentService {
             return false;
         }
     }
-
 
 
 
@@ -645,7 +644,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         List<MetricResp> metrics = metricService.getMetrics(filter);
         if (!CollectionUtils.isEmpty(metrics)) {
-            modelConfig.setMetrics(metrics.stream().map(MetricResp::getId).collect(Collectors.toList()));
+            modelConfig.setMetrics(
+                    metrics.stream().map(MetricResp::getId).collect(Collectors.toList()));
         }
         return modelConfig;
     }
@@ -673,7 +673,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         MetaFilter filter = new MetaFilter();
         filter.setDomainId(domainId);
         List<ModelResp> modelResps = modelService.getModelList(filter);
-        return modelResps.stream().filter(modelResp -> StringUtils.equals(modelResp.getBizName(), bizName))
+        return modelResps.stream()
+                .filter(modelResp -> StringUtils.equals(modelResp.getBizName(), bizName))
                 .findFirst().orElse(null);
     }
 
@@ -963,8 +964,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     private Map<String, List<String>> buildDefaultValuesMap(List<BiDimensionCofig> dimensionConfigs,
             Map<String, List<String>> oldDimDefaultValuesMap) {
-        Map<String, List<String>> defaultValuesMap = dimensionConfigs.stream()
-                .filter(biDimensionCofig -> !CollectionUtils.isEmpty(biDimensionCofig.getDefaultValues()))
+        Map<String, List<String>> defaultValuesMap = dimensionConfigs.stream().filter(
+                biDimensionCofig -> !CollectionUtils.isEmpty(biDimensionCofig.getDefaultValues()))
                 .collect(Collectors.toMap(BiDimensionCofig::getName,
                         BiDimensionCofig::getDefaultValues));
         if (oldDimDefaultValuesMap != null) {
@@ -978,8 +979,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     private List<String> extractDimensionNamesWithValues(List<BiDimensionCofig> dimensionConfigs) {
         return dimensionConfigs.stream()
                 .filter(biDimensionCofig -> !CollectionUtils.isEmpty(biDimensionCofig.getValues()))
-                .map(BiDimensionCofig::getName)
-                .toList();
+                .map(BiDimensionCofig::getName).toList();
     }
 
     private void importDimensionIfNeeded(User user, List<BiDimensionCofig> dimensionConfigs,
@@ -1069,13 +1069,13 @@ public class BiAgentServiceImpl implements BiAgentService {
             }
             DimensionResp resp = resps.getFirst();
             // 停用原有加入词典的逻辑
-             DictItemReq dictItemReq = new DictItemReq();
-             dictItemReq.setType(TypeEnums.DIMENSION);
-             dictItemReq.setItemId(resp.getId());
-             // 导入的维度值锁定不允许刷新
-             dictItemReq.setStatus(StatusEnum.ONLINE);
-             dictItemReq.setLocked(1);
-             ensureDictConf(dictItemReq, user, resp.getId());
+            DictItemReq dictItemReq = new DictItemReq();
+            dictItemReq.setType(TypeEnums.DIMENSION);
+            dictItemReq.setItemId(resp.getId());
+            // 导入的维度值锁定不允许刷新
+            dictItemReq.setStatus(StatusEnum.ONLINE);
+            dictItemReq.setLocked(1);
+            ensureDictConf(dictItemReq, user, resp.getId());
 
             // String nature = dictItemResp.getNature();
             // List<String> lines = values.stream().map(value -> {
@@ -1109,8 +1109,8 @@ public class BiAgentServiceImpl implements BiAgentService {
 
 
             // 清理该维度旧向量和旧dimValueMaps，避免历史值残留
-            DictSingleTaskReq deleteTaskReq =
-                    DictSingleTaskReq.builder().type(TypeEnums.DIMENSION).itemId(resp.getId()).build();
+            DictSingleTaskReq deleteTaskReq = DictSingleTaskReq.builder().type(TypeEnums.DIMENSION)
+                    .itemId(resp.getId()).build();
             try {
                 dictTaskService.deleteDictTaskForBI(deleteTaskReq, user);
             } catch (Exception e) {
@@ -1138,10 +1138,11 @@ public class BiAgentServiceImpl implements BiAgentService {
             if (!CollectionUtils.isEmpty(dimAliasMap)) {
                 // 记录维度值别名集合
                 List<DimensionValueDO> dimensionValueAliasList = new ArrayList<>();
-                dimAliasMap.getOrDefault(resp.getName(), Collections.emptyList()).forEach(dimValues -> {
+                dimAliasMap.getOrDefault(resp.getName(), Collections.emptyList())
+                        .forEach(dimValues -> {
                             // 获取别名
                             List<String> alias = dimValues.getAlias();
-                            if (!CollectionUtils.isEmpty(alias)){
+                            if (!CollectionUtils.isEmpty(alias)) {
                                 alias.forEach(tAlias -> {
                                     DimensionValueDO dimensionValueDO = new DimensionValueDO();
                                     // 设置维度值的别名进去
@@ -1151,21 +1152,23 @@ public class BiAgentServiceImpl implements BiAgentService {
                                     dimensionValueDO.setDimId(resp.getId());
                                     dimensionValueDO.setDimName(resp.getName());
                                     dimensionValueDO.setDimBizName(resp.getBizName());
-                                    //这是维度值
+                                    // 这是维度值
                                     dimensionValueDO.setDimValue(dimValues.getTechName());
                                     dimensionValueAliasList.add(dimensionValueDO);
                                 });
                             }
                         });
-                dimensionService.sendDimensionValueAliasEventBatch(dimensionValueAliasList, EventType.ADD);
+                dimensionService.sendDimensionValueAliasEventBatch(dimensionValueAliasList,
+                        EventType.ADD);
             }
 
             if (!CollectionUtils.isEmpty(previewDimValueMaps)) {
-                //原本调用updateDimValueAliasBatch方法改为updateDimValueMapsOnlyBatch，因为词典已取消，无需缓存别名到内存。
-                dimensionService.updateDimValueMapsOnlyBatch(resp.getId(), previewDimValueMaps, user);
+                // 原本调用updateDimValueAliasBatch方法改为updateDimValueMapsOnlyBatch，因为词典已取消，无需缓存别名到内存。
+                dimensionService.updateDimValueMapsOnlyBatch(resp.getId(), previewDimValueMaps,
+                        user);
             }
-            DictSingleTaskReq successTaskReq = DictSingleTaskReq.builder()
-                    .type(TypeEnums.DIMENSION).itemId(resp.getId()).build();
+            DictSingleTaskReq successTaskReq = DictSingleTaskReq.builder().type(TypeEnums.DIMENSION)
+                    .itemId(resp.getId()).build();
             dictTaskService.addSuccessTaskForBI(successTaskReq, user);
 
         }
@@ -1189,8 +1192,9 @@ public class BiAgentServiceImpl implements BiAgentService {
     private boolean isDimensionValuesUnchanged(DimensionResp dimensionResp,
             List<String> normalizedValues, List<DimValueMap> previewDimValueMaps) {
 
-        List<DimValueMap> existingMaps = dimensionResp.getDimValueMaps() == null ? Collections.emptyList()
-                : dimensionResp.getDimValueMaps();
+        List<DimValueMap> existingMaps =
+                dimensionResp.getDimValueMaps() == null ? Collections.emptyList()
+                        : dimensionResp.getDimValueMaps();
         Set<String> existingValues = existingMaps.stream().filter(Objects::nonNull)
                 .map(DimValueMap::getValue).filter(StringUtils::isNotBlank)
                 .collect(Collectors.toCollection(LinkedHashSet::new));

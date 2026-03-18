@@ -71,7 +71,8 @@ public class EmbeddingMapper extends BaseMapper {
                     .detectWord(matchResult.getDetectWord()).build();
             schemaElementMatch.setLlmMatched(matchResult.isLlmMatched());
             // 转化一下,判断一下type为DIMENSION_VALUE_ALIAS
-            doDimValueAliasLogic(schemaElementMatch, matchResult.getMetadata(), chatQueryContext.getSemanticSchema().getDimensionValues(),elementType);
+            doDimValueAliasLogic(schemaElementMatch, matchResult.getMetadata(),
+                    chatQueryContext.getSemanticSchema().getDimensionValues(), elementType);
 
             // 3. Add SchemaElementMatch to mapInfo
             addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
@@ -121,14 +122,16 @@ public class EmbeddingMapper extends BaseMapper {
 
 
 
-
-    private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch, Map<String, String> dimValueAlias, List<SchemaElement> dimensionValues, SchemaElementType elementType) {
+    private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch,
+            Map<String, String> dimValueAlias, List<SchemaElement> dimensionValues,
+            SchemaElementType elementType) {
         SchemaElement element = schemaElementMatch.getElement();
         boolean matched = false;
         if (SchemaElementType.DIMENSION_VALUE_ALIAS.equals(elementType)) {
             Long dimId = element.getId();
             String word = schemaElementMatch.getWord();
-            if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word) && dimValueAlias.containsKey(dimId.toString())) {
+            if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word)
+                    && dimValueAlias.containsKey(dimId.toString())) {
                 String id = dimValueAlias.get("id");
                 if (Objects.nonNull(id) && id.contains(word)) {
                     String wordTech = dimValueAlias.get("dimValue");
@@ -137,12 +140,14 @@ public class EmbeddingMapper extends BaseMapper {
                 }
             }
             if (!matched) {
-                SchemaElement dimensionValue = dimensionValues.stream()
-                        .filter(dimValue -> dimId.equals(dimValue.getId())).findFirst().orElse(null);
+                SchemaElement dimensionValue =
+                        dimensionValues.stream().filter(dimValue -> dimId.equals(dimValue.getId()))
+                                .findFirst().orElse(null);
                 if (dimensionValue != null) {
-                    SchemaValueMap dimValue =
-                            dimensionValue.getSchemaValueMaps().stream()
-                                    .filter(schemaValueMap -> StringUtils.equals(schemaValueMap.getBizName(), word) || schemaValueMap.getAlias().contains(word)).findFirst().orElse(null);
+                    SchemaValueMap dimValue = dimensionValue.getSchemaValueMaps().stream().filter(
+                            schemaValueMap -> StringUtils.equals(schemaValueMap.getBizName(), word)
+                                    || schemaValueMap.getAlias().contains(word))
+                            .findFirst().orElse(null);
                     if (dimValue != null) {
                         schemaElementMatch.setWord(dimValue.getTechName());
                     }
