@@ -367,6 +367,16 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (Objects.isNull(dictItemResp)) {
             return 0L;
         }
+        DictTaskResp latestTask = dictRepository.queryLatestDictTask(taskReq);
+        if (Objects.nonNull(latestTask) && Objects.nonNull(latestTask.getId())) {
+            DictTaskDO existTask = dictRepository.queryDictTaskById(latestTask.getId());
+            if (Objects.nonNull(existTask)) {
+                existTask.setStatus(TaskStatusEnum.SUCCESS.getStatus());
+                existTask.setElapsedMs(DateUtils.calculateDiffMs(existTask.getCreatedAt()));
+                dictRepository.editDictTask(existTask);
+                return existTask.getId();
+            }
+        }
         DictTaskDO dictTaskDO =
                 dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.SUCCESS);
         log.info("[addDictTask] dictTaskDO:{}", dictTaskDO);
@@ -374,6 +384,7 @@ public class DictTaskServiceImpl implements DictTaskService {
         dictRepository.addDictTask(dictTaskDO);
         return dictTaskDO.getId();
     }
+
 
     @Override
     public void reloadDictWord() {
