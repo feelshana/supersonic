@@ -75,7 +75,7 @@ public class MapFilter {
             if (!CollectionUtils.isEmpty(value)) {
                 value.removeIf(
                         schemaElementMatch -> StringUtils.length(schemaElementMatch.getWord()) <= 2
-                                && schemaElementMatch.getSimilarity() < 1);
+                                && schemaElementMatch.getSimilarity() < 0.98);
             }
         }
     }

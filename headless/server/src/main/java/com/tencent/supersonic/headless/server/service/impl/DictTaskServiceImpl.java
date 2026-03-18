@@ -65,6 +65,9 @@ public class DictTaskServiceImpl implements DictTaskService {
 
     private String dimValue = "DimValue_%d_%d";
 
+    private static final int MAX_DICT_VALUE_SCAN = 10000;
+
+
     private final DictRepository dictRepository;
     private final DictUtils dictConverter;
     private final DictUtils dictUtils;
@@ -577,25 +580,32 @@ public class DictTaskServiceImpl implements DictTaskService {
             }
 
             String countSql = String.format(
-                    "select count(1) total from (select distinct %s from %s %s) dim_values",
-                    dimBizName, tableStr, whereClause);
+                    "select count(1) total from (select distinct %s from %s %s limit %d) dim_values",
+                    dimBizName, tableStr, whereClause, MAX_DICT_VALUE_SCAN);
             QuerySqlReq countReq = QuerySqlReq.builder().sql(countSql).build();
             countReq.addModelId(dimResp.getModelId());
             SemanticQueryResp countResp = queryService.queryByReq(countReq, user);
             long total = extractTotal(countResp);
-            if (total <= 0) {
+            long cappedTotal = Math.min(total, MAX_DICT_VALUE_SCAN);
+            if (cappedTotal <= 0) {
                 return empty;
             }
 
             Integer current = dictValueReq.getCurrent();
             Integer pageSize = dictValueReq.getPageSize();
             int offset = Math.max((current - 1) * pageSize, 0);
+            if (offset >= cappedTotal) {
+                empty.setTotal(cappedTotal);
+                return empty;
+            }
+            int currentPageSize = (int) Math.min(pageSize, cappedTotal - offset);
             String dataSql = String.format(
                     "select distinct %s as value from %s %s order by value limit %d offset %d",
-                    dimBizName, tableStr, whereClause, pageSize, offset);
+                    dimBizName, tableStr, whereClause, currentPageSize, offset);
             QuerySqlReq dataReq = QuerySqlReq.builder().sql(dataSql).build();
             dataReq.addModelId(dimResp.getModelId());
             SemanticQueryResp dataResp = queryService.queryByReq(dataReq, user);
+
 
             List<DictValueDimResp> list = new ArrayList<>();
             if (Objects.nonNull(dataResp) && !CollectionUtils.isEmpty(dataResp.getResultList())) {
@@ -618,8 +628,9 @@ public class DictTaskServiceImpl implements DictTaskService {
 
             fillDimMapInfo(list, dictValueReq.getItemId());
             empty.setList(list);
-            empty.setTotal(total);
+            empty.setTotal(cappedTotal);
             return empty;
+
         } catch (Exception e) {
             log.warn("query dict value from db fallback error, req:{}", dictValueReq, e);
             return empty;
