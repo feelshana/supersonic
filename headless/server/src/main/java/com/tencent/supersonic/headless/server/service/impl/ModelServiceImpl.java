@@ -134,7 +134,106 @@ public class ModelServiceImpl implements ModelService {
     }
 
     @Override
+    @Transactional
+    public ModelResp syncModelForBi(ModelReq modelReq, User user) throws Exception {
+        ModelDO persistedModelDO = modelRepository.getModelById(modelReq.getId());
+        if (persistedModelDO == null) {
+            throw new InvalidArgumentException(
+                    String.format("model not exist, id:%s", modelReq.getId()));
+        }
+        ModelResp existingModel = ModelConverter.convert(persistedModelDO);
+
+        ModelDO syncModelDO = new ModelDO();
+        BeanUtils.copyProperties(persistedModelDO, syncModelDO);
+        ModelConverter.convert(syncModelDO, modelReq, user);
+
+        boolean modelMetaChanged = isModelMetaChanged(existingModel, modelReq);
+        if (modelMetaChanged) {
+            modelRepository.updateModel(syncModelDO);
+            sendEvent(syncModelDO, EventType.UPDATE);
+        }
+
+        syncModelDimensions(syncModelDO, user);
+        syncModelMetrics(syncModelDO, user);
+
+        return ModelConverter.convert(modelRepository.getModelById(syncModelDO.getId()));
+    }
+
+
+    private void syncModelDimensions(ModelDO modelDO, User user) throws Exception {
+        List<DimensionReq> dimensionReqs = ModelConverter.convertDimensionList(modelDO);
+        dimensionService.alterDimensionBatch(dimensionReqs, modelDO.getId(), user);
+    }
+
+    private void syncModelMetrics(ModelDO modelDO, User user) throws Exception {
+        List<MetricReq> metricReqs = ModelConverter.convertMetricList(modelDO);
+        metricService.alterMetricBatch(metricReqs, modelDO.getId(), user);
+    }
+
+    private boolean isModelMetaChanged(ModelResp existingModel, ModelReq targetReq) {
+        if (existingModel == null || targetReq == null) {
+            return true;
+        }
+        if (!Objects.equals(existingModel.getDomainId(), targetReq.getDomainId())) {
+            return true;
+        }
+        if (!Objects.equals(existingModel.getDatabaseId(), targetReq.getDatabaseId())) {
+            return true;
+        }
+        if (!StringUtils.equals(existingModel.getName(), targetReq.getName())) {
+            return true;
+        }
+        if (!StringUtils.equals(existingModel.getBizName(), targetReq.getBizName())) {
+            return true;
+        }
+        if (!isSameList(existingModel.getAdmins(), targetReq.getAdmins())) {
+            return true;
+        }
+        if (!isSameList(existingModel.getViewers(), targetReq.getViewers())) {
+            return true;
+        }
+        if (!StringUtils.equals(normalizeSql(existingModel.getFilterSql()),
+                normalizeSql(targetReq.getFilterSql()))) {
+            return true;
+        }
+        ModelDetail existingDetail = existingModel.getModelDetail();
+        ModelDetail targetDetail = targetReq.getModelDetail();
+        if (existingDetail == null || targetDetail == null) {
+            return existingDetail != targetDetail;
+        }
+        if (!StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(existingDetail.getQueryType()),
+                StringUtils.trimToEmpty(targetDetail.getQueryType()))) {
+            return true;
+        }
+        if (!StringUtils.equals(normalizeSql(existingDetail.getTableQuery()),
+                normalizeSql(targetDetail.getTableQuery()))) {
+            return true;
+        }
+        return !StringUtils.equals(normalizeSql(existingDetail.getSqlQuery()),
+                normalizeSql(targetDetail.getSqlQuery()));
+    }
+
+    private String normalizeSql(String sql) {
+        String normalized = StringUtils.trimToEmpty(sql).replaceAll("\\s+", " ");
+        if (StringUtils.endsWith(normalized, ";")) {
+            return StringUtils.trimToEmpty(normalized.substring(0, normalized.length() - 1));
+        }
+        return normalized;
+    }
+
+    private boolean isSameList(List<String> left, List<String> right) {
+        List<String> leftSorted = left == null ? Collections.emptyList()
+                : left.stream().filter(StringUtils::isNotBlank).map(StringUtils::trim).sorted()
+                        .toList();
+        List<String> rightSorted = right == null ? Collections.emptyList()
+                : right.stream().filter(StringUtils::isNotBlank).map(StringUtils::trim).sorted()
+                        .toList();
+        return Objects.equals(leftSorted, rightSorted);
+    }
+
+    @Override
     public List<ModelResp> getModelList(MetaFilter metaFilter) {
+
         ModelFilter modelFilter = new ModelFilter();
         BeanUtils.copyProperties(metaFilter, modelFilter);
         List<ModelResp> modelResps =

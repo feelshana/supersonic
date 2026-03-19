@@ -35,7 +35,10 @@ public class TermMatchMapper extends BaseMapper {
     protected boolean accept(ChatQueryContext chatQueryContext) {
         return !MapModeEnum.ALL.equals(chatQueryContext.getRequest().getMapModeEnum());
     }
-
+    @Override
+    protected boolean acceptFilter() {
+        return false;
+    }
     @Override
     public void doMap(ChatQueryContext chatQueryContext) {
         String queryText = StringUtils.defaultString(chatQueryContext.getRequest().getQueryText());
