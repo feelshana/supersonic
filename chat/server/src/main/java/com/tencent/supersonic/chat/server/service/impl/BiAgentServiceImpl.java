@@ -6,9 +6,11 @@ import com.google.common.collect.Maps;
 import com.tencent.supersonic.auth.api.authentication.request.UserReq;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.agent.AgentTool;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
 import com.tencent.supersonic.chat.server.agent.ToolConfig;
+
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.BiAgentService;
 import com.tencent.supersonic.common.bi.BiAgentConfig;
@@ -394,9 +396,10 @@ public class BiAgentServiceImpl implements BiAgentService {
     private Agent updateExistingAgent(Agent agent, ToolConfig toolConfig, BiAgentConfig config,
             User user) {
         String newToolConfig = JSONObject.toJSONString(toolConfig);
-        boolean sameToolConfig = StringUtils.equals(agent.getToolConfig(), newToolConfig);
+        boolean sameToolConfig = isSameToolConfigIgnoreId(agent.getToolConfig(), newToolConfig);
         boolean sameAdmins = isSameList(agent.getAdmins(), config.getAdmins());
         boolean sameViewers = isSameList(agent.getViewers(), config.getViewers());
+
 
         if (sameToolConfig && sameAdmins && sameViewers) {
             log.info("智能助手无变化，跳过更新, id: {}", agent.getId());
@@ -660,14 +663,10 @@ public class BiAgentServiceImpl implements BiAgentService {
         }
 
         modelReq.setId(existingModel.getId());
-        if (isSameModel(existingModel, modelReq)) {
-            log.info("模型无变化，跳过更新, id: {}", existingModel.getId());
-            return existingModel;
-        }
-
-        log.info("模型存在变化，执行更新, id: {}", existingModel.getId());
-        return modelService.updateModel(modelReq, user);
+        log.info("模型存在，执行模型/维度/指标同步, id: {}", existingModel.getId());
+        return modelService.syncModelForBi(modelReq, user);
     }
+
 
     private ModelResp findModelByBizName(Long domainId, String bizName) {
         MetaFilter filter = new MetaFilter();
@@ -687,32 +686,8 @@ public class BiAgentServiceImpl implements BiAgentService {
                 .findFirst().orElse(null);
     }
 
-    private boolean isSameModel(ModelResp existingModel, ModelReq targetReq) {
-        if (existingModel == null || targetReq == null) {
-            return false;
-        }
-        if (!Objects.equals(existingModel.getDomainId(), targetReq.getDomainId())) {
-            return false;
-        }
-        if (!Objects.equals(existingModel.getDatabaseId(), targetReq.getDatabaseId())) {
-            return false;
-        }
-        if (!StringUtils.equals(existingModel.getName(), targetReq.getName())) {
-            return false;
-        }
-        if (!StringUtils.equals(existingModel.getBizName(), targetReq.getBizName())) {
-            return false;
-        }
-        if (!isSameList(existingModel.getAdmins(), targetReq.getAdmins())) {
-            return false;
-        }
-        if (!isSameList(existingModel.getViewers(), targetReq.getViewers())) {
-            return false;
-        }
-        String existingModelDetail = JSONObject.toJSONString(existingModel.getModelDetail());
-        String targetModelDetail = JSONObject.toJSONString(targetReq.getModelDetail());
-        return StringUtils.equals(existingModelDetail, targetModelDetail);
-    }
+
+
 
     private boolean isSameDataSet(DataSetResp existingDataSet, DataSetReq targetReq) {
         if (existingDataSet == null || targetReq == null) {
@@ -735,6 +710,32 @@ public class BiAgentServiceImpl implements BiAgentService {
         return StringUtils.equals(existingDetail, targetDetail);
     }
 
+    private boolean isSameToolConfigIgnoreId(String oldToolConfig, String newToolConfig) {
+        ToolConfig oldConfig = parseToolConfig(oldToolConfig);
+        ToolConfig newConfig = parseToolConfig(newToolConfig);
+        normalizeToolIds(oldConfig);
+        normalizeToolIds(newConfig);
+        return StringUtils.equals(JSONObject.toJSONString(oldConfig), JSONObject.toJSONString(newConfig));
+    }
+
+    private ToolConfig parseToolConfig(String toolConfig) {
+        if (StringUtils.isBlank(toolConfig)) {
+            return new ToolConfig();
+        }
+        ToolConfig parsed = JSONObject.parseObject(toolConfig, ToolConfig.class);
+        return parsed == null ? new ToolConfig() : parsed;
+    }
+
+    private void normalizeToolIds(ToolConfig config) {
+        List<AgentTool> tools = Optional.ofNullable(config).map(ToolConfig::getTools)
+                .orElse(Collections.emptyList());
+        tools.forEach(tool -> {
+            if (tool != null) {
+                tool.setId(null);
+            }
+        });
+    }
+
     private boolean isSameList(List<String> left, List<String> right) {
         List<String> leftSorted = left == null ? Collections.emptyList()
                 : left.stream().filter(StringUtils::isNotBlank).sorted().toList();
@@ -742,6 +743,7 @@ public class BiAgentServiceImpl implements BiAgentService {
                 : right.stream().filter(StringUtils::isNotBlank).sorted().toList();
         return Objects.equals(leftSorted, rightSorted);
     }
+
 
     private List<ModelResp> createModel(BiModelConfig config, BiPageConfig pageConfig,
             Map<String, List<DimValueMap>> dimAliasMap,

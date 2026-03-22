@@ -27,6 +27,9 @@ public interface ModelService {
 
     ModelResp updateModel(ModelReq datasourceReq, User user) throws Exception;
 
+    ModelResp syncModelForBi(ModelReq modelReq, User user) throws Exception;
+
+
     List<ModelResp> getModelList(MetaFilter metaFilter);
 
     Map<Long, ModelResp> getModelMap(ModelFilter modelFilter);
