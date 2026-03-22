@@ -83,9 +83,7 @@ public class ChatWorkflowEngine {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
                     // 向量召回后仍然没有结果，则代表问题不相关
-                    if (queryCtx.getMapInfo().isEmpty()
-                            || !containsDateKeywords(queryCtx.getRequest().getQueryText(),
-                                    queryCtx.getAgentId())) {
+                    if (queryCtx.getMapInfo().isEmpty()) {
                         errDefault(parseResult, queryCtx);
                     } else {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
@@ -201,14 +199,7 @@ public class ChatWorkflowEngine {
         List<SemanticParseInfo> selectedParses = new ArrayList<>();
         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
         SqlInfo sqlInfo = new SqlInfo();
-        String emptyMapTips;
-        if (!queryCtx.getMapInfo().isEmpty()
-                && !containsDateKeywords(queryCtx.getRequest().getQueryText(),
-                        queryCtx.getAgentId())) {
-            emptyMapTips = produceDateTips(queryCtx.getSemanticSchema());
-        } else {
-            emptyMapTips = produceEmptyMapTips(queryCtx.getSemanticSchema());
-        }
+        String emptyMapTips = produceEmptyMapTips(queryCtx.getSemanticSchema());
         sqlInfo.setParsedS2SQL(emptyMapTips);
         sqlInfo.setCorrectedS2SQL(emptyMapTips);
         sqlInfo.setQuerySQL(null);

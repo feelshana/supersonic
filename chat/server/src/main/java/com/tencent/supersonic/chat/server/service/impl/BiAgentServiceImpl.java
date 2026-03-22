@@ -10,7 +10,6 @@ import com.tencent.supersonic.chat.server.agent.AgentTool;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DatasetTool;
 import com.tencent.supersonic.chat.server.agent.ToolConfig;
-
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.BiAgentService;
 import com.tencent.supersonic.common.bi.BiAgentConfig;
@@ -688,7 +687,6 @@ public class BiAgentServiceImpl implements BiAgentService {
 
 
 
-
     private boolean isSameDataSet(DataSetResp existingDataSet, DataSetReq targetReq) {
         if (existingDataSet == null || targetReq == null) {
             return false;
@@ -715,7 +713,8 @@ public class BiAgentServiceImpl implements BiAgentService {
         ToolConfig newConfig = parseToolConfig(newToolConfig);
         normalizeToolIds(oldConfig);
         normalizeToolIds(newConfig);
-        return StringUtils.equals(JSONObject.toJSONString(oldConfig), JSONObject.toJSONString(newConfig));
+        return StringUtils.equals(JSONObject.toJSONString(oldConfig),
+                JSONObject.toJSONString(newConfig));
     }
 
     private ToolConfig parseToolConfig(String toolConfig) {
