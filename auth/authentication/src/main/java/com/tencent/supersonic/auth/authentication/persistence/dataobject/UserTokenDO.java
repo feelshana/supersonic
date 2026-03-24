@@ -13,7 +13,6 @@ public class UserTokenDO {
     @TableId(type = IdType.AUTO)
     Integer id;
     String name;
-    String analysiscloudName;
     String userName;
     Long expireTime;
     String token;

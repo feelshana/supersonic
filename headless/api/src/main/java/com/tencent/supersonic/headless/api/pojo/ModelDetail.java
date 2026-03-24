@@ -50,5 +50,11 @@ public class ModelDetail {
         return dimensions.stream().filter(dim -> DimensionType.partition_time.equals(dim.getType()))
                 .collect(Collectors.toList());
     }
-
+    public List<Dimension> filterTimeDimsForBI() {
+        if (CollectionUtils.isEmpty(dimensions)) {
+            return Lists.newArrayList();
+        }
+        return dimensions.stream().filter(dim -> DimensionType.time.equals(dim.getType()) ||DimensionType.partition_time.equals(dim.getType()))
+                .collect(Collectors.toList());
+    }
 }
