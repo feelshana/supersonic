@@ -525,12 +525,12 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                 .collect(Collectors.toMap(DimValueMap::getValue, v -> v, (v1, v2) -> v2));
         String value = dimValueMaps.getValue();
         if (CollectionUtils.isEmpty(dimValueMaps.getAlias())) {
-            //  清除维度值别名
-//            dimValueMapList = dimValueMapList.stream()
-//                    .filter(map -> !map.getValue().equalsIgnoreCase(value)).collect(Collectors.toList());
+            // 清除维度值别名
+            // dimValueMapList = dimValueMapList.stream()
+            // .filter(map -> !map.getValue().equalsIgnoreCase(value)).collect(Collectors.toList());
 
             dimValueMapList.forEach(t -> {
-                //置空
+                // 置空
                 if (t.getValue().equalsIgnoreCase(value)) {
                     t.setAlias(Collections.emptyList());
                 }
@@ -541,8 +541,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
             // 新增
             if (!valeAndMapInfo.containsKey(value)) {
                 dimValueMapList.add(dimValueMaps);
-                List<DimensionValueDO>   dimensionValueDOS=  insertDimValueAliasInVector(req.getId(),
-                        dimensionDO, dimValueMaps);
+                List<DimensionValueDO> dimensionValueDOS =
+                        insertDimValueAliasInVector(req.getId(), dimensionDO, dimValueMaps);
                 sendDimensionValueAliasEventBatch(dimensionValueDOS, EventType.ADD);
             } else {
                 // 更新
@@ -554,8 +554,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                             // 先删除之前的
                             deleteDimValueAlias(req.getId(), value);
                             // 新增向量入库
-                            List<DimensionValueDO>   dimensionValueDOS=  insertDimValueAliasInVector(req.getId(),
-                                    dimensionDO, dimValueMaps);
+                            List<DimensionValueDO> dimensionValueDOS = insertDimValueAliasInVector(
+                                    req.getId(), dimensionDO, dimValueMaps);
                             sendDimensionValueAliasEventBatch(dimensionValueDOS, EventType.ADD);
                         }
                     }
@@ -587,7 +587,7 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
     /**
      * 通过维度值，维度主键，删除这个维度值在向量库的维度值别名
      *
-     * @param dimId    维度主键
+     * @param dimId 维度主键
      * @param dimValue 维度值
      */
     private void deleteDimValueAlias(Long dimId, String dimValue) {
@@ -595,7 +595,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         filterCondition.put("type", TypeEnums.DIMENSION_VALUE_ALIAS.name());
         filterCondition.put("dimId", dimId);
         filterCondition.put("dimValue", dimValue);
-        embeddingService.deleteByCondition(embeddingConfig.getMetaCollectionName(), filterCondition);
+        embeddingService.deleteByCondition(embeddingConfig.getMetaCollectionName(),
+                filterCondition);
     }
 
     @Override
@@ -673,7 +674,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                 .append(dimensionReq.getExt(), dimensionResp.getExt()).isEquals();
         boolean isTypeParamChange =
                 !Objects.equals(dimensionReq.getTypeParams(), dimensionResp.getTypeParams());
-        return isNameChange || isExtChange || isTypeParamChange;
+        boolean isDimValueChange = dimensionResp.isHasDimValues() != dimensionReq.isHasDimValues();
+        return isNameChange || isExtChange || isTypeParamChange || isDimValueChange;
     }
 
     private void deleteDimensionValue(List<DimensionDO> dimensionDOS) {
@@ -693,7 +695,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
     }
 
     @Override
-    public void sendDimensionValueAliasEventBatch(List<DimensionValueDO> dimensionValueAliasList, EventType eventType) {
+    public void sendDimensionValueAliasEventBatch(List<DimensionValueDO> dimensionValueAliasList,
+            EventType eventType) {
 
         DataEvent event = getDimValueAliasDataEvent(dimensionValueAliasList, eventType);
         eventPublisher.publishEvent(event);
@@ -701,9 +704,11 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
 
     }
 
-    private DataEvent getDimValueAliasDataEvent(List<DimensionValueDO> dimensionValueAliasList, EventType eventType) {
+    private DataEvent getDimValueAliasDataEvent(List<DimensionValueDO> dimensionValueAliasList,
+            EventType eventType) {
 
-        List<DataItem> dataItems = dimensionValueAliasList.stream().map(this::getDataItemByDimensionValueAlias).toList();
+        List<DataItem> dataItems = dimensionValueAliasList.stream()
+                .map(this::getDataItemByDimensionValueAlias).toList();
         return new DataEvent(this, dataItems, eventType);
     }
 
@@ -713,35 +718,34 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
                 .name(dimensionValueDO.getDimName()).bizName(dimensionValueDO.getDimBizName())
                 .modelId(dimensionValueDO.getModelId().toString())
                 .domainId(modelResp.getDomainId().toString()).type(TypeEnums.DIMENSION_VALUE_ALIAS)
-                .dimValue(dimensionValueDO.getDimValue())
-                .dimValueAlis(dimensionValueDO.getAlias()).build();
+                .dimValue(dimensionValueDO.getDimValue()).dimValueAlis(dimensionValueDO.getAlias())
+                .build();
     }
 
     /**
-     *  插入维度别名向量
+     * 插入维度别名向量
+     * 
      * @param dimId 维度主键
      * @param dimensionDO 维度信息
      * @param dimValueMaps 前端传入的维度值别名
      * @return 插入的维度别名向量对象集合
      */
-    private List<DimensionValueDO> insertDimValueAliasInVector(Long dimId,
-                                                               DimensionDO dimensionDO,
-                                                               DimValueMap dimValueMaps) {
+    private List<DimensionValueDO> insertDimValueAliasInVector(Long dimId, DimensionDO dimensionDO,
+            DimValueMap dimValueMaps) {
 
-        return dimValueMaps.getAlias()
-                .stream().map(tAlias -> {
-                    DimensionValueDO dimensionValueDO = new DimensionValueDO();
-                    // 设置维度值的别名进去
-                    dimensionValueDO.setAlias(tAlias);
-                    dimensionValueDO.setModelId(dimensionDO.getModelId());
-                    // 这是维度别名
-                    dimensionValueDO.setDimId(dimId);
-                    dimensionValueDO.setDimName(dimensionDO.getName());
-                    dimensionValueDO.setDimBizName(dimValueMaps.getBizName());
-                    //这是维度值
-                    dimensionValueDO.setDimValue(dimValueMaps.getTechName());
-                    return dimensionValueDO;
-                }).toList();
+        return dimValueMaps.getAlias().stream().map(tAlias -> {
+            DimensionValueDO dimensionValueDO = new DimensionValueDO();
+            // 设置维度值的别名进去
+            dimensionValueDO.setAlias(tAlias);
+            dimensionValueDO.setModelId(dimensionDO.getModelId());
+            // 这是维度别名
+            dimensionValueDO.setDimId(dimId);
+            dimensionValueDO.setDimName(dimensionDO.getName());
+            dimensionValueDO.setDimBizName(dimValueMaps.getBizName());
+            // 这是维度值
+            dimensionValueDO.setDimValue(dimValueMaps.getTechName());
+            return dimensionValueDO;
+        }).toList();
     }
 
 }

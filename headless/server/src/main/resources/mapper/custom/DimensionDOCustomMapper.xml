@@ -99,6 +99,7 @@
             </if>
             <if test="dimension.status != null">status = #{dimension.status,jdbcType=INTEGER},</if>
             <if test="dimension.modelId != null">model_id = #{dimension.modelId,jdbcType=BIGINT},</if>
+            <if test="dimension.hasDimValues != null">has_dim_values = #{dimension.hasDimValues,jdbcType=BOOLEAN},</if>
             <if test="dimension.type != null and dimension.type !=''">type = #{dimension.type,jdbcType=VARCHAR},</if>
             <if test="dimension.typeParams != null and dimension.typeParams !=''">type_params =
                 #{dimension.typeParams,jdbcType=VARCHAR},
