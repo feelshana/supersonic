@@ -69,7 +69,12 @@ public class ModelResp extends SchemaItem {
         }
         return modelDetail.filterTimeDims();
     }
-
+    public List<Dimension> getTimeDimensionForBI() {
+        if (modelDetail == null) {
+            return Lists.newArrayList();
+        }
+        return modelDetail.filterTimeDimsForBI();
+    }
     public Set<String> getFieldList() {
         Set<String> fieldSet = new HashSet<>();
         if (modelDetail == null) {

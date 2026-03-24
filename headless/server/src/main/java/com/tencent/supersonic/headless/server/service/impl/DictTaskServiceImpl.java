@@ -4,6 +4,7 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.Constants;
+import com.tencent.supersonic.common.pojo.DateConf;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
@@ -13,6 +14,8 @@ import com.tencent.supersonic.common.service.EmbeddingService;
 import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.headless.api.pojo.DimValueMap;
+import com.tencent.supersonic.headless.api.pojo.Dimension;
+
 import com.tencent.supersonic.headless.api.pojo.request.DictItemFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
@@ -43,6 +46,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -579,9 +585,19 @@ public class DictTaskServiceImpl implements DictTaskService {
                 whereClause += String.format(" and %s like '%%%s%%'", dimBizName, escapedKey);
             }
 
-            String countSql = String.format(
-                    "select count(1) total from (select distinct %s from %s %s limit %d) dim_values",
-                    dimBizName, tableStr, whereClause, MAX_DICT_VALUE_SCAN);
+            DateSamplingConfig dateSamplingConfig =
+                    resolveDateSamplingConfig(dictValueReq.getItemId(), modelResp);
+            String sampledWhereClause = whereClause;
+            if (Objects.nonNull(dateSamplingConfig)
+                    && StringUtils.isNotBlank(dateSamplingConfig.getDateFilterSql())) {
+                sampledWhereClause += " and " + dateSamplingConfig.getDateFilterSql();
+            }
+
+            String sampledSql = String.format("select %s as value from %s %s limit %d", dimBizName,
+                    tableStr, sampledWhereClause, MAX_DICT_VALUE_SCAN);
+            String countSql =
+                    String.format("select count(1) total from (select distinct value from (%s) sampled) t",
+                            sampledSql);
             QuerySqlReq countReq = QuerySqlReq.builder().sql(countSql).build();
             countReq.addModelId(dimResp.getModelId());
             SemanticQueryResp countResp = queryService.queryByReq(countReq, user);
@@ -589,6 +605,14 @@ public class DictTaskServiceImpl implements DictTaskService {
             long cappedTotal = Math.min(total, MAX_DICT_VALUE_SCAN);
             if (cappedTotal <= 0) {
                 return empty;
+            }
+
+            if (cappedTotal <= 50) {
+                int dimValueMapsCount =
+                        countFilteredDimValueMaps(dictValueReq.getItemId(), dictValueReq.getKeyValue());
+                if (dimValueMapsCount > cappedTotal) {
+                    return getDictValuePageFromMaps(dictValueReq);
+                }
             }
 
             Integer current = dictValueReq.getCurrent();
@@ -600,8 +624,8 @@ public class DictTaskServiceImpl implements DictTaskService {
             }
             int currentPageSize = (int) Math.min(pageSize, cappedTotal - offset);
             String dataSql = String.format(
-                    "select distinct %s as value from %s %s order by value limit %d offset %d",
-                    dimBizName, tableStr, whereClause, currentPageSize, offset);
+                    "select distinct value from (%s) sampled order by value limit %d offset %d",
+                    sampledSql, currentPageSize, offset);
             QuerySqlReq dataReq = QuerySqlReq.builder().sql(dataSql).build();
             dataReq.addModelId(dimResp.getModelId());
             SemanticQueryResp dataResp = queryService.queryByReq(dataReq, user);
@@ -635,6 +659,102 @@ public class DictTaskServiceImpl implements DictTaskService {
             log.warn("query dict value from db fallback error, req:{}", dictValueReq, e);
             return empty;
         }
+    }
+
+    private int countFilteredDimValueMaps(Long dimId, String keyValue) {
+        DimensionResp dimResp = dimensionService.getDimension(dimId);
+        if (Objects.isNull(dimResp) || CollectionUtils.isEmpty(dimResp.getDimValueMaps())) {
+            return 0;
+        }
+        return (int) dimResp.getDimValueMaps().stream().filter(Objects::nonNull).map(
+                map -> StringUtils.defaultIfBlank(map.getValue(), map.getTechName()))
+                .filter(StringUtils::isNotBlank)
+                .filter(value -> StringUtils.isBlank(keyValue)
+                        || StringUtils.containsIgnoreCase(value, keyValue))
+                .count();
+    }
+
+    private DateSamplingConfig resolveDateSamplingConfig(Long dimId, ModelResp modelResp) {
+        if (Objects.isNull(dimId) || Objects.isNull(modelResp)) {
+            return null;
+        }
+        String dateField = null;
+        DictItemFilter dictItemFilter =
+                DictItemFilter.builder().itemId(dimId).type(TypeEnums.DIMENSION).build();
+        List<DictItemResp> dictItems = dictRepository.queryDictConf(dictItemFilter);
+        if (!CollectionUtils.isEmpty(dictItems) && Objects.nonNull(dictItems.getFirst().getConfig())
+                && Objects.nonNull(dictItems.getFirst().getConfig().getDateConf())) {
+            DateConf dateConf = dictItems.getFirst().getConfig().getDateConf();
+            if (StringUtils.isNotBlank(dateConf.getDateField())) {
+                dateField = dateConf.getDateField();
+            }
+        }
+
+        List<Dimension> timeDimensions = modelResp.getTimeDimensionForBI();
+        Dimension timeDimension = CollectionUtils.isEmpty(timeDimensions) ? null : timeDimensions.getFirst();
+        String dateFormat = Objects.nonNull(timeDimension)
+                ? StringUtils.defaultIfBlank(timeDimension.getDateFormat(), "yyyy-MM-dd")
+                : "yyyy-MM-dd";
+        String timeGranularity = Objects.nonNull(timeDimension)
+                && Objects.nonNull(timeDimension.getTypeParams())
+                        ? timeDimension.getTypeParams().getTimeGranularity()
+                        : "";
+
+        if (StringUtils.isBlank(dateField) && Objects.nonNull(timeDimension)) {
+            dateField = StringUtils.defaultIfBlank(timeDimension.getBizName(), timeDimension.getExpr());
+        }
+
+        if (StringUtils.isBlank(dateField) || !isSafeFieldName(dateField)) {
+            return null;
+        }
+
+        String dateFilterSql = buildDateFilterSql(dateField, dateFormat, timeGranularity);
+        if (StringUtils.isBlank(dateFilterSql)) {
+            return null;
+        }
+        return new DateSamplingConfig(dateField, dateFilterSql);
+    }
+
+    private String buildDateFilterSql(String dateField, String dateFormat, String timeGranularity) {
+        boolean monthGranularity = isMonthGranularity(dateFormat, timeGranularity);
+        LocalDate startDate;
+        LocalDate endDate;
+        if (monthGranularity) {
+            YearMonth prevMonth = YearMonth.now().minusMonths(1);
+            startDate = prevMonth.atDay(1);
+            endDate = prevMonth.atEndOfMonth();
+        } else {
+            startDate = LocalDate.now().minusDays(6);
+            endDate = LocalDate.now();
+        }
+
+        String start = formatDate(startDate, dateFormat);
+        String end = formatDate(endDate, dateFormat);
+        return String.format("%s >= '%s' and %s <= '%s'", dateField, start, dateField, end);
+    }
+
+    private boolean isMonthGranularity(String dateFormat, String timeGranularity) {
+        if (StringUtils.equalsIgnoreCase(timeGranularity, "month")) {
+            return true;
+        }
+        if (StringUtils.isBlank(dateFormat)) {
+            return false;
+        }
+        String format = dateFormat.toLowerCase();
+        return format.contains("m") && !format.contains("d");
+    }
+
+    private String formatDate(LocalDate date, String dateFormat) {
+        String format = StringUtils.defaultIfBlank(dateFormat, "yyyy-MM-dd");
+        try {
+            return date.format(DateTimeFormatter.ofPattern(format));
+        } catch (Exception e) {
+            return date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        }
+    }
+
+    private boolean isSafeFieldName(String fieldName) {
+        return StringUtils.isNotBlank(fieldName) && fieldName.matches("[a-zA-Z0-9_.$]+$");
     }
 
     private long extractTotal(SemanticQueryResp semanticQueryResp) {
@@ -778,6 +898,24 @@ public class DictTaskServiceImpl implements DictTaskService {
         List<DictWord> data = dimDictWords.subList(startIndex, endIndex);
         dictValueRespPageInfo.setList(getDictValueDimRespList(data, dictValueReq.getItemId()));
         return dictValueRespPageInfo;
+    }
+
+    private static class DateSamplingConfig {
+        private final String dateField;
+        private final String dateFilterSql;
+
+        private DateSamplingConfig(String dateField, String dateFilterSql) {
+            this.dateField = dateField;
+            this.dateFilterSql = dateFilterSql;
+        }
+
+        public String getDateField() {
+            return dateField;
+        }
+
+        public String getDateFilterSql() {
+            return dateFilterSql;
+        }
     }
 
     @Override
