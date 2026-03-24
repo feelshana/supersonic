@@ -486,8 +486,15 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (!isLatestTaskSuccess(dictValueReq)) {
             return emptyDictValuePage(dictValueReq);
         }
-        return getDictValuePageFromDb(dictValueReq, user);
+
+        DimensionResp dimResp = dimensionService.getDimension(dictValueReq.getItemId());
+        if (Objects.nonNull(dimResp) && !CollectionUtils.isEmpty(dimResp.getDimValueMaps())
+                && dimResp.getDimValueMaps().size() < 50) {
+            return getDictValuePageFromMaps(dictValueReq, dimResp);
+        }
+        return getDictValuePageFromDb(dictValueReq, user, dimResp);
     }
+
 
     private boolean isDictVisibleEnabled(DictValueReq dictValueReq) {
         DictItemFilter filter = DictItemFilter.builder().itemId(dictValueReq.getItemId())
@@ -521,8 +528,13 @@ public class DictTaskServiceImpl implements DictTaskService {
 
 
     private PageInfo<DictValueDimResp> getDictValuePageFromMaps(DictValueReq dictValueReq) {
-        PageInfo<DictValueDimResp> pageInfo = new PageInfo<>();
         DimensionResp dimResp = dimensionService.getDimension(dictValueReq.getItemId());
+        return getDictValuePageFromMaps(dictValueReq, dimResp);
+    }
+
+    private PageInfo<DictValueDimResp> getDictValuePageFromMaps(DictValueReq dictValueReq,
+            DimensionResp dimResp) {
+        PageInfo<DictValueDimResp> pageInfo = new PageInfo<>();
         if (Objects.isNull(dimResp) || CollectionUtils.isEmpty(dimResp.getDimValueMaps())) {
             pageInfo.setList(new ArrayList<>());
             pageInfo.setTotal(0);
@@ -530,6 +542,7 @@ public class DictTaskServiceImpl implements DictTaskService {
             pageInfo.setPageSize(dictValueReq.getPageSize());
             return pageInfo;
         }
+
 
         List<DictValueDimResp> values = dimResp.getDimValueMaps().stream().filter(Objects::nonNull)
                 .map(this::convert2DictValueInternal).filter(Objects::nonNull)
@@ -552,7 +565,8 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq,
-            User user) {
+            User user, DimensionResp preloadedDimResp) {
+
         PageInfo<DictValueDimResp> empty = new PageInfo<>();
         empty.setList(new ArrayList<>());
         empty.setTotal(0);
@@ -560,7 +574,9 @@ public class DictTaskServiceImpl implements DictTaskService {
         empty.setPageSize(dictValueReq.getPageSize());
 
         try {
-            DimensionResp dimResp = dimensionService.getDimension(dictValueReq.getItemId());
+            DimensionResp dimResp = Objects.nonNull(preloadedDimResp) ? preloadedDimResp
+                    : dimensionService.getDimension(dictValueReq.getItemId());
+
             if (Objects.isNull(dimResp) || Objects.isNull(dimResp.getModelId())) {
                 return empty;
             }
@@ -611,7 +627,8 @@ public class DictTaskServiceImpl implements DictTaskService {
                 int dimValueMapsCount =
                         countFilteredDimValueMaps(dictValueReq.getItemId(), dictValueReq.getKeyValue());
                 if (dimValueMapsCount > cappedTotal) {
-                    return getDictValuePageFromMaps(dictValueReq);
+                    return getDictValuePageFromMaps(dictValueReq, dimResp);
+
                 }
             }
 
@@ -719,19 +736,21 @@ public class DictTaskServiceImpl implements DictTaskService {
         boolean monthGranularity = isMonthGranularity(dateFormat, timeGranularity);
         LocalDate startDate;
         LocalDate endDate;
-        if (monthGranularity) {
+        LocalDate today = LocalDate.now();
+        if (monthGranularity || today.getDayOfMonth() == 1) {
             YearMonth prevMonth = YearMonth.now().minusMonths(1);
             startDate = prevMonth.atDay(1);
             endDate = prevMonth.atEndOfMonth();
         } else {
-            startDate = LocalDate.now().minusDays(6);
-            endDate = LocalDate.now();
+            startDate = today.minusDays(3);
+            endDate = today;
         }
 
         String start = formatDate(startDate, dateFormat);
         String end = formatDate(endDate, dateFormat);
         return String.format("%s >= '%s' and %s <= '%s'", dateField, start, dateField, end);
     }
+
 
     private boolean isMonthGranularity(String dateFormat, String timeGranularity) {
         if (StringUtils.equalsIgnoreCase(timeGranularity, "month")) {
