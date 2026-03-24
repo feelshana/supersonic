@@ -30,7 +30,9 @@ public class RuleSqlCorrector extends BaseSemanticCorrector {
         }
 
         for (BaseSemanticCorrector corrector : correctors) {
-            corrector.correct(chatQueryContext, semanticParseInfo);
+            if (corrector instanceof GrammarCorrector) {
+                corrector.correct(chatQueryContext, semanticParseInfo);
+            }
         }
     }
 }
