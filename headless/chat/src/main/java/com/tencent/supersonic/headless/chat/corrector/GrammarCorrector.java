@@ -28,7 +28,9 @@ public class GrammarCorrector extends BaseSemanticCorrector {
     @Override
     public void doCorrect(ChatQueryContext chatQueryContext, SemanticParseInfo semanticParseInfo) {
         for (BaseSemanticCorrector corrector : correctors) {
-            corrector.correct(chatQueryContext, semanticParseInfo);
+            if (corrector instanceof WhereCorrector) {
+                corrector.correct(chatQueryContext, semanticParseInfo);
+            }
         }
         removeSameFieldFromSelect(semanticParseInfo);
     }

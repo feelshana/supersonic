@@ -67,8 +67,7 @@ public class WhereCorrector extends BaseSemanticCorrector {
         Map<String, Map<String, String>> aliasAndBizNameToTechName =
                 getAliasAndBizNameToTechName(dimensions);
         String correctedS2SQL = semanticParseInfo.getSqlInfo().getCorrectedS2SQL();
-        String replaceSql =
-                SqlReplaceHelper.replaceValue(correctedS2SQL, aliasAndBizNameToTechName);
+        String replaceSql = SqlReplaceHelper.replaceValue(correctedS2SQL, aliasAndBizNameToTechName);
         semanticParseInfo.getSqlInfo().setCorrectedS2SQL(replaceSql);
     }
 
