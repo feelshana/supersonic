@@ -742,7 +742,7 @@ public class DictTaskServiceImpl implements DictTaskService {
             startDate = prevMonth.atDay(1);
             endDate = prevMonth.atEndOfMonth();
         } else {
-            startDate = today.minusDays(2);
+            startDate = today.minusDays(3);
             endDate = today;
         }
 
