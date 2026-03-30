@@ -142,7 +142,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
         if (StringUtils.isNotBlank(response)) {
-            log.info("大模型分词返回:{}", response);
+            log.info("用户的问题是：{}，大模型分词返回:{}", text, response);
 
             try {
                 // 解析JSON格式的响应

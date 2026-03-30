@@ -309,8 +309,12 @@ public class SqlQueryParser implements QueryParser {
                                     && "=".equals(expression.getOperator())
                                     && (d.getName().equals(expression.getFieldName())
                                             || d.getBizName().equals(expression.getFieldName())))
-                            .findFirst().ifPresent(dimSchemaResp -> dimSchemaResp
-                                    .setCurrentValue(expression.getFieldValue().toString()));
+                            .findFirst().ifPresent(dimSchemaResp -> {
+                                if (expression.getFieldValue() != null) {
+                                    dimSchemaResp.setCurrentValue(
+                                            expression.getFieldValue().toString());
+                                }
+                            });
                 }
             });
         }

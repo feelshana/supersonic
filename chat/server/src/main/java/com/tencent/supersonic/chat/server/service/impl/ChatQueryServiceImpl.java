@@ -334,22 +334,45 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public QueryResult parseAndExecute(ChatParseReq chatParseReq) {
-        ChatParseResp parseResp = parse(chatParseReq);
-        if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
-            log.debug("chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
-                    chatParseReq.getChatId(), chatParseReq.getAgentId(),
-                    chatParseReq.getQueryText());
-            return null;
+        try {
+            ChatParseResp parseResp = parse(chatParseReq);
+            if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
+                log.warn("chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
+                        chatParseReq.getChatId(), chatParseReq.getAgentId(),
+                        chatParseReq.getQueryText());
+                QueryResult emptyResult = new QueryResult();
+                emptyResult.setQueryState(QueryState.EMPTY);
+                if (StringUtils.isBlank(parseResp.getErrorMsg())) {
+                    emptyResult.setErrorMsg("未能解析出有效查询，请尝试换一种问法");
+                } else {
+                    emptyResult.setErrorMsg(parseResp.getErrorMsg());
+                }
+                return emptyResult;
+            }
+            ChatExecuteReq executeReq = new ChatExecuteReq();
+            executeReq.setQueryId(parseResp.getQueryId());
+            executeReq.setParseId(parseResp.getSelectedParses().get(0).getId());
+            executeReq.setQueryText(chatParseReq.getQueryText());
+            executeReq.setChatId(chatParseReq.getChatId());
+            executeReq.setUser(User.getDefaultUser());
+            executeReq.setAgentId(chatParseReq.getAgentId());
+            executeReq.setSaveAnswer(true);
+            QueryResult queryResult = execute(executeReq);
+            if (queryResult == null) {
+                QueryResult failResult = new QueryResult();
+                failResult.setQueryState(QueryState.EMPTY);
+                failResult.setErrorMsg("执行查询未返回结果");
+                return failResult;
+            }
+            return queryResult;
+        } catch (Exception e) {
+            log.error("parseAndExecute failed, chatId:{}, agentId:{}, queryText:{}", chatParseReq.getChatId(),
+                    chatParseReq.getAgentId(), chatParseReq.getQueryText(), e);
+            QueryResult errorResult = new QueryResult();
+            errorResult.setQueryState(QueryState.INVALID);
+            errorResult.setErrorMsg("查询处理异常：" + e.getMessage());
+            return errorResult;
         }
-        ChatExecuteReq executeReq = new ChatExecuteReq();
-        executeReq.setQueryId(parseResp.getQueryId());
-        executeReq.setParseId(parseResp.getSelectedParses().get(0).getId());
-        executeReq.setQueryText(chatParseReq.getQueryText());
-        executeReq.setChatId(chatParseReq.getChatId());
-        executeReq.setUser(User.getDefaultUser());
-        executeReq.setAgentId(chatParseReq.getAgentId());
-        executeReq.setSaveAnswer(true);
-        return execute(executeReq);
     }
 
     private ParseContext buildParseContext(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {
