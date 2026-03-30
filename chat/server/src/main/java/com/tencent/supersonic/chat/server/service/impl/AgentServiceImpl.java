@@ -8,6 +8,7 @@ import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
 import com.tencent.supersonic.chat.server.agent.VisualConfig;
 import com.tencent.supersonic.chat.server.persistence.dataobject.AgentDO;
 import com.tencent.supersonic.chat.server.persistence.mapper.AgentDOMapper;
@@ -253,7 +254,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                 if (isSkipDimension(dimension)) {
                     continue;
                 }
-                if (Boolean.TRUE.equals(dimension.isHasDimValues())) {
+                if (Boolean.TRUE.equals(dimension.isHasDimValues()) || !CollectionUtils.isEmpty(dimension.getSchemaValueMaps())) {
                     PageInfo<DictValueDimResp> pageInfo =
                             onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
                     if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
@@ -334,6 +335,21 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         replyGuidelineBuilder.append("]");
 
         return replyGuidelineBuilder.toString();
+    }
+
+    @Override
+    public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(List<Integer> agentIds, String queryText, User user) {
+        log.info("[getRedSeaDataSetInfo] agentIds:{}, queryText:{}", agentIds, queryText);
+        return agentIds.stream().map(agentId -> {
+            Agent agent = convert(getById(agentId));
+            String info = getAgentDataSetInfo(agentId, queryText, user);
+            AgentDataSetInfoDTO dto = new AgentDataSetInfoDTO();
+            dto.setAgentId(agentId);
+            dto.setDescription(agent.getDescription());
+            dto.setAgentName(agent.getName());
+            dto.setDataSetInfo(info);
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     private boolean isSkipDimension(SchemaElement dimension) {
