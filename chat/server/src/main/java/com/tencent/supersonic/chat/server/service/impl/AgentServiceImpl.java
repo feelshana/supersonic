@@ -254,7 +254,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                 if (isSkipDimension(dimension)) {
                     continue;
                 }
-                if (Boolean.TRUE.equals(dimension.isHasDimValues()) || !CollectionUtils.isEmpty(dimension.getSchemaValueMaps())) {
+                if (Boolean.TRUE.equals(dimension.isHasDimValues())
+                        || !CollectionUtils.isEmpty(dimension.getSchemaValueMaps())) {
                     PageInfo<DictValueDimResp> pageInfo =
                             onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
                     if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
@@ -338,7 +339,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     }
 
     @Override
-    public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(List<Integer> agentIds, String queryText, User user) {
+    public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(List<Integer> agentIds, String queryText,
+            User user) {
         log.info("[getRedSeaDataSetInfo] agentIds:{}, queryText:{}", agentIds, queryText);
         return agentIds.stream().map(agentId -> {
             Agent agent = convert(getById(agentId));

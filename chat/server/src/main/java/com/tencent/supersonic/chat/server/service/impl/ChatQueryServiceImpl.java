@@ -337,7 +337,8 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         try {
             ChatParseResp parseResp = parse(chatParseReq);
             if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
-                log.warn("chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
+                log.warn(
+                        "chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
                         chatParseReq.getChatId(), chatParseReq.getAgentId(),
                         chatParseReq.getQueryText());
                 QueryResult emptyResult = new QueryResult();
@@ -366,8 +367,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             }
             return queryResult;
         } catch (Exception e) {
-            log.error("parseAndExecute failed, chatId:{}, agentId:{}, queryText:{}", chatParseReq.getChatId(),
-                    chatParseReq.getAgentId(), chatParseReq.getQueryText(), e);
+            log.error("parseAndExecute failed, chatId:{}, agentId:{}, queryText:{}",
+                    chatParseReq.getChatId(), chatParseReq.getAgentId(),
+                    chatParseReq.getQueryText(), e);
             QueryResult errorResult = new QueryResult();
             errorResult.setQueryState(QueryState.INVALID);
             errorResult.setErrorMsg("查询处理异常：" + e.getMessage());

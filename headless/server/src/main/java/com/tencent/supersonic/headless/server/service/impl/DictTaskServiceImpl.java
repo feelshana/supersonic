@@ -15,7 +15,6 @@ import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.headless.api.pojo.DimValueMap;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
-
 import com.tencent.supersonic.headless.api.pojo.request.DictItemFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
@@ -564,8 +563,8 @@ public class DictTaskServiceImpl implements DictTaskService {
         return pageInfo;
     }
 
-    private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq,
-            User user, DimensionResp preloadedDimResp) {
+    private PageInfo<DictValueDimResp> getDictValuePageFromDb(DictValueReq dictValueReq, User user,
+            DimensionResp preloadedDimResp) {
 
         PageInfo<DictValueDimResp> empty = new PageInfo<>();
         empty.setList(new ArrayList<>());
@@ -611,9 +610,9 @@ public class DictTaskServiceImpl implements DictTaskService {
 
             String sampledSql = String.format("select %s as value from %s %s limit %d", dimBizName,
                     tableStr, sampledWhereClause, MAX_DICT_VALUE_SCAN);
-            String countSql =
-                    String.format("select count(1) total from (select distinct value from (%s) sampled) t",
-                            sampledSql);
+            String countSql = String.format(
+                    "select count(1) total from (select distinct value from (%s) sampled) t",
+                    sampledSql);
             QuerySqlReq countReq = QuerySqlReq.builder().sql(countSql).build();
             countReq.addModelId(dimResp.getModelId());
             SemanticQueryResp countResp = queryService.queryByReq(countReq, user);
@@ -624,8 +623,8 @@ public class DictTaskServiceImpl implements DictTaskService {
             }
 
             if (cappedTotal <= 50) {
-                int dimValueMapsCount =
-                        countFilteredDimValueMaps(dictValueReq.getItemId(), dictValueReq.getKeyValue());
+                int dimValueMapsCount = countFilteredDimValueMaps(dictValueReq.getItemId(),
+                        dictValueReq.getKeyValue());
                 if (dimValueMapsCount > cappedTotal) {
                     return getDictValuePageFromMaps(dictValueReq, dimResp);
 
@@ -683,10 +682,9 @@ public class DictTaskServiceImpl implements DictTaskService {
         if (Objects.isNull(dimResp) || CollectionUtils.isEmpty(dimResp.getDimValueMaps())) {
             return 0;
         }
-        return (int) dimResp.getDimValueMaps().stream().filter(Objects::nonNull).map(
-                map -> StringUtils.defaultIfBlank(map.getValue(), map.getTechName()))
-                .filter(StringUtils::isNotBlank)
-                .filter(value -> StringUtils.isBlank(keyValue)
+        return (int) dimResp.getDimValueMaps().stream().filter(Objects::nonNull)
+                .map(map -> StringUtils.defaultIfBlank(map.getValue(), map.getTechName()))
+                .filter(StringUtils::isNotBlank).filter(value -> StringUtils.isBlank(keyValue)
                         || StringUtils.containsIgnoreCase(value, keyValue))
                 .count();
     }
@@ -708,17 +706,19 @@ public class DictTaskServiceImpl implements DictTaskService {
         }
 
         List<Dimension> timeDimensions = modelResp.getTimeDimensionForBI();
-        Dimension timeDimension = CollectionUtils.isEmpty(timeDimensions) ? null : timeDimensions.getFirst();
+        Dimension timeDimension =
+                CollectionUtils.isEmpty(timeDimensions) ? null : timeDimensions.getFirst();
         String dateFormat = Objects.nonNull(timeDimension)
                 ? StringUtils.defaultIfBlank(timeDimension.getDateFormat(), "yyyy-MM-dd")
                 : "yyyy-MM-dd";
-        String timeGranularity = Objects.nonNull(timeDimension)
-                && Objects.nonNull(timeDimension.getTypeParams())
+        String timeGranularity =
+                Objects.nonNull(timeDimension) && Objects.nonNull(timeDimension.getTypeParams())
                         ? timeDimension.getTypeParams().getTimeGranularity()
                         : "";
 
         if (StringUtils.isBlank(dateField) && Objects.nonNull(timeDimension)) {
-            dateField = StringUtils.defaultIfBlank(timeDimension.getBizName(), timeDimension.getExpr());
+            dateField =
+                    StringUtils.defaultIfBlank(timeDimension.getBizName(), timeDimension.getExpr());
         }
 
         if (StringUtils.isBlank(dateField) || !isSafeFieldName(dateField)) {

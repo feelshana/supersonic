@@ -311,8 +311,8 @@ public class SqlQueryParser implements QueryParser {
                                             || d.getBizName().equals(expression.getFieldName())))
                             .findFirst().ifPresent(dimSchemaResp -> {
                                 if (expression.getFieldValue() != null) {
-                                    dimSchemaResp.setCurrentValue(
-                                            expression.getFieldValue().toString());
+                                    dimSchemaResp
+                                            .setCurrentValue(expression.getFieldValue().toString());
                                 }
                             });
                 }
