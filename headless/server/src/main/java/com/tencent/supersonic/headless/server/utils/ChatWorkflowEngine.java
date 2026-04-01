@@ -52,6 +52,7 @@ public class ChatWorkflowEngine {
     public void start(ChatWorkflowState initialState, ChatQueryContext queryCtx) {
         ParseResp parseResult = queryCtx.getParseResp();
         queryCtx.setChatWorkflowState(initialState);
+        long workflowStartTime = System.currentTimeMillis();
         while (queryCtx.getChatWorkflowState() != ChatWorkflowState.FINISHED) {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
@@ -158,10 +159,10 @@ public class ChatWorkflowEngine {
                     queryCtx.setChatWorkflowState(ChatWorkflowState.TRANSLATING);
                     break;
                 case TRANSLATING:
-                    long start = System.currentTimeMillis();
-
+                    long translatingStart = System.currentTimeMillis();
                     performTranslating(queryCtx, parseResult);
-                    parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
+                    long translatingTime = System.currentTimeMillis() - translatingStart;
+                    parseResult.getParseTimeCost().setSqlTime(translatingTime);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
                     break;
                 case PHYSICAL_SQL_CORRECTING:
@@ -176,6 +177,9 @@ public class ChatWorkflowEngine {
                     break;
             }
         }
+        log.info("[PERFORMANCE] PARSE阶段总耗时: {}ms, 问题: {}",
+                System.currentTimeMillis() - workflowStartTime,
+                StringUtils.abbreviate(queryCtx.getRequest().getQueryText(), 50));
     }
 
     private boolean containsDateKeywords(String question, Integer agentId) {
@@ -216,7 +220,14 @@ public class ChatWorkflowEngine {
     private void performMapping(ChatQueryContext queryCtx) {
         if (Objects.isNull(queryCtx.getMapInfo())
                 || MapUtils.isEmpty(queryCtx.getMapInfo().getDataSetElementMatches())) {
-            schemaMappers.forEach(mapper -> mapper.map(queryCtx));
+            schemaMappers.forEach(mapper -> {
+                long mapperStart = System.currentTimeMillis();
+                mapper.map(queryCtx);
+                if ("EmbeddingMapper".equals(mapper.getClass().getSimpleName())) {
+                    log.info("[PERFORMANCE] EmbeddingMapper 耗时: {}ms",
+                            System.currentTimeMillis() - mapperStart);
+                }
+            });
         }
     }
 

@@ -76,9 +76,9 @@ public abstract class BaseMatchStrategy<T extends MapResult> implements MatchStr
     protected void executeTasks(List<Callable<Void>> tasks) {
         try {
             executor.invokeAll(tasks);
-            for (Callable<Void> future : tasks) {
-                future.call();
-            }
+            // for (Callable<Void> future : tasks) {
+            // future.call();
+            // }
         } catch (Exception e) {
             // Thread.currentThread().interrupt();
             log.error("Task execution failed, but continuing: ", e);

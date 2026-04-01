@@ -21,12 +21,14 @@ import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMSqlQuery;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import dev.langchain4j.service.TokenStream;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 public class SqlExecutor implements ChatQueryExecutor {
 
     @Override
@@ -86,11 +88,13 @@ public class SqlExecutor implements ChatQueryExecutor {
 
         ChatContext chatCtx =
                 chatContextService.getOrCreateContext(executeContext.getRequest().getChatId());
+
         SemanticParseInfo parseInfo = executeContext.getParseInfo();
         if (Objects.isNull(parseInfo.getSqlInfo())
                 || StringUtils.isBlank(parseInfo.getSqlInfo().getCorrectedS2SQL())) {
             return null;
         }
+
         // 将setSchemaValueMaps的维度值信息清理了，减少Context数据存储
         parseInfo.getDimensions().forEach(schemaElement -> schemaElement.setSchemaValueMaps(null));
         if (parseInfo.getElementMatches() != null && !parseInfo.getElementMatches().isEmpty()) {
@@ -100,6 +104,7 @@ public class SqlExecutor implements ChatQueryExecutor {
                 }
             });
         }
+
         Map<String, Object> properties = parseInfo.getProperties();
 
         // 使用querySQL，它已经包含了所有修正（包括物理SQL修正）
@@ -111,7 +116,7 @@ public class SqlExecutor implements ChatQueryExecutor {
         sqlReq.setSqlInfo(parseInfo.getSqlInfo());
         sqlReq.setDataSetId(parseInfo.getDataSetId());
         sqlReq.setQueryId(executeContext.getRequest().getQueryId());
-        long startTime = System.currentTimeMillis();
+        long sqlStart = System.currentTimeMillis();
         QueryResult queryResult = new QueryResult();
         queryResult.setQueryId(executeContext.getRequest().getQueryId());
         queryResult.setChatContext(parseInfo);
@@ -126,7 +131,10 @@ public class SqlExecutor implements ChatQueryExecutor {
         try {
             SemanticQueryResp queryResp = semanticLayer.queryBySchemaStrValues(sqlReq,
                     executeContext.getRequest().getUser());
-            queryResult.setQueryTimeCost(System.currentTimeMillis() - startTime);
+            long sqlCost = System.currentTimeMillis() - sqlStart;
+            log.info("[PERFORMANCE] SQL执行耗时: {}ms, 返回行数: {}", sqlCost,
+                    queryResp != null ? queryResp.getResultList().size() : 0);
+            queryResult.setQueryTimeCost(sqlCost);
             if (queryResp != null) {
                 queryResult.setQueryAuthorization(queryResp.getQueryAuthorization());
                 queryResult.setQuerySql(finalSql);
@@ -135,6 +143,7 @@ public class SqlExecutor implements ChatQueryExecutor {
                 queryResult.setQueryState(QueryState.SUCCESS);
                 queryResult.setErrorMsg(queryResp.getErrorMsg());
                 queryResult.setResultType(queryResp.getResultType());
+
                 chatCtx.setParseInfo(parseInfo);
                 chatContextService.updateContext(chatCtx);
             } else {

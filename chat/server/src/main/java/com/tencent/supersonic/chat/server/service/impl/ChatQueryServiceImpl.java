@@ -334,8 +334,14 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public QueryResult parseAndExecute(ChatParseReq chatParseReq) {
+        long totalStart = System.currentTimeMillis();
+        long parseTime = 0;
+        long executeTime = 0;
         try {
+            long parseStart = System.currentTimeMillis();
             ChatParseResp parseResp = parse(chatParseReq);
+            parseTime = System.currentTimeMillis() - parseStart;
+
             if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
                 log.warn(
                         "chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
@@ -358,13 +364,24 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             executeReq.setUser(User.getDefaultUser());
             executeReq.setAgentId(chatParseReq.getAgentId());
             executeReq.setSaveAnswer(true);
+
+            long executeStart = System.currentTimeMillis();
             QueryResult queryResult = execute(executeReq);
+            executeTime = System.currentTimeMillis() - executeStart;
+
             if (queryResult == null) {
                 QueryResult failResult = new QueryResult();
                 failResult.setQueryState(QueryState.EMPTY);
                 failResult.setErrorMsg("执行查询未返回结果");
                 return failResult;
             }
+
+            long totalTime = System.currentTimeMillis() - totalStart;
+            log.info(
+                    "[PERFORMANCE-TOTAL] /parseAndExecute 总耗时: {}ms (PARSE: {}ms, EXECUTE: {}ms), 问题: {}",
+                    totalTime, parseTime, executeTime,
+                    StringUtils.abbreviate(chatParseReq.getQueryText(), 50));
+
             return queryResult;
         } catch (Exception e) {
             log.error("parseAndExecute failed, chatId:{}, agentId:{}, queryText:{}",

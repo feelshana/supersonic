@@ -140,7 +140,9 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
         chatModelConfig.setJsonFormatType("json_object");
 
         ChatLanguageModel chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
+        long llmSplitStart = System.currentTimeMillis();
         String response = chatLanguageModel.generate(prompt.toUserMessage().singleText());
+        log.info("[PERFORMANCE] LLM分词耗时: {}ms", System.currentTimeMillis() - llmSplitStart);
         if (StringUtils.isNotBlank(response)) {
             log.info("用户的问题是：{}，大模型分词返回:{}", text, response);
 
