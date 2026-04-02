@@ -244,14 +244,26 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         StringBuilder dimensionsInfo = new StringBuilder();
         if (semanticSchema.getDimensions() != null) {
             for (SchemaElement dimension : semanticSchema.getDimensions()) {
+                // 跳过名称含id的维度（如省份id、内容ID、分组Id等）
+                String dimNameLower = dimension.getName().toLowerCase();
+                if (dimNameLower.contains("id")) {
+                    continue;
+                }
 
                 dimensionsInfo.append("   - ").append(dimension.getName());
                 if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
-                    dimensionsInfo.append(" FORMAT '").append(dimension.getTimeFormat())
-                            .append("'");
+                    final String DAILY_FORMAT = "yyyyMMdd";
+                    final String MONTHLY_FORMAT = "yyyyMM";
+                    String granularityDesc = DAILY_FORMAT.equals(dimension.getTimeFormat()) ? "日表"
+                            : MONTHLY_FORMAT.equals(dimension.getTimeFormat()) ? "月表" : "";
+                    dimensionsInfo.append("（日期字段，格式：").append(dimension.getTimeFormat());
+                    if (!granularityDesc.isEmpty()) {
+                        dimensionsInfo.append("，").append(granularityDesc);
+                    }
+                    dimensionsInfo.append("）");
                 }
-                dimensionsInfo.append("\n");
                 if (isSkipDimension(dimension)) {
+                    dimensionsInfo.append("\n");
                     continue;
                 }
                 if (Boolean.TRUE.equals(dimension.isHasDimValues())
@@ -263,33 +275,72 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                                 pageInfo.getList().stream().map(DictValueDimResp::getValue)
                                         .limit(50).collect(Collectors.toList());
                         if (!dimensionValues.isEmpty()) {
-                            dimensionsInfo.append("     维度值: ")
-                                    .append(String.join(", ", dimensionValues)).append("\n");
+                            dimensionsInfo.append("\n");
+                            // 省份维度：含“全国”时只输出说明，不列维度值
+                            boolean isProvinceDim = dimNameLower.contains("省份")
+                                    || dimNameLower.contains("province");
+                            if (isProvinceDim && dimensionValues.contains("全国")) {
+                                List<String> sampleProvinces = dimensionValues.stream()
+                                        .filter(v -> !"全国".equals(v)).limit(3)
+                                        .collect(Collectors.toList());
+                                dimensionsInfo.append("     说明：该维度包含'全国'");
+                                if (!sampleProvinces.isEmpty()) {
+                                    dimensionsInfo.append("和'").append(String.join("'、'", sampleProvinces)).append("'等省份数据");
+                                }
+                                dimensionsInfo.append("，全国的数据不需要用各省来累加\n");
+                            } else {
+                                // 城市维度：含“全省”时只输出说明，不列维度值
+                                boolean isCityDim = dimNameLower.contains("城市")
+                                        || dimNameLower.contains("地市")
+                                        || dimNameLower.contains("city");
+                                if (isCityDim && dimensionValues.contains("全省")) {
+                                    List<String> sampleCities = dimensionValues.stream()
+                                            .filter(v -> !"全省".equals(v)).limit(3)
+                                            .collect(Collectors.toList());
+                                    dimensionsInfo.append("     说明：该维度包含'全省'");
+                                    if (!sampleCities.isEmpty()) {
+                                        dimensionsInfo.append("和'").append(String.join("'、'", sampleCities)).append("'等城市数据");
+                                    }
+                                    dimensionsInfo.append("，全省的数据不需要用各城市来累加\n");
+                                } else {
+                                    // 普通维度：正常输出维度值
+                                    dimensionsInfo.append("     维度值: ")
+                                            .append(String.join(", ", dimensionValues)).append("\n");
+                                }
+                            }
+                        } else {
+                            dimensionsInfo.append("\n");
                         }
+                    } else {
+                        dimensionsInfo.append("\n");
                     }
+                } else {
+                    dimensionsInfo.append("\n");
                 }
             }
         }
-        QueryNLReq queryNLReq = new QueryNLReq();
-        queryNLReq.setQueryText(queryText);
-        queryNLReq.setAgentId(agentId);
-        queryNLReq.setDataSetIds(dataSetIds);
-        queryNLReq.setText2SQLType(Text2SQLType.NONE);
-
-        MapResp map;
-        try {
-            map = chatLayerService.map(queryNLReq);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to call chatLayerService.", e);
-        }
-
-        SchemaMapInfo mapInfo = map != null ? map.getMapInfo() : null;
+        // 仅当 queryText 非空时才执行语义映射，用于拼接第6项信息
         List<SchemaElementMatch> schemaElementMatches = null;
+        if (StringUtils.isNotEmpty(queryText)) {
+            QueryNLReq queryNLReq = new QueryNLReq();
+            queryNLReq.setQueryText(queryText);
+            queryNLReq.setAgentId(agentId);
+            queryNLReq.setDataSetIds(dataSetIds);
+            queryNLReq.setText2SQLType(Text2SQLType.NONE);
 
-        if (mapInfo != null && mapInfo.getDataSetElementMatches() != null
-                && !dataSetIds.isEmpty()) {
-            Long firstDataSetId = dataSetIds.iterator().next();
-            schemaElementMatches = mapInfo.getDataSetElementMatches().get(firstDataSetId);
+            MapResp map;
+            try {
+                map = chatLayerService.map(queryNLReq);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to call chatLayerService.", e);
+            }
+
+            SchemaMapInfo mapInfo = map != null ? map.getMapInfo() : null;
+            if (mapInfo != null && mapInfo.getDataSetElementMatches() != null
+                    && !dataSetIds.isEmpty()) {
+                Long firstDataSetId = dataSetIds.iterator().next();
+                schemaElementMatches = mapInfo.getDataSetElementMatches().get(firstDataSetId);
+            }
         }
 
         StringBuilder replyGuidelineBuilder = new StringBuilder();
@@ -308,32 +359,18 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
         replyGuidelineBuilder.append("\n4. 当前日期：").append(currentDate);
 
-        final String DAILY_FORMAT = "yyyyMMdd";
-        final String MONTHLY_FORMAT = "yyyyMM";
-
-        replyGuidelineBuilder.append("\n5. 当前数据集日期格式：\n");
-        if (semanticSchema.getDimensions() != null) {
-            replyGuidelineBuilder.append(semanticSchema.getDimensions().stream()
-                    .filter(d -> StringUtils.isNotEmpty(d.getTimeFormat())).map(d -> {
-                        String formatDesc = DAILY_FORMAT.equals(d.getTimeFormat()) ? "日表"
-                                : MONTHLY_FORMAT.equals(d.getTimeFormat()) ? "月表" : "";
-                        return d.getName() + " FORMAT '" + d.getTimeFormat() + "' " + formatDesc;
-                    }).collect(Collectors.joining("\n")));
+        if (StringUtils.isNotEmpty(queryText)) {
+            replyGuidelineBuilder.append("\n5. 当前用户问题映射到的维度及其维度值：\n[");
+            if (!CollectionUtils.isEmpty(schemaElementMatches)) {
+                List<String> dimensionValuePairs = schemaElementMatches.stream()
+                        .filter(m -> Boolean.TRUE.equals(m.isFullMatched())
+                                && SchemaElementType.VALUE.equals(m.getElement().getType()))
+                        .map(m -> m.getElement().getName() + "：" + m.getWord())
+                        .collect(Collectors.toList());
+                replyGuidelineBuilder.append(String.join(",", dimensionValuePairs));
+            }
+            replyGuidelineBuilder.append("]");
         }
-
-        replyGuidelineBuilder.append("\n6. 当前用户问题映射到的维度及其维度值：\n[");
-
-        if (!CollectionUtils.isEmpty(schemaElementMatches)) {
-            List<String> dimensionValuePairs = schemaElementMatches.stream()
-                    .filter(m -> Boolean.TRUE.equals(m.isFullMatched())
-                            && SchemaElementType.VALUE.equals(m.getElement().getType()))
-                    .map(m -> m.getElement().getName() + "：" + m.getWord())
-                    .collect(Collectors.toList());
-
-            replyGuidelineBuilder.append(String.join(",", dimensionValuePairs));
-        }
-
-        replyGuidelineBuilder.append("]");
 
         return replyGuidelineBuilder.toString();
     }
@@ -358,13 +395,10 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         if (dimension == null) {
             return true;
         }
-        // 跳过省份、城市和日期维度
+        // 跳过日期类维度（省份/城市维度不跳过，由上层单独识别并追加说明）
         String dimensionName = dimension.getName().toLowerCase();
-        return dimensionName.contains("省份") || dimensionName.contains("城市")
-                || dimensionName.contains("地市") || dimensionName.contains("日期")
-                || dimensionName.contains("时间") || dimensionName.contains("province")
-                || dimensionName.contains("city") || dimensionName.contains("date")
-                || dimensionName.contains("time");
+        return dimensionName.contains("日期") || dimensionName.contains("时间")
+                || dimensionName.contains("date") || dimensionName.contains("time");
     }
 
     /**
