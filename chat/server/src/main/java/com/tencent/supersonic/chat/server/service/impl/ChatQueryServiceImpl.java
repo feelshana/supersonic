@@ -132,7 +132,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 break;
             }
         }
+
         saveHistoryInfo(parseContext);
+
         // 不是简易模式的自然语言回答才走后续逻辑
         if (!parseContext.getResponse().getSelectedParses().isEmpty() && !Objects.equals(
                 parseContext.getResponse().getSelectedParses().get(0).getSqlInfo().getResultType(),
@@ -166,6 +168,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     public QueryResult execute(ChatExecuteReq chatExecuteReq) {
         QueryResult queryResult = new QueryResult();
         ExecuteContext executeContext = buildExecuteContext(chatExecuteReq);
+
         for (ChatQueryExecutor chatQueryExecutor : chatQueryExecutors) {
             if (chatQueryExecutor.accept(executeContext)) {
                 queryResult = chatQueryExecutor.execute(executeContext);
@@ -338,6 +341,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         long parseTime = 0;
         long executeTime = 0;
         try {
+            if (chatParseReq.getQueryType() != null && "simple".equals(chatParseReq.getQueryType())){
+                log.info("queryType 为: {} , 进入简易模式。", chatParseReq.getQueryType());
+            }
             long parseStart = System.currentTimeMillis();
             ChatParseResp parseResp = parse(chatParseReq);
             parseTime = System.currentTimeMillis() - parseStart;

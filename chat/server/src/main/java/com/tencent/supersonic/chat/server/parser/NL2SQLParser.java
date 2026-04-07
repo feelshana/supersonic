@@ -78,6 +78,19 @@ public class NL2SQLParser implements ChatQueryParser {
         rewriteMultiTurn(parseContext, parseContext.getAgent().getId(),
                 parseContext.getRequest().getQueryText());
 
+        // SIMPLE 模式：跳过两阶段规则解析，直接以 LLM_OR_RULE 方式发起解析
+        // ChatWorkflowEngine 内部会跳过 MAPPING 直接进入 PARSING（LLMSqlParser 处理）
+        if ("SIMPLE".equalsIgnoreCase(parseContext.getRequest().getQueryType())) {
+            log.info("[SIMPLE MODE] 跳过 MAPPING+RAG，直接发起 LLM 解析，问题: {}",
+                    parseContext.getRequest().getQueryText());
+            QueryNLReq simpleQueryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
+            simpleQueryNLReq.setText2SQLType(Text2SQLType.LLM_OR_RULE);
+            simpleQueryNLReq.setSelectedParseInfo(null);
+            // SIMPLE 模式问题已高度结构化，跳过 RAG 向量召回，直接让 LLM 基于完整 Schema 生成 SQL
+            doParse(simpleQueryNLReq, parseContext.getResponse());
+            return;
+        }
+
         // 检查当前请求的 agentId 是否在 simpleModelAgentIds 列表中
         if (parseContext.getRequest().getAgentId() == 43) {
             QueryNLReq queryNLReq = QueryReqConverter.buildQueryNLReq(parseContext);
