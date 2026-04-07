@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Popconfirm, Switch, Table } from 'antd';
+import { Button, Input, Popconfirm, Switch, Table } from 'antd';
 import moment from 'moment';
 import { useEffect, useState } from 'react';
 import styles from './style.less';
@@ -10,23 +10,30 @@ type Props = {
   loading: boolean;
   onSelectAgent: (agent: AgentType) => void;
   onDeleteAgent: (id: number) => void;
-
   onSaveAgent: (agent: AgentType, noTip?: boolean) => Promise<void>;
   onCreatBtnClick?: () => void;
 };
 
 const AgentsSection: React.FC<Props> = ({
   agents,
+  loading,
   onSelectAgent,
   onDeleteAgent,
   onSaveAgent,
   onCreatBtnClick,
 }) => {
   const [showAgents, setShowAgents] = useState<AgentType[]>([]);
-
+  const [inputValue, setInputValue] = useState('');
+  const [searchValue, setSearchValue] = useState('');
   useEffect(() => {
-    setShowAgents(agents);
-  }, [agents]);
+    const keyword = searchValue.trim().toLowerCase();
+    if (!keyword) {
+      setShowAgents(agents);
+      return;
+    }
+
+    setShowAgents(agents.filter((agent) => agent.name?.toLowerCase().includes(keyword)));
+  }, [agents, searchValue]);
 
   const columns = [
     {
@@ -124,6 +131,18 @@ const AgentsSection: React.FC<Props> = ({
     <div className={styles.agentsSection}>
       <div className={styles.content}>
         <div className={styles.searchBar}>
+          <Input.Search
+            allowClear
+            className={styles.searchControl}
+            placeholder="请输入助理名称"
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value); // 只控制输入框
+            }}
+            onSearch={(value) => {
+              setSearchValue(value); // 只有回车/点击才触发过滤
+            }}
+          />
           <Button
             type="primary"
             onClick={() => {
@@ -134,7 +153,7 @@ const AgentsSection: React.FC<Props> = ({
             新建助理
           </Button>
         </div>
-        <Table columns={columns} dataSource={showAgents} />
+        <Table columns={columns} dataSource={showAgents} loading={loading} rowKey="id" />
       </div>
     </div>
   );
