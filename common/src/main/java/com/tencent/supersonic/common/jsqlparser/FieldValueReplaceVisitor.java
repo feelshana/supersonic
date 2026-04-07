@@ -80,8 +80,8 @@ public class FieldValueReplaceVisitor extends ExpressionVisitorAdapter {
         Expression leftExpression = ((ComparisonOperator) expression).getLeftExpression();
         Expression rightExpression = ((ComparisonOperator) expression).getRightExpression();
 
-        log.info("原始表达式左侧值 {}", leftExpression);
-        log.info("原始表达式右侧值 {}", rightExpression);
+        log.debug("原始表达式左侧值 {}", leftExpression);
+        log.debug("原始表达式右侧值 {}", rightExpression);
 
         if (!(leftExpression instanceof Column || leftExpression instanceof Function)) {
             return;
@@ -124,7 +124,7 @@ public class FieldValueReplaceVisitor extends ExpressionVisitorAdapter {
                 rightStringValue.setValue(replaceValue);
             }
         }
-        log.info("替换后表达式右侧值 {}", rightExpression);
+        log.debug("替换后表达式右侧值 {}", rightExpression);
     }
 
     private String getReplaceValue(Map<String, String> valueMap, String beforeValue) {
