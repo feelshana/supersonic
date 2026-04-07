@@ -31,6 +31,17 @@ public class LLMRequestService {
 
 
     public Long getDataSetId(ChatQueryContext queryCtx) {
+        // SIMPLE 模式：跳过了 MAPPING，MapInfo 为空，直接从请求的 dataSetIds 中取第一个
+        if (queryCtx.isSimpleMode()) {
+            Set<Long> dataSetIds = queryCtx.getRequest().getDataSetIds();
+            if (!CollectionUtils.isEmpty(dataSetIds)) {
+                Long dataSetId = dataSetIds.iterator().next();
+                log.info("[SIMPLE MODE] 直接使用请求中的 dataSetId: {}", dataSetId);
+                return dataSetId;
+            }
+            log.warn("[SIMPLE MODE] 请求中未指定 dataSetIds，无法确定数据集");
+            return null;
+        }
         DataSetResolver dataSetResolver = ComponentFactory.getModelResolver();
         return dataSetResolver.resolve(queryCtx, queryCtx.getRequest().getDataSetIds());
     }
@@ -75,6 +86,8 @@ public class LLMRequestService {
         llmReq.setDynamicExemplars(queryCtx.getRequest().getDynamicExemplars());
 
         llmReq.setAgentId(queryCtx.getRequest().getAgentId());
+        // SIMPLE 模式标记透传，供 OnePassSCSqlGenStrategy 判断是否跳过向量召回走直接生成路径
+        llmReq.setQueryType(queryCtx.getRequest().getQueryType());
         return llmReq;
     }
 

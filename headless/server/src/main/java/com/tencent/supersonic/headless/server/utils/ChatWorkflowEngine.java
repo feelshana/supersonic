@@ -56,6 +56,13 @@ public class ChatWorkflowEngine {
         while (queryCtx.getChatWorkflowState() != ChatWorkflowState.FINISHED) {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
+                    // SIMPLE 模式：问题已高度结构化，跳过向量召回/词典分词，直接进入 PARSING
+                    if (queryCtx.isSimpleMode()) {
+                        log.info("[SIMPLE MODE] 跳过 MAPPING 阶段，直接进入 PARSING，问题: {}",
+                                queryCtx.getRequest().getQueryText());
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
+                        break;
+                    }
                     performMapping(queryCtx);
                     if ((queryCtx.getAgentId() != null && queryCtx.getAgentId() == 43)
                             || (queryCtx.getRequest().getAgentId() != null
@@ -105,11 +112,20 @@ public class ChatWorkflowEngine {
                     List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
                             .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
                     parseResult.setSelectedParses(parseInfos);
+                    if (parseInfos.isEmpty()) {
+                        log.warn("PARSING 阶段未生成任何候选查询，结束流程");
+                        errDefault(parseResult, queryCtx);
+                        break;
+                    }
                     log.info("【大模型生成的sql】:\n{}", parseResult.getSelectedParses().getFirst()
                             .getSqlInfo().getParsedS2SQL());
-                    if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
+                    // SIMPLE 模式与直连模式：LLM 直接生成物理可执行 SQL，跳过 S2SQL_CORRECTING 和 TRANSLATING
+                    if (queryCtx.isSimpleMode() || StringUtils.endsWithIgnoreCase(
                             queryCtx.getSemanticSchema().getDataSets().getFirst().getDataSetName(),
                             "直连模式")) {
+                        parseResult.setState(ParseResp.ParseState.COMPLETED);
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                    } else if (queryCtx.needSQL()) {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
                     } else {
                         parseResult.setState(ParseResp.ParseState.COMPLETED);

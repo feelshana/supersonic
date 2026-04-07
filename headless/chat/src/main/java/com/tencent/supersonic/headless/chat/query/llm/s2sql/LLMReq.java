@@ -29,6 +29,11 @@ public class LLMReq {
     private String customPrompt;
     private List<Text2SQLExemplar> dynamicExemplars;
     private Integer agentId;
+    /**
+     * 查询模式，"SIMPLE" 表示简易模式，由 LLMRequestService 从 ChatQueryContext 透传，
+     * OnePassSCSqlGenStrategy 据此判断是否走 handleDirectLinkMode 路径。
+     */
+    private String queryType;
 
     @Data
     public static class ElementValue {

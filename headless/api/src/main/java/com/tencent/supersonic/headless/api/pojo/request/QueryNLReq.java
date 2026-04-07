@@ -37,6 +37,11 @@ public class QueryNLReq extends SemanticQueryReq implements Serializable {
     private String requestId = "";
     private List<String> segmentDimBizNames = new ArrayList<>();
     private List<String> excludeDefaultDimNames = new ArrayList<>();
+    /**
+     * 查询模式，"SIMPLE" 表示简易模式，透传自 ChatParseReq，
+     * 供下游 ChatWorkflowEngine / LLMRequestService 判断是否跳过 MAPPING。
+     */
+    private String queryType;
 
     @Override
     public String toCustomizedString() {
