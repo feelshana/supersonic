@@ -73,4 +73,13 @@ public class ChatQueryContext implements Serializable {
         DataSetSchema dataSetSchema = semanticSchema.getDataSetSchemaMap().get(dataSetId);
         return dataSetSchema.containsPartitionDimensions();
     }
+
+    /**
+     * 判断是否为 SIMPLE 简易模式。
+     * SIMPLE 模式下跳过 MAPPING（向量召回/词典分词）环节，
+     * 直接将完整 Schema 传给 LLM 生成 SQL，适用于结构化程度高的外部调用。
+     */
+    public boolean isSimpleMode() {
+        return "SIMPLE".equalsIgnoreCase(request.getQueryType());
+    }
 }

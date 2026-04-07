@@ -262,7 +262,12 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
     }
 
     private boolean isDirectLinkMode(LLMReq llmReq) {
-        return StringUtils.endsWithIgnoreCase(llmReq.getSchema().getDataSetName(), "直连模式");
+        // 直连模式：DataSet 名称以"直连模式"结尾
+        if (StringUtils.endsWithIgnoreCase(llmReq.getSchema().getDataSetName(), "直连模式")) {
+            return true;
+        }
+        // SIMPLE 模式：调用方显式传参 queryType="SIMPLE"，问题已高度结构化，直接带完整 Schema 生成 SQL
+        return "SIMPLE".equalsIgnoreCase(llmReq.getQueryType());
     }
 
     private LLMResp handleDirectLinkMode(LLMReq llmReq) {
@@ -275,7 +280,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             for (List<Text2SQLExemplar> exemplars : exemplarsList) {
                 llmReq.setDynamicExemplars(exemplars);
                 SimpleStrategy simpleStrategy = new SimpleStrategy();
-                Prompt promptText = simpleStrategy.generatePrompt(llmReq, promptHelper);
+                String dimensionValueInfo = buildDimensionValueInfo(llmReq);
+                Prompt promptText = simpleStrategy.generatePrompt(llmReq, promptHelper,dimensionValueInfo);
                 prompt2Exemplar.put(promptText, exemplars);
             }
         } catch (Exception e) {
