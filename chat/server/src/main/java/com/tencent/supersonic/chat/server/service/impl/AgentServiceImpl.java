@@ -280,32 +280,37 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                             boolean isProvinceDim = dimNameLower.contains("省份")
                                     || dimNameLower.contains("province");
                             if (isProvinceDim && dimensionValues.contains("全国")) {
-                                List<String> sampleProvinces = dimensionValues.stream()
-                                        .filter(v -> !"全国".equals(v)).limit(3)
-                                        .collect(Collectors.toList());
+                                List<String> sampleProvinces =
+                                        dimensionValues.stream().filter(v -> !"全国".equals(v))
+                                                .limit(3).collect(Collectors.toList());
                                 dimensionsInfo.append("     说明：该维度包含'全国'");
                                 if (!sampleProvinces.isEmpty()) {
-                                    dimensionsInfo.append("和'").append(String.join("'、'", sampleProvinces)).append("'等省份数据");
+                                    dimensionsInfo.append("和'")
+                                            .append(String.join("'、'", sampleProvinces))
+                                            .append("'等省份数据");
                                 }
                                 dimensionsInfo.append("，全国的数据不需要用各省来累加\n");
                             } else {
                                 // 城市维度：含“全省”时只输出说明，不列维度值
-                                boolean isCityDim = dimNameLower.contains("城市")
-                                        || dimNameLower.contains("地市")
-                                        || dimNameLower.contains("city");
+                                boolean isCityDim =
+                                        dimNameLower.contains("城市") || dimNameLower.contains("地市")
+                                                || dimNameLower.contains("city");
                                 if (isCityDim && dimensionValues.contains("全省")) {
-                                    List<String> sampleCities = dimensionValues.stream()
-                                            .filter(v -> !"全省".equals(v)).limit(3)
-                                            .collect(Collectors.toList());
+                                    List<String> sampleCities =
+                                            dimensionValues.stream().filter(v -> !"全省".equals(v))
+                                                    .limit(3).collect(Collectors.toList());
                                     dimensionsInfo.append("     说明：该维度包含'全省'");
                                     if (!sampleCities.isEmpty()) {
-                                        dimensionsInfo.append("和'").append(String.join("'、'", sampleCities)).append("'等城市数据");
+                                        dimensionsInfo.append("和'")
+                                                .append(String.join("'、'", sampleCities))
+                                                .append("'等城市数据");
                                     }
                                     dimensionsInfo.append("，全省的数据不需要用各城市来累加\n");
                                 } else {
                                     // 普通维度：正常输出维度值
                                     dimensionsInfo.append("     维度值: ")
-                                            .append(String.join(", ", dimensionValues)).append("\n");
+                                            .append(String.join(", ", dimensionValues))
+                                            .append("\n");
                                 }
                             }
                         } else {
