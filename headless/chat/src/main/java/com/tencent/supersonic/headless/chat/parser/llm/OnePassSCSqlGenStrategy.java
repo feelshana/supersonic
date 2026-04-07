@@ -281,7 +281,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                 llmReq.setDynamicExemplars(exemplars);
                 SimpleStrategy simpleStrategy = new SimpleStrategy();
                 String dimensionValueInfo = buildDimensionValueInfo(llmReq);
-                Prompt promptText = simpleStrategy.generatePrompt(llmReq, promptHelper,dimensionValueInfo);
+                Prompt promptText =
+                        simpleStrategy.generatePrompt(llmReq, promptHelper, dimensionValueInfo);
                 prompt2Exemplar.put(promptText, exemplars);
             }
         } catch (Exception e) {

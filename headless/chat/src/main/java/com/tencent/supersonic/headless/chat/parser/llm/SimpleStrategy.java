@@ -37,7 +37,8 @@ public class SimpleStrategy {
             + "4. **严格禁止在思考过程中出现任何SQL代码片段或英文字段名**，使用中文业务术语描述。\n" + "5. 保持专业但亲切的语气，避免机械化的技术描述。\n"
             + "6. 术语信息：{{termInfo}}。\n" + "当前用户的问题是：{{question}}\n" + "请开始分析并用自然的语言回复：";
 
-    public Prompt generatePrompt(LLMReq llmReq, PromptHelper promptHelper,String dimensionValueInfo) {
+    public Prompt generatePrompt(LLMReq llmReq, PromptHelper promptHelper,
+            String dimensionValueInfo) {
         StringBuilder context = new StringBuilder();
         // 添加SQL专家说明
         context.append("您是一个SQL专家,名字叫红海ChatBI。请帮助生成一个SQL查询以回答问题。您的回复仅应基于给定的上下文，并遵循回复指南和格式说明。\n\n");

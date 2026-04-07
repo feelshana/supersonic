@@ -119,6 +119,7 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public ChatParseResp parse(ChatParseReq chatParseReq) {
+        long _t0 = System.currentTimeMillis();
         Long queryId = chatParseReq.getQueryId();
         if (Objects.isNull(queryId)) {
             queryId = chatManageService.createChatQuery(chatParseReq);
@@ -132,8 +133,11 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 break;
             }
         }
+        long _t1 = System.currentTimeMillis();
 
         saveHistoryInfo(parseContext);
+        long _t2 = System.currentTimeMillis();
+        log.info("[PERF-parse] saveHistoryInfo: {}ms", _t2 - _t1);
 
         // 不是简易模式的自然语言回答才走后续逻辑
         if (!parseContext.getResponse().getSelectedParses().isEmpty() && !Objects.equals(
@@ -147,7 +151,11 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
         if (!parseContext.needFeedback()) {
             chatManageService.batchAddParse(chatParseReq, parseContext.getResponse());
+            long _t3 = System.currentTimeMillis();
+            log.info("[PERF-parse] batchAddParse: {}ms", _t3 - _t2);
             chatManageService.updateParseCostTime(parseContext.getResponse());
+            log.info("[PERF-parse] updateParseCostTime: {}ms, parse()总耗时: {}ms",
+                    System.currentTimeMillis() - _t3, System.currentTimeMillis() - _t0);
         }
 
         return parseContext.getResponse();
@@ -166,8 +174,11 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public QueryResult execute(ChatExecuteReq chatExecuteReq) {
+        long _e0 = System.currentTimeMillis();
         QueryResult queryResult = new QueryResult();
         ExecuteContext executeContext = buildExecuteContext(chatExecuteReq);
+        log.info("[PERF-execute] buildExecuteContext(含getParseInfo DB查询): {}ms",
+                System.currentTimeMillis() - _e0);
 
         for (ChatQueryExecutor chatQueryExecutor : chatQueryExecutors) {
             if (chatQueryExecutor.accept(executeContext)) {
@@ -186,7 +197,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                     processor.process(executeContext);
                 }
             }
+            long _e1 = System.currentTimeMillis();
             saveQueryResult(chatExecuteReq, queryResult);
+            log.info("[PERF-execute] saveQueryResult: {}ms", System.currentTimeMillis() - _e1);
         }
 
         return queryResult;
@@ -341,7 +354,8 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         long parseTime = 0;
         long executeTime = 0;
         try {
-            if (chatParseReq.getQueryType() != null && "simple".equals(chatParseReq.getQueryType())){
+            if (chatParseReq.getQueryType() != null
+                    && "simple".equals(chatParseReq.getQueryType())) {
                 log.info("queryType 为: {} , 进入简易模式。", chatParseReq.getQueryType());
             }
             long parseStart = System.currentTimeMillis();
