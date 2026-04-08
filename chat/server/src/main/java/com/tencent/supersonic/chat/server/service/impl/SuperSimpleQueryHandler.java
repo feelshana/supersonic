@@ -9,7 +9,6 @@ import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
-import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
@@ -174,24 +173,44 @@ public class SuperSimpleQueryHandler {
     }
 
     /**
-     * 从 Schema 对应的 Model 中获取真实物理表名（tableQuery 字段）。
+     * 从 Schema 对应的 Model 中获取真实物理表名（tableQuery 字段）。 优先从 dataSet.getModel() 取，若为空则从
+     * dimensions/metrics 中取第一个有 model 值的元素。
      */
     private String resolvePhysicalTableName(DataSetSchema schema) {
         try {
             SchemaElement dataSet = schema.getDataSet();
-            if (dataSet.getModel() != null) {
-                SchemaService schemaService = ContextUtils.getBean(SchemaService.class);
-                MetaFilter metaFilter = new MetaFilter();
-                metaFilter.setIds(List.of(dataSet.getModel()));
-                List<ModelResp> models = schemaService.getModelList(metaFilter.getIds());
-                if (models != null && !models.isEmpty()) {
-                    String tableQuery = models.get(0).getModelDetail() != null
-                            ? models.get(0).getModelDetail().getTableQuery()
-                            : null;
-                    if (StringUtils.isNotBlank(tableQuery)) {
-                        // tableQuery 可能是 "db.table" 格式，只取表名部分
-                        return tableQuery.contains(".") ? tableQuery : tableQuery;
-                    }
+            // 优先从 dataSet 本身取 modelId
+            Long modelId = dataSet.getModel();
+            // dataSet.model 为空时，从 dimensions 或 metrics 中找一个有 model 的元素
+            if (modelId == null) {
+                modelId = schema.getDimensions().stream().filter(e -> e.getModel() != null)
+                        .map(SchemaElement::getModel).findFirst().orElse(null);
+            }
+            if (modelId == null) {
+                modelId = schema.getMetrics().stream().filter(e -> e.getModel() != null)
+                        .map(SchemaElement::getModel).findFirst().orElse(null);
+            }
+            if (modelId == null) {
+                modelId = schema.getDimensionValues().stream().filter(e -> e.getModel() != null)
+                        .map(SchemaElement::getModel).findFirst().orElse(null);
+            }
+            if (modelId == null) {
+                log.warn("[SUPER_SIMPLE] 无法从 Schema 中找到 modelId，跳过物理表名获取");
+                return null;
+            }
+            SchemaService schemaService = ContextUtils.getBean(SchemaService.class);
+            List<ModelResp> models = schemaService.getModelList(List.of(modelId));
+            if (models != null && !models.isEmpty()) {
+                String tableQuery = models.get(0).getModelDetail() != null
+                        ? models.get(0).getModelDetail().getTableQuery()
+                        : null;
+                if (StringUtils.isNotBlank(tableQuery)) {
+                    // tableQuery 可能是 "db.table" 格式，只取表名部分，避免 JDBC 连接已含 db 前缀时重复
+                    String tableName = tableQuery.contains(".")
+                            ? tableQuery.substring(tableQuery.lastIndexOf('.') + 1)
+                            : tableQuery;
+                    log.info("[SUPER_SIMPLE] 获取到物理表名: {}（原始: {}）", tableName, tableQuery);
+                    return tableName;
                 }
             }
         } catch (Exception e) {
