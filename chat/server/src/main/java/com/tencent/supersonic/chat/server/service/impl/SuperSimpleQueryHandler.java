@@ -1,0 +1,261 @@
+package com.tencent.supersonic.chat.server.service.impl;
+
+import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
+import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.service.AgentService;
+import com.tencent.supersonic.common.pojo.ChatApp;
+import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.common.util.ContextUtils;
+import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
+import com.tencent.supersonic.headless.api.pojo.MetaFilter;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
+import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
+import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
+import com.tencent.supersonic.headless.api.pojo.response.QueryState;
+import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
+import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
+import com.tencent.supersonic.headless.server.service.SchemaService;
+import com.tencent.supersonic.headless.server.utils.ModelConfigHelper;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.provider.ModelProvider;
+import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.UserMessage;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.core.io.ClassPathResource;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+
+import static com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy.APP_KEY;
+
+/**
+ * SUPER_SIMPLE 模式处理器：跳过 mapping/parsing/correct/translate， 直接根据数据集 Schema 组装提示词，调用 LLM 生成物理
+ * SQL，然后执行并返回结果。
+ */
+@Slf4j
+public class SuperSimpleQueryHandler {
+
+    private static final String PROMPT_FILE_NAME = "super_simple_prompt.txt";
+    private static final String PLACEHOLDER_DATE = "{{CURRENT_DATE}}";
+    private static final String PLACEHOLDER_SCHEMA = "{{SCHEMA_INFO}}";
+    private static final String PLACEHOLDER_QUERY = "{{QUERY_TEXT}}";
+    private final AgentService agentService;
+    private final SemanticLayerService semanticLayerService;
+
+    public SuperSimpleQueryHandler(AgentService agentService,
+            SemanticLayerService semanticLayerService) {
+        this.agentService = agentService;
+        this.semanticLayerService = semanticLayerService;
+    }
+
+    public QueryResult execute(ChatParseReq chatParseReq) {
+        long start = System.currentTimeMillis();
+        try {
+            // Step 1: 获取 Agent 绑定的第一个 dataSetId
+            Agent agent = agentService.getAgent(chatParseReq.getAgentId());
+            if (agent == null) {
+                return errorResult("未找到 Agent: " + chatParseReq.getAgentId());
+            }
+            Set<Long> dataSetIds = agent.getDataSetIds();
+            if (dataSetIds == null || dataSetIds.isEmpty()) {
+                return errorResult("Agent 未绑定任何数据集");
+            }
+            Long dataSetId = dataSetIds.stream().findFirst().get();
+
+            // Step 2: 获取数据集 Schema，构建字段描述
+            DataSetSchema schema = semanticLayerService.getDataSetSchema(dataSetId);
+            if (schema == null) {
+                return errorResult("数据集 Schema 获取失败，dataSetId=" + dataSetId);
+            }
+            String schemaInfo = buildSchemaInfo(schema);
+
+            // Step 3: 读取提示词模板，渲染占位符
+            String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String promptTemplate = readPromptTemplate();
+            String prompt = promptTemplate.replace(PLACEHOLDER_DATE, today)
+                    .replace(PLACEHOLDER_SCHEMA, schemaInfo)
+                    .replace(PLACEHOLDER_QUERY, chatParseReq.getQueryText());
+            log.info("[SUPER_SIMPLE] 提示词已组装，Schema字段数: 维度{}个，指标{}个", schema.getDimensions().size(),
+                    schema.getMetrics().size());
+
+            // Step 4: 调用 LLM 生成 SQL
+            ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
+            if (chatApp == null) {
+                return errorResult("Agent 未配置 " + APP_KEY + " ChatApp");
+            }
+            ChatModelConfig modelConfig = ModelConfigHelper.getChatModelConfig(chatApp);
+            if (modelConfig == null) {
+                return errorResult("ChatApp 模型配置为空");
+            }
+            long llmStart = System.currentTimeMillis();
+            ChatLanguageModel llm = ModelProvider.getChatModel(modelConfig);
+            SqlExtractor extractor = AiServices.create(SqlExtractor.class, llm);
+            String sql = extractor.generateSql(prompt);
+            log.info("[PERFORMANCE] SUPER_SIMPLE LLM生成SQL耗时: {}ms, SQL: {}",
+                    System.currentTimeMillis() - llmStart, sql);
+
+            if (StringUtils.isBlank(sql)) {
+                return errorResult("LLM 未生成有效 SQL");
+            }
+            // 清理 LLM 可能输出的 markdown 代码块标记
+            sql = cleanSql(sql);
+
+            // Step 5: 执行 SQL
+            User user = User.getDefaultUser();
+            QuerySqlReq querySqlReq = new QuerySqlReq();
+            querySqlReq.setSql(sql);
+            querySqlReq.setDataSetId(dataSetId);
+            SemanticQueryResp resp = semanticLayerService.queryByReq(querySqlReq, user);
+
+            // Step 6: 转换为 QueryResult
+            QueryResult result = new QueryResult();
+            result.setQuerySql(sql);
+            if (resp != null) {
+                result.setQueryColumns(resp.getColumns());
+                result.setQueryResults(resp.getResultList());
+                if (StringUtils.isBlank(resp.getErrorMsg())) {
+                    result.setQueryState(QueryState.SUCCESS);
+                } else {
+                    result.setQueryState(QueryState.INVALID);
+                    result.setErrorMsg(resp.getErrorMsg());
+                }
+            } else {
+                result.setQueryState(QueryState.EMPTY);
+            }
+            log.info("[SUPER_SIMPLE] 执行完成，总耗时: {}ms，返回行数: {}", System.currentTimeMillis() - start,
+                    resp != null && resp.getResultList() != null ? resp.getResultList().size() : 0);
+            return result;
+
+        } catch (Exception e) {
+            log.error("[SUPER_SIMPLE] 执行失败", e);
+            return errorResult("SUPER_SIMPLE 模式执行失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 将 DataSetSchema 格式化为 LLM 可理解的字段描述文本。 包含数据集名称、真实物理表名、维度字段、指标字段。
+     */
+    private String buildSchemaInfo(DataSetSchema schema) {
+        StringBuilder sb = new StringBuilder();
+        SchemaElement dataSet = schema.getDataSet();
+        sb.append("数据集名称: ").append(dataSet.getName()).append("\n");
+
+        // 获取真实物理表名（从 Model 的 tableQuery 字段）
+        String physicalTableName = resolvePhysicalTableName(schema);
+        if (StringUtils.isNotBlank(physicalTableName)) {
+            sb.append("物理表名（FROM 子句中使用此表名）: `").append(physicalTableName).append("`\n");
+        }
+
+        if (!schema.getDimensions().isEmpty()) {
+            sb.append("\n维度字段（可用于 WHERE / SELECT）:\n");
+            for (SchemaElement dim : schema.getDimensions()) {
+                sb.append("  `").append(dim.getBizName()).append("`").append("  -- ")
+                        .append(dim.getName()).append("\n");
+            }
+        }
+
+        if (!schema.getMetrics().isEmpty()) {
+            sb.append("\n指标字段（可用于 SELECT，禁止聚合）:\n");
+            for (SchemaElement metric : schema.getMetrics()) {
+                sb.append("  `").append(metric.getBizName()).append("`").append("  -- ")
+                        .append(metric.getName()).append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 从 Schema 对应的 Model 中获取真实物理表名（tableQuery 字段）。
+     */
+    private String resolvePhysicalTableName(DataSetSchema schema) {
+        try {
+            SchemaElement dataSet = schema.getDataSet();
+            if (dataSet.getModel() != null) {
+                SchemaService schemaService = ContextUtils.getBean(SchemaService.class);
+                MetaFilter metaFilter = new MetaFilter();
+                metaFilter.setIds(List.of(dataSet.getModel()));
+                List<ModelResp> models = schemaService.getModelList(metaFilter.getIds());
+                if (models != null && !models.isEmpty()) {
+                    String tableQuery = models.get(0).getModelDetail() != null
+                            ? models.get(0).getModelDetail().getTableQuery()
+                            : null;
+                    if (StringUtils.isNotBlank(tableQuery)) {
+                        // tableQuery 可能是 "db.table" 格式，只取表名部分
+                        return tableQuery.contains(".") ? tableQuery : tableQuery;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SUPER_SIMPLE] 获取物理表名失败，将跳过", e);
+        }
+        return null;
+    }
+
+    /**
+     * 读取提示词模板文件。 优先从 {user.dir}/conf/super_simple_prompt.txt 读取（支持线上热更）， 回退到 classpath 内置文件。
+     */
+    private String readPromptTemplate() throws Exception {
+        // 优先从外部 conf 目录读（线上热更）
+        String externalPath = System.getProperty("user.dir") + "/conf/" + PROMPT_FILE_NAME;
+        java.io.File externalFile = new java.io.File(externalPath);
+        if (externalFile.exists()) {
+            log.info("[SUPER_SIMPLE] 从外部文件加载提示词: {}", externalPath);
+            return new String(Files.readAllBytes(Paths.get(externalPath)), StandardCharsets.UTF_8);
+        }
+        // 回退 classpath
+        ClassPathResource resource = new ClassPathResource(PROMPT_FILE_NAME);
+        if (!resource.exists()) {
+            throw new RuntimeException("提示词文件不存在: " + PROMPT_FILE_NAME);
+        }
+        try (InputStream is = resource.getInputStream()) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
+     * 清理 LLM 输出中可能包含的 markdown 代码块标记。
+     */
+    private String cleanSql(String sql) {
+        sql = sql.trim();
+        if (sql.startsWith("```")) {
+            // 去掉第一行（```sql 或 ```）
+            int firstNewline = sql.indexOf('\n');
+            if (firstNewline != -1) {
+                sql = sql.substring(firstNewline + 1);
+            }
+        }
+        if (sql.endsWith("```")) {
+            sql = sql.substring(0, sql.lastIndexOf("```")).trim();
+        }
+        // 去掉结尾分号
+        if (sql.endsWith(";")) {
+            sql = sql.substring(0, sql.length() - 1).trim();
+        }
+        return sql;
+    }
+
+    private QueryResult errorResult(String msg) {
+        log.warn("[SUPER_SIMPLE] {}", msg);
+        QueryResult result = new QueryResult();
+        result.setQueryState(QueryState.INVALID);
+        result.setErrorMsg(msg);
+        return result;
+    }
+
+    /**
+     * LLM 接口定义，直接返回 SQL 字符串（不需要结构化解析）。
+     */
+    interface SqlExtractor {
+        @UserMessage("{{it}}")
+        String generateSql(String prompt);
+    }
+}

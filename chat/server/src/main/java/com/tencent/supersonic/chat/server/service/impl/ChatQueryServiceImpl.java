@@ -374,9 +374,25 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         long parseTime = 0;
         long executeTime = 0;
         try {
-            if (chatParseReq.getQueryType() != null
-                    && "simple".equals(chatParseReq.getQueryType())) {
-                log.info("queryType 为: {} , 进入简易模式。", chatParseReq.getQueryType());
+            String queryType = chatParseReq.getQueryType();
+            if ("simple".equals(queryType)) {
+                log.info("queryType 为: {} , 进入简易模式。", queryType);
+            } else if ("super_simple".equals(queryType)) {
+                log.info("queryType 为: {} , 进入超级简易模式。", queryType);
+            } else {
+                log.info("queryType 为: {} , 进入正常模式。", queryType);
+            }
+            // SUPER_SIMPLE 模式：完全跳过 parse 流程，直接 LLM 生成物理 SQL 并执行
+            if ("super_simple".equalsIgnoreCase(chatParseReq.getQueryType())) {
+                log.info("[SUPER_SIMPLE] 进入超级简易模式，直接LLM生成物理SQL，问题: {}",
+                        chatParseReq.getQueryText());
+                SuperSimpleQueryHandler handler =
+                        new SuperSimpleQueryHandler(agentService, semanticLayerService);
+                QueryResult result = handler.execute(chatParseReq);
+                log.info("[PERFORMANCE-TOTAL] SUPER_SIMPLE 总耗时: {}ms, 问题: {}",
+                        System.currentTimeMillis() - totalStart,
+                        StringUtils.abbreviate(chatParseReq.getQueryText(), 50));
+                return result;
             }
             long parseStart = System.currentTimeMillis();
             ChatParseResp parseResp = parse(chatParseReq);
