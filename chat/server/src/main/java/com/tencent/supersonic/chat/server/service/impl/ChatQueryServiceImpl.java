@@ -65,6 +65,7 @@ import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -75,6 +76,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.chat.server.parser.NL2SQLParser.APP_KEY_MULTI_TURN;
@@ -99,6 +101,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     private VoiceService voiceService;
     @Autowired
     private SchemaService schemaService;
+    @Autowired
+    @Qualifier("chatExecutor")
+    private ThreadPoolExecutor chatExecutor;
     private final List<ChatQueryParser> chatQueryParsers = ComponentFactory.getChatParsers();
     private final List<ChatQueryExecutor> chatQueryExecutors = ComponentFactory.getChatExecutors();
     private final List<ParseResultProcessor> parseResultProcessors =
@@ -119,7 +124,6 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public ChatParseResp parse(ChatParseReq chatParseReq) {
-        long _t0 = System.currentTimeMillis();
         Long queryId = chatParseReq.getQueryId();
         if (Objects.isNull(queryId)) {
             queryId = chatManageService.createChatQuery(chatParseReq);
@@ -135,9 +139,13 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
         long _t1 = System.currentTimeMillis();
 
-        saveHistoryInfo(parseContext);
-        long _t2 = System.currentTimeMillis();
-        log.info("[PERF-parse] saveHistoryInfo: {}ms", _t2 - _t1);
+        // saveHistoryInfo 为纯写操作，异步化不阻塞主流程
+        final ParseContext finalParseContext = parseContext;
+        chatExecutor.execute(() -> {
+            long _s = System.currentTimeMillis();
+            saveHistoryInfo(finalParseContext);
+            log.info("[PERF-parse] saveHistoryInfo(async): {}ms", System.currentTimeMillis() - _s);
+        });
 
         // 不是简易模式的自然语言回答才走后续逻辑
         if (!parseContext.getResponse().getSelectedParses().isEmpty() && !Objects.equals(
@@ -150,12 +158,18 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             }
         }
         if (!parseContext.needFeedback()) {
+            // batchAddParse 必须同步：execute() 阶段需要从 DB 读取刚写入的 parseInfo
             chatManageService.batchAddParse(chatParseReq, parseContext.getResponse());
             long _t3 = System.currentTimeMillis();
-            log.info("[PERF-parse] batchAddParse: {}ms", _t3 - _t2);
-            chatManageService.updateParseCostTime(parseContext.getResponse());
-            log.info("[PERF-parse] updateParseCostTime: {}ms, parse()总耗时: {}ms",
-                    System.currentTimeMillis() - _t3, System.currentTimeMillis() - _t0);
+            log.info("[PERF-parse] batchAddParse(sync): {}ms", _t3 - _t1);
+            // updateParseCostTime 为纯统计写入，异步化
+            final ChatParseResp finalResp = parseContext.getResponse();
+            chatExecutor.execute(() -> {
+                long _s = System.currentTimeMillis();
+                chatManageService.updateParseCostTime(finalResp);
+                log.info("[PERF-parse] updateParseCostTime(async): {}ms",
+                        System.currentTimeMillis() - _s);
+            });
         }
 
         return parseContext.getResponse();
@@ -197,9 +211,15 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                     processor.process(executeContext);
                 }
             }
-            long _e1 = System.currentTimeMillis();
-            saveQueryResult(chatExecuteReq, queryResult);
-            log.info("[PERF-execute] saveQueryResult: {}ms", System.currentTimeMillis() - _e1);
+            // saveQueryResult 为纯写操作，异步化不阻塞结果返回
+            final ChatExecuteReq finalReq = chatExecuteReq;
+            final QueryResult finalResult = queryResult;
+            chatExecutor.execute(() -> {
+                long _s = System.currentTimeMillis();
+                saveQueryResult(finalReq, finalResult);
+                log.info("[PERF-execute] saveQueryResult(async): {}ms",
+                        System.currentTimeMillis() - _s);
+            });
         }
 
         return queryResult;

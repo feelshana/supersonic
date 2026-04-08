@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Slf4j
 public class SqlExecutor implements ChatQueryExecutor {
@@ -144,8 +145,17 @@ public class SqlExecutor implements ChatQueryExecutor {
                 queryResult.setErrorMsg(queryResp.getErrorMsg());
                 queryResult.setResultType(queryResp.getResultType());
 
-                chatCtx.setParseInfo(parseInfo);
-                chatContextService.updateContext(chatCtx);
+                // updateContext 为纯写操作，异步化不阻塞 SQL 结果返回
+                final ChatContext finalChatCtx = chatCtx;
+                finalChatCtx.setParseInfo(parseInfo);
+                ThreadPoolExecutor chatExecutor =
+                        ContextUtils.getBean("chatExecutor", ThreadPoolExecutor.class);
+                chatExecutor.execute(() -> {
+                    long _s = System.currentTimeMillis();
+                    chatContextService.updateContext(finalChatCtx);
+                    log.info("[PERF-execute] updateContext(async): {}ms",
+                            System.currentTimeMillis() - _s);
+                });
             } else {
                 queryResult.setQueryState(QueryState.INVALID);
             }

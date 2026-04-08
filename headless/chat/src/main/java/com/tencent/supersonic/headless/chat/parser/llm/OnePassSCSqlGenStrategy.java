@@ -295,6 +295,7 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         SemanticSqlExtractor extractor =
                 AiServices.create(SemanticSqlExtractor.class, languageModel);
 
+        long llmStart = System.currentTimeMillis();
         Map<String, Prompt> output2Prompt = new ConcurrentHashMap<>();
         prompt2Exemplar.keySet().parallelStream().forEach(prompt -> {
             SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());
@@ -312,7 +313,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                 prompt2Exemplar.get(output2Prompt.get(sqlMapPair.getLeft()));
         llmResp.setSqlRespMap(ResponseHelper.buildSqlRespMap(usedExemplars, sqlMapPair.getRight()));
 
-        log.info("Simplified model SQL generation, SQL: {}", llmResp.getSqlOutput());
+        log.info("[PERFORMANCE] LLM Text2SQL耗时: {}ms, SQL: {}",
+                System.currentTimeMillis() - llmStart, llmResp.getSqlOutput());
         return llmResp;
     }
 
