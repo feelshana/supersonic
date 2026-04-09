@@ -10,6 +10,7 @@ import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
+import com.tencent.supersonic.headless.api.pojo.SqlInfo;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.QueryState;
@@ -75,7 +76,9 @@ public class SuperSimpleQueryHandler {
             if (schema == null) {
                 return errorResult("数据集 Schema 获取失败，dataSetId=" + dataSetId);
             }
-            String schemaInfo = buildSchemaInfo(schema);
+            // 解析 modelId，供后续获取物理表名和数据库连接复用
+            Long resolvedModelId = resolveModelId(schema);
+            String schemaInfo = buildSchemaInfo(schema, resolvedModelId);
 
             // Step 3: 读取提示词模板，渲染占位符
             String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -108,11 +111,17 @@ public class SuperSimpleQueryHandler {
             // 清理 LLM 可能输出的 markdown 代码块标记
             sql = cleanSql(sql);
 
-            // Step 5: 执行 SQL
-            User user = User.getDefaultUser();
+            // Step 5: 将物理 SQL 通过 sqlInfo.querySQL 交给 semanticLayerService 执行
+            // queryByReq 检测到 sqlInfo.querySQL 非空时，会直接 setSql + setIsTranslated(true)，
+            // 跳过 Calcite 翻译层，JdbcExecutor 用 ontology.getDatabase() 执行，数据库连接配置完全正确
             QuerySqlReq querySqlReq = new QuerySqlReq();
-            querySqlReq.setSql(sql);
             querySqlReq.setDataSetId(dataSetId);
+            querySqlReq.setSql(sql);
+            SqlInfo sqlInfo = new SqlInfo();
+            sqlInfo.setQuerySQL(sql);
+            querySqlReq.setSqlInfo(sqlInfo);
+            querySqlReq.setNeedAuth(false);
+            User user = chatParseReq.getUser();
             SemanticQueryResp resp = semanticLayerService.queryByReq(querySqlReq, user);
 
             // Step 6: 转换为 QueryResult
@@ -143,15 +152,20 @@ public class SuperSimpleQueryHandler {
     /**
      * 将 DataSetSchema 格式化为 LLM 可理解的字段描述文本。 包含数据集名称、真实物理表名、维度字段、指标字段。
      */
-    private String buildSchemaInfo(DataSetSchema schema) {
+    private String buildSchemaInfo(DataSetSchema schema, Long modelId) {
         StringBuilder sb = new StringBuilder();
         SchemaElement dataSet = schema.getDataSet();
         sb.append("数据集名称: ").append(dataSet.getName()).append("\n");
 
         // 获取真实物理表名（从 Model 的 tableQuery 字段）
-        String physicalTableName = resolvePhysicalTableName(schema);
+        String physicalTableName = resolvePhysicalTableName(modelId);
         if (StringUtils.isNotBlank(physicalTableName)) {
-            sb.append("物理表名（FROM 子句中使用此表名）: `").append(physicalTableName).append("`\n");
+            // 若含库名前缀（db.table），拆成 `db`.`table` 避免 LLM 用反引号包整个字符串导致语法错误
+            String formattedTableName = physicalTableName.contains(".") ? "`"
+                    + physicalTableName.substring(0, physicalTableName.lastIndexOf('.')) + "`.`"
+                    + physicalTableName.substring(physicalTableName.lastIndexOf('.') + 1) + "`"
+                    : "`" + physicalTableName + "`";
+            sb.append("物理表名（FROM 子句中直接使用，不要修改格式）: ").append(formattedTableName).append("\n");
         }
 
         if (!schema.getDimensions().isEmpty()) {
@@ -173,31 +187,37 @@ public class SuperSimpleQueryHandler {
     }
 
     /**
-     * 从 Schema 对应的 Model 中获取真实物理表名（tableQuery 字段）。 优先从 dataSet.getModel() 取，若为空则从
-     * dimensions/metrics 中取第一个有 model 值的元素。
+     * 从 Schema 中解析出 modelId（三级回退：dataSet → dimensions → metrics → dimensionValues）。
      */
-    private String resolvePhysicalTableName(DataSetSchema schema) {
+    private Long resolveModelId(DataSetSchema schema) {
+        Long modelId = schema.getDataSet().getModel();
+        if (modelId == null) {
+            modelId = schema.getDimensions().stream().filter(e -> e.getModel() != null)
+                    .map(SchemaElement::getModel).findFirst().orElse(null);
+        }
+        if (modelId == null) {
+            modelId = schema.getMetrics().stream().filter(e -> e.getModel() != null)
+                    .map(SchemaElement::getModel).findFirst().orElse(null);
+        }
+        if (modelId == null) {
+            modelId = schema.getDimensionValues().stream().filter(e -> e.getModel() != null)
+                    .map(SchemaElement::getModel).findFirst().orElse(null);
+        }
+        if (modelId == null) {
+            log.warn("[SUPER_SIMPLE] 无法从 Schema 中找到 modelId");
+        }
+        return modelId;
+    }
+
+    /**
+     * 根据 modelId 获取物理表名（tableQuery 字段）。 直接返回原始 tableQuery（含 db.table 格式），由 JdbcExecutor 通过
+     * ontology.getDatabase() 正确定位数据库。
+     */
+    private String resolvePhysicalTableName(Long modelId) {
+        if (modelId == null) {
+            return null;
+        }
         try {
-            SchemaElement dataSet = schema.getDataSet();
-            // 优先从 dataSet 本身取 modelId
-            Long modelId = dataSet.getModel();
-            // dataSet.model 为空时，从 dimensions 或 metrics 中找一个有 model 的元素
-            if (modelId == null) {
-                modelId = schema.getDimensions().stream().filter(e -> e.getModel() != null)
-                        .map(SchemaElement::getModel).findFirst().orElse(null);
-            }
-            if (modelId == null) {
-                modelId = schema.getMetrics().stream().filter(e -> e.getModel() != null)
-                        .map(SchemaElement::getModel).findFirst().orElse(null);
-            }
-            if (modelId == null) {
-                modelId = schema.getDimensionValues().stream().filter(e -> e.getModel() != null)
-                        .map(SchemaElement::getModel).findFirst().orElse(null);
-            }
-            if (modelId == null) {
-                log.warn("[SUPER_SIMPLE] 无法从 Schema 中找到 modelId，跳过物理表名获取");
-                return null;
-            }
             SchemaService schemaService = ContextUtils.getBean(SchemaService.class);
             List<ModelResp> models = schemaService.getModelList(List.of(modelId));
             if (models != null && !models.isEmpty()) {
@@ -205,12 +225,8 @@ public class SuperSimpleQueryHandler {
                         ? models.get(0).getModelDetail().getTableQuery()
                         : null;
                 if (StringUtils.isNotBlank(tableQuery)) {
-                    // tableQuery 可能是 "db.table" 格式，只取表名部分，避免 JDBC 连接已含 db 前缀时重复
-                    String tableName = tableQuery.contains(".")
-                            ? tableQuery.substring(tableQuery.lastIndexOf('.') + 1)
-                            : tableQuery;
-                    log.info("[SUPER_SIMPLE] 获取到物理表名: {}（原始: {}）", tableName, tableQuery);
-                    return tableName;
+                    log.info("[SUPER_SIMPLE] 获取到物理表名: {}", tableQuery);
+                    return tableQuery;
                 }
             }
         } catch (Exception e) {
