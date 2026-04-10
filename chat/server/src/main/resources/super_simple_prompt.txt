@@ -14,7 +14,7 @@
 6. 本表为结果表，禁止使用 SUM、AVG、COUNT 等聚合函数
 7. SQL 末尾必须有 LIMIT，如未指定则追加 LIMIT 100
 8. 只输出纯 SQL，不输出任何解释、注释或 markdown 代码块
-
+9. 禁止z在sql中使用union all语法。
 ### 用户问题
 
 {{QUERY_TEXT}}

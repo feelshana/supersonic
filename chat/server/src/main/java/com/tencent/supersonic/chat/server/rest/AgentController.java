@@ -83,9 +83,10 @@ public class AgentController {
     public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(
             @RequestParam("agentIds") List<Integer> agentIds,
             @RequestParam(value = "queryText", required = false) String queryText,
+            @RequestParam(value = "queryType", required = false) String queryType,
             HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
-        return agentService.getRedSeaDataSetInfo(agentIds, queryText, user);
+        return agentService.getRedSeaDataSetInfo(agentIds, queryText, queryType, user);
     }
 
     @RequestMapping("/getToolTypes")

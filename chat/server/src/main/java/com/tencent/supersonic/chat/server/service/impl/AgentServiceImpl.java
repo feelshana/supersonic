@@ -382,16 +382,20 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
     @Override
     public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(List<Integer> agentIds, String queryText,
-            User user) {
-        log.info("[getRedSeaDataSetInfo] agentIds:{}, queryText:{}", agentIds, queryText);
+            String queryType, User user) {
+        log.info("[getRedSeaDataSetInfo] agentIds:{}, queryText:{}, queryType:{}", agentIds, queryText, queryType);
+        boolean needDetail = "detail".equalsIgnoreCase(queryType);
         return agentIds.stream().map(agentId -> {
             Agent agent = convert(getById(agentId));
-            String info = getAgentDataSetInfo(agentId, queryText, user);
             AgentDataSetInfoDTO dto = new AgentDataSetInfoDTO();
             dto.setAgentId(agentId);
-            dto.setDescription(agent.getDescription());
             dto.setAgentName(agent.getName());
-            dto.setDataSetInfo(info);
+            if (needDetail) {
+                String info = getAgentDataSetInfo(agentId, queryText, user);
+                dto.setDataSetInfo(info);
+            } else {
+                dto.setDescription(agent.getDescription());
+            }
             return dto;
         }).collect(Collectors.toList());
     }

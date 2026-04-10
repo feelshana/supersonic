@@ -1,5 +1,6 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
+import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.server.agent.Agent;
@@ -12,9 +13,11 @@ import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SqlInfo;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
+import com.tencent.supersonic.headless.api.pojo.response.DictValueDimResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.QueryState;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
+import com.tencent.supersonic.headless.chat.parser.llm.OnePassSCSqlGenStrategy;
 import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.service.SchemaService;
 import com.tencent.supersonic.headless.server.utils.ModelConfigHelper;
@@ -25,6 +28,7 @@ import dev.langchain4j.service.UserMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.CollectionUtils;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -170,9 +174,70 @@ public class SuperSimpleQueryHandler {
 
         if (!schema.getDimensions().isEmpty()) {
             sb.append("\n维度字段（可用于 WHERE / SELECT）:\n");
+            OnePassSCSqlGenStrategy sqlGenStrategy =
+                    ContextUtils.getBean(OnePassSCSqlGenStrategy.class);
             for (SchemaElement dim : schema.getDimensions()) {
                 sb.append("  `").append(dim.getBizName()).append("`").append("  -- ")
-                        .append(dim.getName()).append("\n");
+                        .append(dim.getName());
+                // 日期类维度：追加格式说明，不追加维度值
+                String dimNameLower = dim.getName().toLowerCase();
+                if (StringUtils.isNotEmpty(dim.getTimeFormat())) {
+                    sb.append("（日期字段，格式：").append(dim.getTimeFormat()).append("）");
+                    sb.append("\n");
+                    continue;
+                }
+                // 含 id 的维度跳过维度值
+                boolean isIdDim = dimNameLower.contains("id");
+                // 日期/时间类维度跳过维度值
+                boolean isTimeDim = dimNameLower.contains("日期") || dimNameLower.contains("时间")
+                        || dimNameLower.contains("date") || dimNameLower.contains("time");
+                if (isIdDim || isTimeDim) {
+                    sb.append("\n");
+                    continue;
+                }
+                // 尝试获取维度值示例
+                if (sqlGenStrategy != null && (Boolean.TRUE.equals(dim.isHasDimValues())
+                        || !CollectionUtils.isEmpty(dim.getSchemaValueMaps()))) {
+                    PageInfo<DictValueDimResp> pageInfo =
+                            sqlGenStrategy.getDimensionValuesFromDict(dim);
+                    if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
+                        // 先拿到全量维度值，用于判断是否含“全国”/“全省”
+                        List<String> allValues =
+                                pageInfo.getList().stream().map(DictValueDimResp::getValue)
+                                        .collect(java.util.stream.Collectors.toList());
+                        if (!allValues.isEmpty()) {
+                            boolean isProvinceDim = dimNameLower.contains("省份")
+                                    || dimNameLower.contains("province");
+                            boolean isCityDim = dimNameLower.contains("城市")
+                                    || dimNameLower.contains("地市") || dimNameLower.contains("city");
+                            if (isProvinceDim && allValues.contains("全国")) {
+                                List<String> samples =
+                                        allValues.stream().filter(v -> !"全国".equals(v)).limit(3)
+                                                .collect(java.util.stream.Collectors.toList());
+                                sb.append("，含'全国'");
+                                if (!samples.isEmpty()) {
+                                    sb.append("和'").append(String.join("'、'", samples))
+                                            .append("'等省份数据，全国数据不需要用各省累加");
+                                }
+                            } else if (isCityDim && allValues.contains("全省")) {
+                                List<String> samples =
+                                        allValues.stream().filter(v -> !"全省".equals(v)).limit(3)
+                                                .collect(java.util.stream.Collectors.toList());
+                                sb.append("，含'全省'");
+                                if (!samples.isEmpty()) {
+                                    sb.append("和'").append(String.join("'、'", samples))
+                                            .append("'等城市数据，全省数据不需要用各城市累加");
+                                }
+                            } else {
+                                // 普通维度：取前 10 个作为示例
+                                List<String> dimValues = allValues.stream().limit(10)
+                                        .collect(java.util.stream.Collectors.toList());
+                                sb.append("，维度值示例：").append(String.join("、", dimValues));
+                            }
+                        }
+                    }
+                }
+                sb.append("\n");
             }
         }
 

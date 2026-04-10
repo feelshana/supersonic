@@ -675,7 +675,20 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         boolean isTypeParamChange =
                 !Objects.equals(dimensionReq.getTypeParams(), dimensionResp.getTypeParams());
         boolean isDimValueChange = dimensionResp.isHasDimValues() != dimensionReq.isHasDimValues();
-        return isNameChange || isExtChange || isTypeParamChange || isDimValueChange;
+        boolean isDefaultValuesChange =
+                !isSameDefaultValues(dimensionReq.getDefaultValues(), dimensionResp.getDefaultValues());
+        return isNameChange || isExtChange || isTypeParamChange || isDimValueChange
+                || isDefaultValuesChange;
+    }
+
+    private boolean isSameDefaultValues(List<String> newValues, List<String> oldValues) {
+        List<String> left = newValues == null ? Collections.emptyList()
+                : newValues.stream().filter(StringUtils::isNotBlank).sorted()
+                        .collect(Collectors.toList());
+        List<String> right = oldValues == null ? Collections.emptyList()
+                : oldValues.stream().filter(StringUtils::isNotBlank).sorted()
+                        .collect(Collectors.toList());
+        return Objects.equals(left, right);
     }
 
     private void deleteDimensionValue(List<DimensionDO> dimensionDOS) {
