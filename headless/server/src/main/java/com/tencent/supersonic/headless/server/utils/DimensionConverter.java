@@ -30,9 +30,9 @@ public class DimensionConverter {
 
     public static DimensionDO convert(DimensionDO dimensionDO, DimensionReq dimensionReq) {
         BeanMapper.mapper(dimensionReq, dimensionDO);
-        if (dimensionReq.getDefaultValues() != null) {
-            dimensionDO.setDefaultValues(JSONObject.toJSONString(dimensionReq.getDefaultValues()));
-        }
+        // 支持 null 清空语义：不传默认值时写入数据库 NULL，而非保留旧值
+        dimensionDO.setDefaultValues(dimensionReq.getDefaultValues() != null
+                ? JSONObject.toJSONString(dimensionReq.getDefaultValues()) : null);
         if (!CollectionUtils.isEmpty(dimensionReq.getDimValueMaps())) {
             List<DimValueMap> dimValueMaps = dimensionReq.getDimValueMaps();
             dimValueMaps.stream().forEach(dimValueMap -> {
@@ -58,9 +58,9 @@ public class DimensionConverter {
     public static DimensionDO convert2DimensionDO(DimensionReq dimensionReq) {
         DimensionDO dimensionDO = new DimensionDO();
         BeanMapper.mapper(dimensionReq, dimensionDO);
-        if (dimensionReq.getDefaultValues() != null) {
-            dimensionDO.setDefaultValues(JSONObject.toJSONString(dimensionReq.getDefaultValues()));
-        }
+        // 支持 null 清空语义：不传默认值时写入数据库 NULL，而非保留旧值
+        dimensionDO.setDefaultValues(dimensionReq.getDefaultValues() != null
+                ? JSONObject.toJSONString(dimensionReq.getDefaultValues()) : null);
         if (dimensionReq.getDimValueMaps() != null) {
             dimensionDO.setDimValueMaps(JSONObject.toJSONString(dimensionReq.getDimValueMaps()));
         }

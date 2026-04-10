@@ -675,8 +675,8 @@ public class DimensionServiceImpl extends ServiceImpl<DimensionDOMapper, Dimensi
         boolean isTypeParamChange =
                 !Objects.equals(dimensionReq.getTypeParams(), dimensionResp.getTypeParams());
         boolean isDimValueChange = dimensionResp.isHasDimValues() != dimensionReq.isHasDimValues();
-        boolean isDefaultValuesChange =
-                !isSameDefaultValues(dimensionReq.getDefaultValues(), dimensionResp.getDefaultValues());
+        boolean isDefaultValuesChange = !isSameDefaultValues(dimensionReq.getDefaultValues(),
+                dimensionResp.getDefaultValues());
         return isNameChange || isExtChange || isTypeParamChange || isDimValueChange
                 || isDefaultValuesChange;
     }
