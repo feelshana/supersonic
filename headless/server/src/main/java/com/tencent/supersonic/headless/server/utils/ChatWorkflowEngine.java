@@ -3,10 +3,7 @@ package com.tencent.supersonic.headless.server.utils;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
-import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
-import com.tencent.supersonic.headless.api.pojo.SqlInfo;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
@@ -15,6 +12,7 @@ import com.tencent.supersonic.headless.api.pojo.response.SemanticTranslateResp;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.corrector.LLMPhysicalSqlCorrector;
 import com.tencent.supersonic.headless.chat.corrector.SemanticCorrector;
+import com.tencent.supersonic.headless.chat.knowledge.builder.BaseWordBuilder;
 import com.tencent.supersonic.headless.chat.mapper.SchemaMapper;
 import com.tencent.supersonic.headless.chat.parser.SemanticParser;
 import com.tencent.supersonic.headless.chat.query.QueryManager;
@@ -27,10 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,13 +61,13 @@ public class ChatWorkflowEngine {
                     performMapping(queryCtx);
                     if ((queryCtx.getAgentId() != null && queryCtx.getAgentId() == 43)
                             || (queryCtx.getRequest().getAgentId() != null
-                                    && queryCtx.getRequest().getAgentId() == 43)) {
+                            && queryCtx.getRequest().getAgentId() == 43)) {
                         queryCtx.getRequest().setText2SQLType(Text2SQLType.LLM_OR_RULE);
                     }
                     // 非向量模型只走mapping,向量模型下才会进行text-2-dsl
                     if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)
                             && !queryCtx.getRequest().getText2SQLType()
-                                    .equals(Text2SQLType.LLM_OR_RULE)) {
+                            .equals(Text2SQLType.LLM_OR_RULE)) {
                         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
                         if (!queryCtx.getMapInfo().isEmpty()
                                 && !queryCtx.getMapInfo().getDataSetElementMatches().isEmpty()) {
@@ -91,6 +86,19 @@ public class ChatWorkflowEngine {
                         dimensionValuesMatchHelper.dimensionValuesStoreToCache(queryCtx);
                     }
                     // 向量召回后仍然没有结果，则代表问题不相关
+                    if (queryCtx.getMapInfo().isEmpty()) {
+                        SchemaMapInfo mapInfo = queryCtx.getMapInfo();
+                        Map<Long, List<SchemaElementMatch>> dataSetElementMatches = mapInfo.getDataSetElementMatches();
+                        SemanticSchema semanticSchema = queryCtx.getSemanticSchema();
+                        if (semanticSchema != null) {
+                            SchemaElement matched = semanticSchema.getDimensions().getFirst();
+                            SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
+                                    .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+                                    .detectWord(matched.getName()).word(matched.getName()).similarity(1)
+                                    .build();
+                            dataSetElementMatches.put(matched.getDataSetId(), new ArrayList<>(Collections.singletonList(schemaElementMatch)));
+                        }
+                    }
                     if (queryCtx.getMapInfo().isEmpty()) {
                         errDefault(parseResult, queryCtx);
                     } else {
@@ -363,7 +371,7 @@ public class ChatWorkflowEngine {
                 例如：
                 - “2024年10月1日的支付订单数”
                 - “最近7天各省份的产品销量”
-
+                
                 支持的其他维度包括：%s 等（日期为必填）。
                 """;
         String dimensionStr = semanticSchema.getDimensions().stream()
