@@ -32,7 +32,8 @@ public class DimensionConverter {
         BeanMapper.mapper(dimensionReq, dimensionDO);
         // 支持 null 清空语义：不传默认值时写入数据库 NULL，而非保留旧值
         dimensionDO.setDefaultValues(dimensionReq.getDefaultValues() != null
-                ? JSONObject.toJSONString(dimensionReq.getDefaultValues()) : null);
+                ? JSONObject.toJSONString(dimensionReq.getDefaultValues())
+                : null);
         if (!CollectionUtils.isEmpty(dimensionReq.getDimValueMaps())) {
             List<DimValueMap> dimValueMaps = dimensionReq.getDimValueMaps();
             dimValueMaps.stream().forEach(dimValueMap -> {
@@ -60,7 +61,8 @@ public class DimensionConverter {
         BeanMapper.mapper(dimensionReq, dimensionDO);
         // 支持 null 清空语义：不传默认值时写入数据库 NULL，而非保留旧值
         dimensionDO.setDefaultValues(dimensionReq.getDefaultValues() != null
-                ? JSONObject.toJSONString(dimensionReq.getDefaultValues()) : null);
+                ? JSONObject.toJSONString(dimensionReq.getDefaultValues())
+                : null);
         if (dimensionReq.getDimValueMaps() != null) {
             dimensionDO.setDimValueMaps(JSONObject.toJSONString(dimensionReq.getDimValueMaps()));
         }

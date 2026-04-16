@@ -61,13 +61,13 @@ public class ChatWorkflowEngine {
                     performMapping(queryCtx);
                     if ((queryCtx.getAgentId() != null && queryCtx.getAgentId() == 43)
                             || (queryCtx.getRequest().getAgentId() != null
-                            && queryCtx.getRequest().getAgentId() == 43)) {
+                                    && queryCtx.getRequest().getAgentId() == 43)) {
                         queryCtx.getRequest().setText2SQLType(Text2SQLType.LLM_OR_RULE);
                     }
                     // 非向量模型只走mapping,向量模型下才会进行text-2-dsl
                     if (!queryCtx.getRequest().getMapModeEnum().equals(MapModeEnum.LOOSE)
                             && !queryCtx.getRequest().getText2SQLType()
-                            .equals(Text2SQLType.LLM_OR_RULE)) {
+                                    .equals(Text2SQLType.LLM_OR_RULE)) {
                         SemanticParseInfo semanticParseInfo = new SemanticParseInfo();
                         if (!queryCtx.getMapInfo().isEmpty()
                                 && !queryCtx.getMapInfo().getDataSetElementMatches().isEmpty()) {
@@ -88,15 +88,22 @@ public class ChatWorkflowEngine {
                     // 向量召回后仍然没有结果，则代表问题不相关
                     if (queryCtx.getMapInfo().isEmpty()) {
                         SchemaMapInfo mapInfo = queryCtx.getMapInfo();
-                        Map<Long, List<SchemaElementMatch>> dataSetElementMatches = mapInfo.getDataSetElementMatches();
+                        Map<Long, List<SchemaElementMatch>> dataSetElementMatches =
+                                mapInfo.getDataSetElementMatches();
                         SemanticSchema semanticSchema = queryCtx.getSemanticSchema();
-                        if (semanticSchema != null) {
-                            SchemaElement matched = semanticSchema.getDimensions().getFirst();
-                            SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
-                                    .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
-                                    .detectWord(matched.getName()).word(matched.getName()).similarity(1)
-                                    .build();
-                            dataSetElementMatches.put(matched.getDataSetId(), new ArrayList<>(Collections.singletonList(schemaElementMatch)));
+                        Set<Long> requestDataSetIds = queryCtx.getRequest().getDataSetIds();
+                        if (semanticSchema != null && !CollectionUtils.isEmpty(requestDataSetIds)) {
+                            Long targetDataSetId = requestDataSetIds.iterator().next();
+                            List<SchemaElement> dimensions = semanticSchema.getDimensions(targetDataSetId);
+                            if (!dimensions.isEmpty()) {
+                                SchemaElement matched = dimensions.getFirst();
+                                SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
+                                        .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+                                        .detectWord(matched.getName()).word(matched.getName())
+                                        .similarity(1).build();
+                                dataSetElementMatches.put(targetDataSetId,
+                                        new ArrayList<>(Collections.singletonList(schemaElementMatch)));
+                            }
                         }
                     }
                     if (queryCtx.getMapInfo().isEmpty()) {
@@ -371,7 +378,7 @@ public class ChatWorkflowEngine {
                 例如：
                 - “2024年10月1日的支付订单数”
                 - “最近7天各省份的产品销量”
-                
+
                 支持的其他维度包括：%s 等（日期为必填）。
                 """;
         String dimensionStr = semanticSchema.getDimensions().stream()
