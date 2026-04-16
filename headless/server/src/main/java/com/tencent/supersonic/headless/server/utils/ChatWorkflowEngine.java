@@ -87,23 +87,43 @@ public class ChatWorkflowEngine {
                     }
                     // 向量召回后仍然没有结果，则代表问题不相关
                     if (queryCtx.getMapInfo().isEmpty()) {
+                        log.warn("[MAPPING_EMPTY] mapInfo为空，尝试兜底注入，问题: {}",
+                                queryCtx.getRequest().getQueryText());
                         SchemaMapInfo mapInfo = queryCtx.getMapInfo();
                         Map<Long, List<SchemaElementMatch>> dataSetElementMatches =
                                 mapInfo.getDataSetElementMatches();
                         SemanticSchema semanticSchema = queryCtx.getSemanticSchema();
                         Set<Long> requestDataSetIds = queryCtx.getRequest().getDataSetIds();
+                        log.warn("[MAPPING_EMPTY] semanticSchema={}, requestDataSetIds={}",
+                                semanticSchema != null ? "非null" : "null", requestDataSetIds);
                         if (semanticSchema != null && !CollectionUtils.isEmpty(requestDataSetIds)) {
                             Long targetDataSetId = requestDataSetIds.iterator().next();
-                            List<SchemaElement> dimensions = semanticSchema.getDimensions(targetDataSetId);
+                            List<SchemaElement> dimensions =
+                                    semanticSchema.getDimensions(targetDataSetId);
+                            log.warn("[MAPPING_EMPTY] targetDataSetId={}, 该数据集下dimension数量={}",
+                                    targetDataSetId, dimensions.size());
                             if (!dimensions.isEmpty()) {
                                 SchemaElement matched = dimensions.getFirst();
-                                SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
-                                        .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
-                                        .detectWord(matched.getName()).word(matched.getName())
-                                        .similarity(1).build();
-                                dataSetElementMatches.put(targetDataSetId,
-                                        new ArrayList<>(Collections.singletonList(schemaElementMatch)));
+                                log.warn(
+                                        "[MAPPING_EMPTY] 兜底注入dimension: name={}, bizName={}, dataSetId={}, model={}",
+                                        matched.getName(), matched.getBizName(),
+                                        matched.getDataSetId(), matched.getModel());
+                                SchemaElementMatch schemaElementMatch =
+                                        SchemaElementMatch.builder().element(matched)
+                                                .frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+                                                .detectWord(matched.getName())
+                                                .word(matched.getName()).similarity(1).build();
+                                dataSetElementMatches.put(targetDataSetId, new ArrayList<>(
+                                        Collections.singletonList(schemaElementMatch)));
+                                log.warn("[MAPPING_EMPTY] 兜底注入完成，dataSetElementMatches key: {}",
+                                        dataSetElementMatches.keySet());
+                            } else {
+                                log.warn("[MAPPING_EMPTY] targetDataSetId={} 下没有dimension，兜底注入失败",
+                                        targetDataSetId);
                             }
+                        } else {
+                            log.warn(
+                                    "[MAPPING_EMPTY] semanticSchema为null或requestDataSetIds为空，无法兜底");
                         }
                     }
                     if (queryCtx.getMapInfo().isEmpty()) {

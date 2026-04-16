@@ -241,6 +241,10 @@ public class SqlQueryParser implements QueryParser {
             });
         });
 
+        // 将SELECT中未匹配到指标的剩余字段合并到fields，解决纯维度查询（如 SELECT period_id，无指标）时
+        // 后续维度匹配步骤因fields为空而全部跳过，导致modelMap为空，最终抛出 data model not found 的问题
+        fields.addAll(allFields);
+
         // first try to find all querying dimensions in the models with querying metrics.
         ontology.getDimensionMap().entrySet().stream()
                 .filter(entry -> ontologyQuery.getMetricMap().containsKey(entry.getKey()))
