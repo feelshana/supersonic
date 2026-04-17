@@ -67,10 +67,16 @@ public class SqlQueryParser implements QueryParser {
             ontologyMetricsDimensions.add(d.getName());
             ontologyBizNameMetricsDimensions.add(d.getBizName());
         });
-        // check if there are fields not matched with any metric or dimension
+        // 逐字段校验：每个ontology字段只要name或bizName任一出现在queryFields中即视为匹配
+        // 原逻辑要求整个集合统一用name或统一用bizName，当SQL混用name和bizName时（如中文name+英文bizName）会误判INVALID
+        boolean allMatched = Stream.concat(
+                ontologyQuery.getMetrics().stream().map(m -> Pair.of(m.getName(), m.getBizName())),
+                ontologyQuery.getDimensions().stream()
+                        .map(d -> Pair.of(d.getName(), d.getBizName())))
+                .allMatch(pair -> queryFieldsSet.contains(pair.getLeft())
+                        || queryFieldsSet.contains(pair.getRight()));
 
-        if (!(queryFieldsSet.containsAll(ontologyMetricsDimensions)
-                || queryFieldsSet.containsAll(ontologyBizNameMetricsDimensions))) {
+        if (!allMatched) {
             List<String> semanticFields = Lists.newArrayList();
             ontologyQuery.getMetrics().forEach(m -> semanticFields.add(m.getName()));
             ontologyQuery.getDimensions().forEach(d -> semanticFields.add(d.getName()));
