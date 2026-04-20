@@ -10,6 +10,7 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.config.CrabConfig;
 import com.tencent.supersonic.chat.server.executor.PlainTextExecutor;
+import com.tencent.supersonic.chat.server.service.ChatManageService;
 import com.tencent.supersonic.chat.server.service.CommonChatService;
 import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
@@ -23,6 +24,7 @@ import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -40,6 +42,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 通用对话服务实现
@@ -69,42 +72,50 @@ public class CommonChatServiceImpl implements CommonChatService {
     private static final String TYPE_REPORT = "报表申请理由";
     private static final String TYPE_DATA = "取数申请理由";
 
-    @Resource
-    private ChatModelService chatModelService;
-    @Resource
-    private WebClient webClient;
-    @Resource
-    private CrabConfig crabConfig;
-    @Resource
-    private  ObjectMapper objectMapper;
 
 
-    @Override
-    public Flux<String> streamChat(CommonChatReq input) {
-        // 1. 构建提示词
-        String typeName = input.getType() == 1 ? TYPE_REPORT : TYPE_DATA;
-        String whereClause = input.getWhere() != null ? input.getWhere() : "无";
-        String prompt = String.format(REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause);
-
-        log.info("生成申请理由的prompt: {}", prompt);
-        // 2. 获取流式模型
-        StreamingChatLanguageModel streamChatModel;
-        try {
-            ChatModel chatModel = chatModelService.getChatModel(modelId);
-            ChatModelConfig config = chatModel.getConfig();
-            streamChatModel = ModelProvider.getStreamingChatModel(config);
-        } catch (Exception e) {
-            log.error("无法获取到流式模型的配置", e);
-            throw new RuntimeException("未正确获大模配置，无法使用自动生成申请理由");
-        }
-
-        // 3. 创建流式解析器
-
-        GenerateApplyReasonStreamExtractor generateApplyReasonStreamExtractor = AiServices.create(GenerateApplyReasonStreamExtractor.class, streamChatModel);
 
 
-        return generateApplyReasonStreamExtractor.generateApplyReasonStream(prompt);
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
+    private final CrabConfig crabConfig;
+    @Autowired
+    public CommonChatServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+                               CrabConfig crabConfig, ChatQueryServiceImpl chatQueryService,
+                               ChatManageService chatManageService) {
+        this.objectMapper = objectMapper;
+        this.crabConfig = crabConfig;
+        this.webClient = webClientBuilder.baseUrl(crabConfig.getHost()).build();
     }
+
+
+
+//    @Override
+//    public Flux<String> streamChat(CommonChatReq input) {
+//        // 1. 构建提示词
+//        String typeName = input.getType() == 1 ? TYPE_REPORT : TYPE_DATA;
+//        String whereClause = input.getWhere() != null ? input.getWhere() : "无";
+//        String prompt = String.format(REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause);
+//
+//        log.info("生成申请理由的prompt: {}", prompt);
+//        // 2. 获取流式模型
+//        StreamingChatLanguageModel streamChatModel;
+//        try {
+//            ChatModel chatModel = chatModelService.getChatModel(modelId);
+//            ChatModelConfig config = chatModel.getConfig();
+//            streamChatModel = ModelProvider.getStreamingChatModel(config);
+//        } catch (Exception e) {
+//            log.error("无法获取到流式模型的配置", e);
+//            throw new RuntimeException("未正确获大模配置，无法使用自动生成申请理由");
+//        }
+//
+//        // 3. 创建流式解析器
+//
+//        GenerateApplyReasonStreamExtractor generateApplyReasonStreamExtractor = AiServices.create(GenerateApplyReasonStreamExtractor.class, streamChatModel);
+//
+//
+//        return generateApplyReasonStreamExtractor.generateApplyReasonStream(prompt);
+//    }
 
     public interface GenerateApplyReasonStreamExtractor {
         /**
