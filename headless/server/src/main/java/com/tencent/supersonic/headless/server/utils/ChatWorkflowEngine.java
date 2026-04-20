@@ -3,10 +3,7 @@ package com.tencent.supersonic.headless.server.utils;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
-import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
-import com.tencent.supersonic.headless.api.pojo.SqlInfo;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.ChatWorkflowState;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
@@ -15,6 +12,7 @@ import com.tencent.supersonic.headless.api.pojo.response.SemanticTranslateResp;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.corrector.LLMPhysicalSqlCorrector;
 import com.tencent.supersonic.headless.chat.corrector.SemanticCorrector;
+import com.tencent.supersonic.headless.chat.knowledge.builder.BaseWordBuilder;
 import com.tencent.supersonic.headless.chat.mapper.SchemaMapper;
 import com.tencent.supersonic.headless.chat.parser.SemanticParser;
 import com.tencent.supersonic.headless.chat.query.QueryManager;
@@ -27,10 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,9 +47,17 @@ public class ChatWorkflowEngine {
     public void start(ChatWorkflowState initialState, ChatQueryContext queryCtx) {
         ParseResp parseResult = queryCtx.getParseResp();
         queryCtx.setChatWorkflowState(initialState);
+        long workflowStartTime = System.currentTimeMillis();
         while (queryCtx.getChatWorkflowState() != ChatWorkflowState.FINISHED) {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
+                    // SIMPLE 模式：问题已高度结构化，跳过向量召回/词典分词，直接进入 PARSING
+                    if (queryCtx.isSimpleMode()) {
+                        log.info("[SIMPLE MODE] 跳过 MAPPING 阶段，直接进入 PARSING，问题: {}",
+                                queryCtx.getRequest().getQueryText());
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
+                        break;
+                    }
                     performMapping(queryCtx);
                     if ((queryCtx.getAgentId() != null && queryCtx.getAgentId() == 43)
                             || (queryCtx.getRequest().getAgentId() != null
@@ -84,6 +87,46 @@ public class ChatWorkflowEngine {
                     }
                     // 向量召回后仍然没有结果，则代表问题不相关
                     if (queryCtx.getMapInfo().isEmpty()) {
+                        log.warn("[MAPPING_EMPTY] mapInfo为空，尝试兜底注入，问题: {}",
+                                queryCtx.getRequest().getQueryText());
+                        SchemaMapInfo mapInfo = queryCtx.getMapInfo();
+                        Map<Long, List<SchemaElementMatch>> dataSetElementMatches =
+                                mapInfo.getDataSetElementMatches();
+                        SemanticSchema semanticSchema = queryCtx.getSemanticSchema();
+                        Set<Long> requestDataSetIds = queryCtx.getRequest().getDataSetIds();
+                        log.warn("[MAPPING_EMPTY] semanticSchema={}, requestDataSetIds={}",
+                                semanticSchema != null ? "非null" : "null", requestDataSetIds);
+                        if (semanticSchema != null && !CollectionUtils.isEmpty(requestDataSetIds)) {
+                            Long targetDataSetId = requestDataSetIds.iterator().next();
+                            List<SchemaElement> dimensions =
+                                    semanticSchema.getDimensions(targetDataSetId);
+                            log.warn("[MAPPING_EMPTY] targetDataSetId={}, 该数据集下dimension数量={}",
+                                    targetDataSetId, dimensions.size());
+                            if (!dimensions.isEmpty()) {
+                                SchemaElement matched = dimensions.getFirst();
+                                log.warn(
+                                        "[MAPPING_EMPTY] 兜底注入dimension: name={}, bizName={}, dataSetId={}, model={}",
+                                        matched.getName(), matched.getBizName(),
+                                        matched.getDataSetId(), matched.getModel());
+                                SchemaElementMatch schemaElementMatch =
+                                        SchemaElementMatch.builder().element(matched)
+                                                .frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+                                                .detectWord(matched.getName())
+                                                .word(matched.getName()).similarity(1).build();
+                                dataSetElementMatches.put(targetDataSetId, new ArrayList<>(
+                                        Collections.singletonList(schemaElementMatch)));
+                                log.warn("[MAPPING_EMPTY] 兜底注入完成，dataSetElementMatches key: {}",
+                                        dataSetElementMatches.keySet());
+                            } else {
+                                log.warn("[MAPPING_EMPTY] targetDataSetId={} 下没有dimension，兜底注入失败",
+                                        targetDataSetId);
+                            }
+                        } else {
+                            log.warn(
+                                    "[MAPPING_EMPTY] semanticSchema为null或requestDataSetIds为空，无法兜底");
+                        }
+                    }
+                    if (queryCtx.getMapInfo().isEmpty()) {
                         errDefault(parseResult, queryCtx);
                     } else {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.PARSING);
@@ -104,11 +147,20 @@ public class ChatWorkflowEngine {
                     List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
                             .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
                     parseResult.setSelectedParses(parseInfos);
+                    if (parseInfos.isEmpty()) {
+                        log.warn("PARSING 阶段未生成任何候选查询，结束流程");
+                        errDefault(parseResult, queryCtx);
+                        break;
+                    }
                     log.info("【大模型生成的sql】:\n{}", parseResult.getSelectedParses().getFirst()
                             .getSqlInfo().getParsedS2SQL());
-                    if (queryCtx.needSQL() && !StringUtils.endsWithIgnoreCase(
+                    // SIMPLE 模式与直连模式：LLM 直接生成物理可执行 SQL，跳过 S2SQL_CORRECTING 和 TRANSLATING
+                    if (queryCtx.isSimpleMode() || StringUtils.endsWithIgnoreCase(
                             queryCtx.getSemanticSchema().getDataSets().getFirst().getDataSetName(),
                             "直连模式")) {
+                        parseResult.setState(ParseResp.ParseState.COMPLETED);
+                        queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
+                    } else if (queryCtx.needSQL()) {
                         queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
                     } else {
                         parseResult.setState(ParseResp.ParseState.COMPLETED);
@@ -158,10 +210,10 @@ public class ChatWorkflowEngine {
                     queryCtx.setChatWorkflowState(ChatWorkflowState.TRANSLATING);
                     break;
                 case TRANSLATING:
-                    long start = System.currentTimeMillis();
-
+                    long translatingStart = System.currentTimeMillis();
                     performTranslating(queryCtx, parseResult);
-                    parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
+                    long translatingTime = System.currentTimeMillis() - translatingStart;
+                    parseResult.getParseTimeCost().setSqlTime(translatingTime);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
                     break;
                 case PHYSICAL_SQL_CORRECTING:
@@ -176,6 +228,9 @@ public class ChatWorkflowEngine {
                     break;
             }
         }
+        log.info("[PERFORMANCE] PARSE阶段总耗时: {}ms, 问题: {}",
+                System.currentTimeMillis() - workflowStartTime,
+                StringUtils.abbreviate(queryCtx.getRequest().getQueryText(), 50));
     }
 
     private boolean containsDateKeywords(String question, Integer agentId) {
@@ -216,7 +271,14 @@ public class ChatWorkflowEngine {
     private void performMapping(ChatQueryContext queryCtx) {
         if (Objects.isNull(queryCtx.getMapInfo())
                 || MapUtils.isEmpty(queryCtx.getMapInfo().getDataSetElementMatches())) {
-            schemaMappers.forEach(mapper -> mapper.map(queryCtx));
+            schemaMappers.forEach(mapper -> {
+                long mapperStart = System.currentTimeMillis();
+                mapper.map(queryCtx);
+                if ("EmbeddingMapper".equals(mapper.getClass().getSimpleName())) {
+                    log.info("[PERFORMANCE] EmbeddingMapper 耗时: {}ms",
+                            System.currentTimeMillis() - mapperStart);
+                }
+            });
         }
     }
 

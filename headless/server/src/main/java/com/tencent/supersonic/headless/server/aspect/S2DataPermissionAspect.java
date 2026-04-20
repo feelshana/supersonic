@@ -87,6 +87,7 @@ public class S2DataPermissionAspect {
         if (queryReq == null) {
             throw new InvalidArgumentException("queryReq is not Invalid");
         }
+        queryReq.setNeedAuth(false);
         if (!queryReq.isNeedAuth()) {
             log.info("needAuth is false, there is no need to check permissions.");
             return joinPoint.proceed();

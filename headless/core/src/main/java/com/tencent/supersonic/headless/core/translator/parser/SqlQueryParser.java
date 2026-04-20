@@ -67,10 +67,16 @@ public class SqlQueryParser implements QueryParser {
             ontologyMetricsDimensions.add(d.getName());
             ontologyBizNameMetricsDimensions.add(d.getBizName());
         });
-        // check if there are fields not matched with any metric or dimension
+        // 逐字段校验：每个ontology字段只要name或bizName任一出现在queryFields中即视为匹配
+        // 原逻辑要求整个集合统一用name或统一用bizName，当SQL混用name和bizName时（如中文name+英文bizName）会误判INVALID
+        boolean allMatched = Stream.concat(
+                ontologyQuery.getMetrics().stream().map(m -> Pair.of(m.getName(), m.getBizName())),
+                ontologyQuery.getDimensions().stream()
+                        .map(d -> Pair.of(d.getName(), d.getBizName())))
+                .allMatch(pair -> queryFieldsSet.contains(pair.getLeft())
+                        || queryFieldsSet.contains(pair.getRight()));
 
-        if (!(queryFieldsSet.containsAll(ontologyMetricsDimensions)
-                || queryFieldsSet.containsAll(ontologyBizNameMetricsDimensions))) {
+        if (!allMatched) {
             List<String> semanticFields = Lists.newArrayList();
             ontologyQuery.getMetrics().forEach(m -> semanticFields.add(m.getName()));
             ontologyQuery.getDimensions().forEach(d -> semanticFields.add(d.getName()));
@@ -241,6 +247,10 @@ public class SqlQueryParser implements QueryParser {
             });
         });
 
+        // 将SELECT中未匹配到指标的剩余字段合并到fields，解决纯维度查询（如 SELECT period_id，无指标）时
+        // 后续维度匹配步骤因fields为空而全部跳过，导致modelMap为空，最终抛出 data model not found 的问题
+        fields.addAll(allFields);
+
         // first try to find all querying dimensions in the models with querying metrics.
         ontology.getDimensionMap().entrySet().stream()
                 .filter(entry -> ontologyQuery.getMetricMap().containsKey(entry.getKey()))
@@ -309,8 +319,12 @@ public class SqlQueryParser implements QueryParser {
                                     && "=".equals(expression.getOperator())
                                     && (d.getName().equals(expression.getFieldName())
                                             || d.getBizName().equals(expression.getFieldName())))
-                            .findFirst().ifPresent(dimSchemaResp -> dimSchemaResp
-                                    .setCurrentValue(expression.getFieldValue().toString()));
+                            .findFirst().ifPresent(dimSchemaResp -> {
+                                if (expression.getFieldValue() != null) {
+                                    dimSchemaResp
+                                            .setCurrentValue(expression.getFieldValue().toString());
+                                }
+                            });
                 }
             });
         }

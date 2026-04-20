@@ -119,6 +119,8 @@
             <if test="dimension.updatedBy != null and dimension.updatedBy !=''">updated_by =
                 #{dimension.updatedBy,jdbcType=VARCHAR},
             </if>
+            default_values = #{dimension.defaultValues,jdbcType=VARCHAR},
+            dim_value_maps = #{dimension.dimValueMaps,jdbcType=VARCHAR},
             <if test="dimension.updatedAt != null">updated_at = #{dimension.updatedAt,jdbcType=TIMESTAMP}</if>
             where id = #{dimension.id,jdbcType=BIGINT}
         </foreach>

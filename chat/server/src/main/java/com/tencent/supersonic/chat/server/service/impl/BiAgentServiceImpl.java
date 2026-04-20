@@ -965,16 +965,11 @@ public class BiAgentServiceImpl implements BiAgentService {
 
     private Map<String, List<String>> buildDefaultValuesMap(List<BiDimensionCofig> dimensionConfigs,
             Map<String, List<String>> oldDimDefaultValuesMap) {
-        Map<String, List<String>> defaultValuesMap = dimensionConfigs.stream().filter(
+        // 以本次训练传递的 defaultValues 为准，不传则为 null，旧值不补回
+        return new HashMap<>(dimensionConfigs.stream().filter(
                 biDimensionCofig -> !CollectionUtils.isEmpty(biDimensionCofig.getDefaultValues()))
                 .collect(Collectors.toMap(BiDimensionCofig::getName,
-                        BiDimensionCofig::getDefaultValues));
-        if (oldDimDefaultValuesMap != null) {
-            for (Map.Entry<String, List<String>> entry : oldDimDefaultValuesMap.entrySet()) {
-                defaultValuesMap.putIfAbsent(entry.getKey(), entry.getValue());
-            }
-        }
-        return defaultValuesMap;
+                        BiDimensionCofig::getDefaultValues)));
     }
 
     private List<String> extractDimensionNamesWithValues(List<BiDimensionCofig> dimensionConfigs) {

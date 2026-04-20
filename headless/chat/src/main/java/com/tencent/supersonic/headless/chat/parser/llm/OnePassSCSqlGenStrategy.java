@@ -105,14 +105,14 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
     @Data
     static class SemanticSql {
-        @Description("告诉用户有关这个问题的查询思路，结合表的元数据与提示词中的查询规则")
-        private String thought;
+        // @Description("告诉用户有关这个问题的查询思路，结合表的元数据与提示词中的查询规则")
+        // private String thought;
 
         @Description("sql to generate")
         private String sql;
 
-        @Description("如果问题与提供的上下文无关，请礼貌引导用户提问与当前表及数据的相关问题")
-        private String message;
+        // @Description("如果问题与提供的上下文无关，请礼貌引导用户提问与当前表及数据的相关问题")
+        // private String message;
     }
 
     interface SemanticSqlExtractor {
@@ -141,9 +141,13 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         // ================== 原逻辑 ===================
         LLMResp llmResp = new LLMResp();
         llmResp.setQuery(llmReq.getQueryText());
+
         // 1.recall exemplars
+        long recallStart = System.currentTimeMillis();
         log.debug("OnePassSCSqlGenStrategy llmReq:\n{}", llmReq);
         List<List<Text2SQLExemplar>> exemplarsList = promptHelper.getFewShotExemplars(llmReq);
+        log.info("[PERFORMANCE] 召回exemplars耗时: {}ms, 组数: {}",
+                System.currentTimeMillis() - recallStart, exemplarsList.size());
 
         // 2.generate sql generation prompt for each self-consistency inference
         ChatApp chatApp = llmReq.getChatAppConfig().get(APP_KEY);
@@ -169,16 +173,18 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             // log.info("生成提示词{}",prompt.text());
             prompt2Exemplar.put(prompt, exemplars);
         }
-
         // 3.perform multiple self-consistency inferences parallelly
         Map<String, Prompt> output2Prompt = new ConcurrentHashMap<>();
         prompt2Exemplar.keySet().parallelStream().forEach(prompt -> {
+            long singleStart = System.currentTimeMillis();
             SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());
+            long singleCost = System.currentTimeMillis() - singleStart;
             output2Prompt.put(s2Sql.getSql(), prompt);
+            log.info("[PERFORMANCE] LLM Text2SQL耗时: {}ms, SQL长度: {}", singleCost,
+                    s2Sql.getSql() != null ? s2Sql.getSql().length() : 0);
             keyPipelineLog.info("OnePassSCSqlGenStrategy modelReq:\n{} \nmodelResp:\n{}",
                     prompt.text(), s2Sql);
         });
-
         // 4.format response.
         Pair<String, Map<String, Double>> sqlMapPair =
                 ResponseHelper.selfConsistencyVote(Lists.newArrayList(output2Prompt.keySet()));
@@ -256,7 +262,12 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
     }
 
     private boolean isDirectLinkMode(LLMReq llmReq) {
-        return StringUtils.endsWithIgnoreCase(llmReq.getSchema().getDataSetName(), "直连模式");
+        // 直连模式：DataSet 名称以"直连模式"结尾
+        if (StringUtils.endsWithIgnoreCase(llmReq.getSchema().getDataSetName(), "直连模式")) {
+            return true;
+        }
+        // SIMPLE 模式：调用方显式传参 queryType="SIMPLE"，问题已高度结构化，直接带完整 Schema 生成 SQL
+        return "SIMPLE".equalsIgnoreCase(llmReq.getQueryType());
     }
 
     private LLMResp handleDirectLinkMode(LLMReq llmReq) {
@@ -269,7 +280,9 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
             for (List<Text2SQLExemplar> exemplars : exemplarsList) {
                 llmReq.setDynamicExemplars(exemplars);
                 SimpleStrategy simpleStrategy = new SimpleStrategy();
-                Prompt promptText = simpleStrategy.generatePrompt(llmReq, promptHelper);
+                String dimensionValueInfo = buildDimensionValueInfo(llmReq);
+                Prompt promptText =
+                        simpleStrategy.generatePrompt(llmReq, promptHelper, dimensionValueInfo);
                 prompt2Exemplar.put(promptText, exemplars);
             }
         } catch (Exception e) {
@@ -282,10 +295,11 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         SemanticSqlExtractor extractor =
                 AiServices.create(SemanticSqlExtractor.class, languageModel);
 
+        long llmStart = System.currentTimeMillis();
         Map<String, Prompt> output2Prompt = new ConcurrentHashMap<>();
         prompt2Exemplar.keySet().parallelStream().forEach(prompt -> {
             SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());
-            String key = pickFirstNonBlank(s2Sql.getSql(), s2Sql.getMessage(), s2Sql.getThought());
+            String key = pickFirstNonBlank(s2Sql.getSql());
             output2Prompt.put(key, prompt);
             keyPipelineLog.info("OnePassSCSqlGenStrategy modelReq:\n{} \nmodelResp:\n{}",
                     prompt.text(), s2Sql);
@@ -299,7 +313,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                 prompt2Exemplar.get(output2Prompt.get(sqlMapPair.getLeft()));
         llmResp.setSqlRespMap(ResponseHelper.buildSqlRespMap(usedExemplars, sqlMapPair.getRight()));
 
-        log.info("Simplified model SQL generation, SQL: {}", llmResp.getSqlOutput());
+        log.info("[PERFORMANCE] LLM Text2SQL耗时: {}ms, SQL: {}",
+                System.currentTimeMillis() - llmStart, llmResp.getSqlOutput());
         return llmResp;
     }
 

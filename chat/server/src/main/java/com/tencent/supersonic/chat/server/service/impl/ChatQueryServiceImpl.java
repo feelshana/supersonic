@@ -65,6 +65,7 @@ import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -75,6 +76,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.chat.server.parser.NL2SQLParser.APP_KEY_MULTI_TURN;
@@ -99,6 +101,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     private VoiceService voiceService;
     @Autowired
     private SchemaService schemaService;
+    @Autowired
+    @Qualifier("chatExecutor")
+    private ThreadPoolExecutor chatExecutor;
     private final List<ChatQueryParser> chatQueryParsers = ComponentFactory.getChatParsers();
     private final List<ChatQueryExecutor> chatQueryExecutors = ComponentFactory.getChatExecutors();
     private final List<ParseResultProcessor> parseResultProcessors =
@@ -132,7 +137,16 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 break;
             }
         }
-        saveHistoryInfo(parseContext);
+        long _t1 = System.currentTimeMillis();
+
+        // saveHistoryInfo 为纯写操作，异步化不阻塞主流程
+        final ParseContext finalParseContext = parseContext;
+        chatExecutor.execute(() -> {
+            long _s = System.currentTimeMillis();
+            saveHistoryInfo(finalParseContext);
+            log.info("[PERF-parse] saveHistoryInfo(async): {}ms", System.currentTimeMillis() - _s);
+        });
+
         // 不是简易模式的自然语言回答才走后续逻辑
         if (!parseContext.getResponse().getSelectedParses().isEmpty() && !Objects.equals(
                 parseContext.getResponse().getSelectedParses().get(0).getSqlInfo().getResultType(),
@@ -144,8 +158,18 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             }
         }
         if (!parseContext.needFeedback()) {
+            // batchAddParse 必须同步：execute() 阶段需要从 DB 读取刚写入的 parseInfo
             chatManageService.batchAddParse(chatParseReq, parseContext.getResponse());
-            chatManageService.updateParseCostTime(parseContext.getResponse());
+            long _t3 = System.currentTimeMillis();
+            log.info("[PERF-parse] batchAddParse(sync): {}ms", _t3 - _t1);
+            // updateParseCostTime 为纯统计写入，异步化
+            final ChatParseResp finalResp = parseContext.getResponse();
+            chatExecutor.execute(() -> {
+                long _s = System.currentTimeMillis();
+                chatManageService.updateParseCostTime(finalResp);
+                log.info("[PERF-parse] updateParseCostTime(async): {}ms",
+                        System.currentTimeMillis() - _s);
+            });
         }
 
         return parseContext.getResponse();
@@ -164,8 +188,12 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public QueryResult execute(ChatExecuteReq chatExecuteReq) {
+        long _e0 = System.currentTimeMillis();
         QueryResult queryResult = new QueryResult();
         ExecuteContext executeContext = buildExecuteContext(chatExecuteReq);
+        log.info("[PERF-execute] buildExecuteContext(含getParseInfo DB查询): {}ms",
+                System.currentTimeMillis() - _e0);
+
         for (ChatQueryExecutor chatQueryExecutor : chatQueryExecutors) {
             if (chatQueryExecutor.accept(executeContext)) {
                 queryResult = chatQueryExecutor.execute(executeContext);
@@ -183,7 +211,15 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                     processor.process(executeContext);
                 }
             }
-            saveQueryResult(chatExecuteReq, queryResult);
+            // saveQueryResult 为纯写操作，异步化不阻塞结果返回
+            final ChatExecuteReq finalReq = chatExecuteReq;
+            final QueryResult finalResult = queryResult;
+            chatExecutor.execute(() -> {
+                long _s = System.currentTimeMillis();
+                saveQueryResult(finalReq, finalResult);
+                log.info("[PERF-execute] saveQueryResult(async): {}ms",
+                        System.currentTimeMillis() - _s);
+            });
         }
 
         return queryResult;
@@ -334,22 +370,84 @@ public class ChatQueryServiceImpl implements ChatQueryService {
 
     @Override
     public QueryResult parseAndExecute(ChatParseReq chatParseReq) {
-        ChatParseResp parseResp = parse(chatParseReq);
-        if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
-            log.debug("chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
+        long totalStart = System.currentTimeMillis();
+        long parseTime = 0;
+        long executeTime = 0;
+        try {
+            String queryType = chatParseReq.getQueryType();
+            if ("simple".equals(queryType)) {
+                log.info("queryType 为: {} , 进入简易模式。", queryType);
+            } else if ("super_simple".equals(queryType)) {
+                log.info("queryType 为: {} , 进入超级简易模式。", queryType);
+            } else {
+                log.info("queryType 为: {} , 进入正常模式。", queryType);
+            }
+            // SUPER_SIMPLE 模式：完全跳过 parse 流程，直接 LLM 生成物理 SQL 并执行
+            if ("super_simple".equalsIgnoreCase(chatParseReq.getQueryType())) {
+                log.info("[SUPER_SIMPLE] 进入超级简易模式，直接LLM生成物理SQL，问题: {}",
+                        chatParseReq.getQueryText());
+                SuperSimpleQueryHandler handler =
+                        new SuperSimpleQueryHandler(agentService, semanticLayerService);
+                QueryResult result = handler.execute(chatParseReq);
+                log.info("[PERFORMANCE-TOTAL] SUPER_SIMPLE 总耗时: {}ms, 问题: {}",
+                        System.currentTimeMillis() - totalStart,
+                        StringUtils.abbreviate(chatParseReq.getQueryText(), 50));
+                return result;
+            }
+            long parseStart = System.currentTimeMillis();
+            ChatParseResp parseResp = parse(chatParseReq);
+            parseTime = System.currentTimeMillis() - parseStart;
+
+            if (CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
+                log.warn(
+                        "chatId:{}, agentId:{}, queryText:{}, parseResp.getSelectedParses() is empty",
+                        chatParseReq.getChatId(), chatParseReq.getAgentId(),
+                        chatParseReq.getQueryText());
+                QueryResult emptyResult = new QueryResult();
+                emptyResult.setQueryState(QueryState.EMPTY);
+                if (StringUtils.isBlank(parseResp.getErrorMsg())) {
+                    emptyResult.setErrorMsg("未能解析出有效查询，请尝试换一种问法");
+                } else {
+                    emptyResult.setErrorMsg(parseResp.getErrorMsg());
+                }
+                return emptyResult;
+            }
+            ChatExecuteReq executeReq = new ChatExecuteReq();
+            executeReq.setQueryId(parseResp.getQueryId());
+            executeReq.setParseId(parseResp.getSelectedParses().get(0).getId());
+            executeReq.setQueryText(chatParseReq.getQueryText());
+            executeReq.setChatId(chatParseReq.getChatId());
+            executeReq.setUser(User.getDefaultUser());
+            executeReq.setAgentId(chatParseReq.getAgentId());
+            executeReq.setSaveAnswer(true);
+
+            long executeStart = System.currentTimeMillis();
+            QueryResult queryResult = execute(executeReq);
+            executeTime = System.currentTimeMillis() - executeStart;
+
+            if (queryResult == null) {
+                QueryResult failResult = new QueryResult();
+                failResult.setQueryState(QueryState.EMPTY);
+                failResult.setErrorMsg("执行查询未返回结果");
+                return failResult;
+            }
+
+            long totalTime = System.currentTimeMillis() - totalStart;
+            log.info(
+                    "[PERFORMANCE-TOTAL] /parseAndExecute 总耗时: {}ms (PARSE: {}ms, EXECUTE: {}ms), 问题: {}",
+                    totalTime, parseTime, executeTime,
+                    StringUtils.abbreviate(chatParseReq.getQueryText(), 50));
+
+            return queryResult;
+        } catch (Exception e) {
+            log.error("parseAndExecute failed, chatId:{}, agentId:{}, queryText:{}",
                     chatParseReq.getChatId(), chatParseReq.getAgentId(),
-                    chatParseReq.getQueryText());
-            return null;
+                    chatParseReq.getQueryText(), e);
+            QueryResult errorResult = new QueryResult();
+            errorResult.setQueryState(QueryState.INVALID);
+            errorResult.setErrorMsg("查询处理异常：" + e.getMessage());
+            return errorResult;
         }
-        ChatExecuteReq executeReq = new ChatExecuteReq();
-        executeReq.setQueryId(parseResp.getQueryId());
-        executeReq.setParseId(parseResp.getSelectedParses().get(0).getId());
-        executeReq.setQueryText(chatParseReq.getQueryText());
-        executeReq.setChatId(chatParseReq.getChatId());
-        executeReq.setUser(User.getDefaultUser());
-        executeReq.setAgentId(chatParseReq.getAgentId());
-        executeReq.setSaveAnswer(true);
-        return execute(executeReq);
     }
 
     private ParseContext buildParseContext(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {

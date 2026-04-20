@@ -73,6 +73,8 @@ public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor 
         if (user != null) {
             return true;
         }
+        log.info("authentication failed, uri:{}, remoteAddr:{}, remoteHost:{}, userAgent:{}", uri,
+                request.getRemoteAddr(), request.getRemoteHost(), request.getHeader("User-Agent"));
         throw new AccessException("authentication failed, please login");
     }
 

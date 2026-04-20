@@ -23,4 +23,8 @@ public class ChatParseReq {
     private boolean disableLLM = false;
     private Long queryId;
     private SemanticParseInfo selectedParse;
+    /**
+     * 查询模式，"SIMPLE" 表示简易模式：跳过 MAPPING 向量召回环节， 直接将完整 Schema 传给 LLM 生成 SQL，适用于问题已高度结构化的外部调用场景。
+     */
+    private String queryType;
 }
