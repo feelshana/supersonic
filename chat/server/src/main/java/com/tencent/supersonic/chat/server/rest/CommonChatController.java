@@ -1,6 +1,8 @@
 
 package com.tencent.supersonic.chat.server.rest;
 
+import javax.annotation.Resource;
+
 import com.alibaba.fastjson.JSON;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
@@ -18,7 +20,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.Resource;
 import java.util.Map;
 
 /**

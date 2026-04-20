@@ -8,7 +8,7 @@ import lombok.Data;
 public class CommonChatReq {
 
     /**
-     * type  1: 报表申请 2: 取数申请
+     * type 1: 报表申请 2: 取数申请
      */
     @NotNull(message = "type 不能为空")
     private Integer type;
