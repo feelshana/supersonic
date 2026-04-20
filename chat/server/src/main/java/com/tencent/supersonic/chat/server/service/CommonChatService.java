@@ -13,13 +13,7 @@ import reactor.core.publisher.Flux;
  */
 public interface CommonChatService {
 
-    /**
-     * 流式对话（SSE 推送）
-     *
-     * @param input 对话请求
-     * @return SseEmitter
-     */
-    Flux<String> streamChat(CommonChatReq input);
+
 
     SseEmitter chat(@Valid CommonChatReq input);
 }
