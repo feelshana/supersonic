@@ -17,6 +17,7 @@ import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.common.util.MiguApiUrlUtils;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.provider.ModelProvider;
 import dev.langchain4j.service.AiServices;
@@ -134,6 +135,28 @@ public class CommonChatServiceImpl implements CommonChatService {
         }).doOnError(error -> {
             log.error("[SSE-ERROR] Error occurred: {}", error.getMessage(), error);
         });
+    }
+
+
+    @Override
+    public String normalChat(String whereSql) {
+        // 1. 构建提示词
+        String typeName =  TYPE_DATA;
+        String prompt = String.format(REPORT_USER_PROMPT, typeName, whereSql, "无");
+
+        log.info("生成申请理由的prompt: {}", prompt);
+        ChatLanguageModel chatLanguageModel;
+        try {
+            Agent agent = agentService.getAgent(agentId);
+            Map<String, ChatApp> chatAppConfig = agent.getChatAppConfig();
+            ChatApp chatApp = chatAppConfig.get(APP_KEY);
+            ChatModelConfig chatModelConfig = chatApp.getChatModelConfig();
+            chatLanguageModel = ModelProvider.getChatModel(chatModelConfig);
+        } catch (Exception e) {
+            log.error("未正确获助手", e);
+            throw new RuntimeException("未正确获助手，无法使用自动生成申请理由");
+        }
+        return chatLanguageModel.generate(prompt);
     }
 
     public interface GenerateApplyReasonStreamExtractor {
