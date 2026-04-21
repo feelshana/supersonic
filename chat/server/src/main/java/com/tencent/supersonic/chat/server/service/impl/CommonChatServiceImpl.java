@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class CommonChatServiceImpl implements CommonChatService {
 
-    @Value("${s2.bi.agent:1}")
+    @Value("${s2.bi.agent-id:1}")
     private Integer agentId;
 
 
