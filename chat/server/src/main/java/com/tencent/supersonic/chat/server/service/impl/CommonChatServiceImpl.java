@@ -79,6 +79,8 @@ public class CommonChatServiceImpl implements CommonChatService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final CrabConfig crabConfig;
+    private final ConcurrentHashMap<String, Disposable> activeSubscriptions = new ConcurrentHashMap<>();
+    
     @Autowired
     public CommonChatServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
                                CrabConfig crabConfig, ChatQueryServiceImpl chatQueryService,
@@ -131,9 +133,12 @@ public class CommonChatServiceImpl implements CommonChatService {
 
     @Override
     public SseEmitter chat(CommonChatReq input) {
-
+        // 生成唯一请求ID
+        String requestId = UUID.randomUUID().toString();
+        
         // 创建SSE发射器（180秒超时）
         SseEmitter emitter = new SseEmitter(180_000L);
+        
         // 1. 构建提示词
         String typeName = input.getType() == 1 ? TYPE_REPORT : TYPE_DATA;
         String whereClause = input.getWhere() != null ? input.getWhere() : "无";
@@ -145,31 +150,55 @@ public class CommonChatServiceImpl implements CommonChatService {
         String requestBody = buildRequestBody(prompt);
         StringBuilder contentAccumulator = new StringBuilder();
 
+        // 设置生命周期回调，防止内存泄漏
+        emitter.onCompletion(() -> {
+            cleanupResources(requestId);
+            log.info("SSE completed normally for request: {}", requestId);
+        });
+
+        emitter.onTimeout(() -> {
+            cleanupResources(requestId);
+            log.warn("SSE terminated by timeout for request: {}, accumulated content: {}", 
+                    requestId, contentAccumulator.toString());
+        });
+
+        emitter.onError(e -> {
+            cleanupResources(requestId);
+            log.error("SSE error occurred for request: {}", requestId, e);
+        });
+
         // 调用DeepSeek API
-        webClient.post().uri(urlPath)
+        Disposable disposable = webClient.post().uri(urlPath)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .bodyValue(requestBody).retrieve()
                 .onStatus(HttpStatusCode::isError,
                         response -> Mono.error(new RuntimeException("API request failed")))
-                .bodyToFlux(JsonNode.class).doOnSubscribe(sub -> log.info("Subscription started"))
+                .bodyToFlux(JsonNode.class).doOnSubscribe(sub -> log.info("Subscription started for request: {}", requestId))
                 .onBackpressureBuffer(crabConfig.getOnBackpressureBuffer())
                 .delayElements(Duration.ofMillis(crabConfig.getDelayElements()))
                 .flatMap(response -> processStreamResponse(response, contentAccumulator))
-                .doOnCancel(() -> log.warn("Downstream cancelled"))
+                .doOnCancel(() -> log.warn("Downstream cancelled for request: {}", requestId))
                 .subscribe(chunk -> sendSseChunk(emitter, chunk),
-                        error -> handleStreamError(emitter, error),
-                        () -> completeStream(emitter, contentAccumulator));
+                        error -> handleStreamError(emitter, error, requestId),
+                        () -> completeStream(emitter, contentAccumulator, requestId));
+        
+        // 保存subscription用于后续清理
+        activeSubscriptions.put(requestId, disposable);
+        
         return emitter;
     }
 
-    private void completeStream(SseEmitter emitter, StringBuilder contentAccumulator) {
+    private void completeStream(SseEmitter emitter, StringBuilder contentAccumulator, String requestId) {
         emitter.complete();
-        log.info("Stream completed successfully, full content: {}", contentAccumulator.toString());
+        cleanupResources(requestId);
+        log.info("Stream completed successfully for request: {}, full content: {}", 
+                requestId, contentAccumulator.toString());
     }
 
-    private void handleStreamError(SseEmitter emitter, Throwable error) {
-        log.error("Stream processing error", error);
+    private void handleStreamError(SseEmitter emitter, Throwable error, String requestId) {
+        log.error("Stream processing error for request: {}", requestId, error);
         emitter.completeWithError(error);
+        cleanupResources(requestId);
     }
     private void sendSseChunk(SseEmitter emitter, String chunk) {
         try {
@@ -177,6 +206,25 @@ public class CommonChatServiceImpl implements CommonChatService {
         } catch (IOException e) {
             log.error("Failed to send SSE chunk", e);
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 清理资源，防止内存泄漏
+     */
+    private void cleanupResources(String requestId) {
+        // 清理subscription
+        Disposable disposable = activeSubscriptions.remove(requestId);
+        disposeSafely(disposable);
+    }
+
+    /**
+     * 安全释放Disposable资源
+     */
+    private void disposeSafely(Disposable disposable) {
+        if (disposable != null && !disposable.isDisposed()) {
+            disposable.dispose();
+            log.debug("Subscription disposed for request");
         }
     }
     private Flux<String> processStreamResponse(JsonNode response, StringBuilder accumulator) {
