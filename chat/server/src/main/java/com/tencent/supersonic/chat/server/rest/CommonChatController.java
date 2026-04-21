@@ -40,13 +40,13 @@ public class CommonChatController {
     public Flux<ServerSentEvent<String>> streamChat(@RequestBody @Valid CommonChatReq input) {
 
         return commonChatService.streamChat(input)
-            .map(chunk -> {
-                Map<String, String> wrapper = Map.of("data", chunk);
-                String jsonData = JSON.toJSONString(wrapper);
-              return   ServerSentEvent.<String>builder()
-                        .data(jsonData)
-                        .build();
-            })
+                .map(chunk -> {
+                    Map<String, String> wrapper = Map.of("data", chunk);
+                    String jsonData = JSON.toJSONString(wrapper);
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonData)
+                            .build();
+                })
                 .concatWith(Mono.just(
                         // 发送结束事件
                         ServerSentEvent.<String>builder()
@@ -54,7 +54,17 @@ public class CommonChatController {
                                 .data("")
                                 .build()
                 ))
-            .doOnComplete(() -> log.info("SSE stream completed"))
-            .doOnError(error -> log.error("SSE stream error", error));
+                .doOnComplete(() -> log.info("SSE stream completed"))
+                .doOnError(error -> log.error("SSE stream error", error));
+    }
+
+
+    /**
+     * 流式对话（SSE）
+     */
+    @PostMapping(value = "/normalChat")
+    public String normalChat(String whereSql) {
+        return commonChatService.normalChat(whereSql);
+
     }
 }
