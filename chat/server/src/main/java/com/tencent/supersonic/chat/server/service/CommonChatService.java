@@ -17,5 +17,5 @@ public interface CommonChatService {
 
     Flux<String> streamChat(CommonChatReq input);
 
-    String normalChat( String whereSql);
+    String normalChat(String whereSql);
 }

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class   CommonChatReq {
+public class CommonChatReq {
 
     /**
      * type 1: 报表申请 2: 取数申请

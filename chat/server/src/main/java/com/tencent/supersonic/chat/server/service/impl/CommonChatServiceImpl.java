@@ -141,7 +141,7 @@ public class CommonChatServiceImpl implements CommonChatService {
     @Override
     public String normalChat(String whereSql) {
         // 1. 构建提示词
-        String typeName =  TYPE_DATA;
+        String typeName = TYPE_DATA;
         String prompt = String.format(REPORT_USER_PROMPT, typeName, whereSql, "无");
 
         log.info("生成申请理由的prompt: {}", prompt);
