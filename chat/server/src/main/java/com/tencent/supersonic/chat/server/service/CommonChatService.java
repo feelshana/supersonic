@@ -14,6 +14,6 @@ import reactor.core.publisher.Flux;
 public interface CommonChatService {
 
 
+    Flux<String> streamChat(CommonChatReq input);
 
-    SseEmitter chat(@Valid CommonChatReq input);
 }

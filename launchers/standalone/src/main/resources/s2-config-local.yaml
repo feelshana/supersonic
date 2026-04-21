@@ -82,6 +82,7 @@ s2:
   bi:
     model-id: 5
     url: http://10.193.131.27:7888
+    agent: 1 #BI-申请专用助手用于生成申请理由
   dictionary:
     enabled: false
 crab:
