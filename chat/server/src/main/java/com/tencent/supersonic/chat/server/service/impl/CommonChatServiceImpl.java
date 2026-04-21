@@ -1,5 +1,7 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
+import javax.annotation.Resource;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +34,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.Resource;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -60,7 +61,7 @@ public class CommonChatServiceImpl implements CommonChatService {
      * 系统提示词模板：根据 type 和 description 生成对应内容
      */
     private static final String REPORT_USER_PROMPT = """
-            
+
             当前任务类型：%s
             任务描述：%s
             where条件：%s
@@ -76,21 +77,20 @@ public class CommonChatServiceImpl implements CommonChatService {
 
 
 
-
-
-//    private final WebClient webClient;
-//    private final ObjectMapper objectMapper;
-//    private final CrabConfig crabConfig;
-//    private final ConcurrentHashMap<String, Disposable> activeSubscriptions = new ConcurrentHashMap<>();
-//
-//    @Autowired
-//    public CommonChatServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
-//                               CrabConfig crabConfig, ChatQueryServiceImpl chatQueryService,
-//                               ChatManageService chatManageService) {
-//        this.objectMapper = objectMapper;
-//        this.crabConfig = crabConfig;
-//        this.webClient = webClientBuilder.baseUrl(crabConfig.getHost()).build();
-//    }
+    // private final WebClient webClient;
+    // private final ObjectMapper objectMapper;
+    // private final CrabConfig crabConfig;
+    // private final ConcurrentHashMap<String, Disposable> activeSubscriptions = new
+    // ConcurrentHashMap<>();
+    //
+    // @Autowired
+    // public CommonChatServiceImpl(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+    // CrabConfig crabConfig, ChatQueryServiceImpl chatQueryService,
+    // ChatManageService chatManageService) {
+    // this.objectMapper = objectMapper;
+    // this.crabConfig = crabConfig;
+    // this.webClient = webClientBuilder.baseUrl(crabConfig.getHost()).build();
+    // }
 
 
 
@@ -99,7 +99,8 @@ public class CommonChatServiceImpl implements CommonChatService {
         // 1. 构建提示词
         String typeName = input.getType() == 1 ? TYPE_REPORT : TYPE_DATA;
         String whereClause = input.getWhere() != null ? input.getWhere() : "无";
-        String prompt = String.format(REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause);
+        String prompt =
+                String.format(REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause);
 
         log.info("生成申请理由的prompt: {}", prompt);
         // 2. 获取流式模型
@@ -108,7 +109,7 @@ public class CommonChatServiceImpl implements CommonChatService {
 
 
         try {
-//            "2273"
+            // "2273"
             Agent agent = agentService.getAgent(agentId);
             Map<String, ChatApp> chatAppConfig = agent.getChatAppConfig();
             ChatApp chatApp = chatAppConfig.get(APP_KEY);
@@ -121,10 +122,11 @@ public class CommonChatServiceImpl implements CommonChatService {
 
         // 3. 创建流式解析器
 
-        GenerateApplyReasonStreamExtractor generateApplyReasonStreamExtractor = AiServices.create(GenerateApplyReasonStreamExtractor.class, streamChatModel);
+        GenerateApplyReasonStreamExtractor generateApplyReasonStreamExtractor =
+                AiServices.create(GenerateApplyReasonStreamExtractor.class, streamChatModel);
 
         Flux<String> flux = generateApplyReasonStreamExtractor.generateApplyReasonStream(prompt);
-        
+
         // 记录流式响应日志
         StringBuilder fullResponse = new StringBuilder();
         return flux.doOnNext(fullResponse::append).doOnComplete(() -> {

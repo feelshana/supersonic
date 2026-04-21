@@ -40,22 +40,14 @@ public class CommonChatController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> streamChat(@RequestBody @Valid CommonChatReq input) {
 
-        return commonChatService.streamChat(input)
-            .map(chunk -> {
-                Map<String, String> wrapper = Map.of("data", chunk);
-                String jsonData = JSON.toJSONString(wrapper);
-              return   ServerSentEvent.<String>builder()
-                        .data(jsonData)
-                        .build();
-            })
-                .concatWith(Mono.just(
-                        // 发送结束事件
-                        ServerSentEvent.<String>builder()
-                                .event("complete")
-                                .data("")
-                                .build()
-                ))
-            .doOnComplete(() -> log.info("SSE stream completed"))
-            .doOnError(error -> log.error("SSE stream error", error));
+        return commonChatService.streamChat(input).map(chunk -> {
+            Map<String, String> wrapper = Map.of("data", chunk);
+            String jsonData = JSON.toJSONString(wrapper);
+            return ServerSentEvent.<String>builder().data(jsonData).build();
+        }).concatWith(Mono.just(
+                // 发送结束事件
+                ServerSentEvent.<String>builder().event("complete").data("").build()))
+                .doOnComplete(() -> log.info("SSE stream completed"))
+                .doOnError(error -> log.error("SSE stream error", error));
     }
 }
