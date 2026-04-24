@@ -73,4 +73,9 @@ public class CommonChatController {
     public List<Retrieval> retrieveQuery(String query) {
         return commonChatService.retrieveQuery(query);
     }
+
+    @GetMapping(value = "/find")
+    public List<Retrieval> findQuery(String query,Long dimId) {
+        return commonChatService.findQuery(query,dimId);
+    }
 }

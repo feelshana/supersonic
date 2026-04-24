@@ -20,7 +20,9 @@ public interface CommonChatService {
 
     Flux<String> streamChat(CommonChatReq input);
 
-    String normalChat( String whereSql);
+    String normalChat(String whereSql);
 
     List<Retrieval> retrieveQuery(String query);
+
+    List<Retrieval> findQuery(String query, Long dimId);
 }
