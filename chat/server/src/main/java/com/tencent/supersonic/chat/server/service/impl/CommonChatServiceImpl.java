@@ -1,45 +1,33 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
-import com.tencent.supersonic.chat.server.config.CrabConfig;
 import com.tencent.supersonic.chat.server.service.AgentService;
-import com.tencent.supersonic.chat.server.service.ChatManageService;
 import com.tencent.supersonic.chat.server.service.CommonChatService;
-import com.tencent.supersonic.common.config.ChatModel;
+import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
-import com.tencent.supersonic.common.util.MiguApiUrlUtils;
+import com.tencent.supersonic.common.pojo.enums.TypeEnums;
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.provider.ModelProvider;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.store.embedding.*;
+import dev.langchain4j.store.embedding.filter.Filter;
+import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.commons.collections.MapUtils;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import javax.annotation.Resource;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 通用对话服务实现
@@ -168,6 +156,66 @@ public class CommonChatServiceImpl implements CommonChatService {
         Flux<String> generateApplyReasonStream(String userMessage);
     }
 
+    @Resource
+    private EmbeddingConfig embeddingConfig;
 
+    @Override
+    public List<Retrieval> retrieveQuery(String query) {
+        String collectionName = embeddingConfig.getMetaCollectionName();
+        EmbeddingStore<TextSegment> embeddingStore = EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
+        EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
+        Map<String, Object> filterCondition = new LinkedHashMap<>();
+        Embedding embeddedText = embeddingModel.embed(query).content();
+        filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
+        Filter filter = createCombinedFilter(filterCondition);
+        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder().queryEmbedding(embeddedText).filter(filter).build();
+        EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
+        return result.matches().stream().map(this::convertToRetrieval)
+                .sorted(Comparator.comparingDouble(Retrieval::getSimilarity).reversed())
+                .collect(Collectors.toList());
+    }
 
+    private  Filter createCombinedFilter(Map<String, Object> criteriaMap) {
+        if (MapUtils.isEmpty(criteriaMap)) {
+            return null;
+        }
+        Filter combinedFilter = null;
+        for (Map.Entry<String, Object> entry : criteriaMap.entrySet()) {
+            String fieldName = entry.getKey();
+            Object fieldValue = entry.getValue();
+            Filter fieldFilter = null;
+            if (fieldValue instanceof List) {
+                // Create an OR filter for each value in the list
+                for (String value : (List<String>) fieldValue) {
+                    IsEqualTo equalToFilter = new IsEqualTo(fieldName, value);
+                    fieldFilter = (fieldFilter == null) ? equalToFilter
+                            : Filter.or(fieldFilter, equalToFilter);
+                }
+            } else if (fieldValue instanceof String || fieldValue instanceof Number
+                    || fieldValue instanceof Enum) {
+                // Create a simple equality filter
+                fieldFilter = new IsEqualTo(fieldName, fieldValue);
+            }
+            // Combine the current field filter with the overall filter using AND logic
+            if (fieldFilter != null) {
+                combinedFilter = (combinedFilter == null) ? fieldFilter
+                        : Filter.and(combinedFilter, fieldFilter);
+            }
+        }
+        return combinedFilter;
+    }
+    private Retrieval convertToRetrieval(EmbeddingMatch<TextSegment> embeddingMatch) {
+        Retrieval retrieval = new Retrieval();
+        TextSegment embedded = embeddingMatch.embedded();
+        retrieval.setSimilarity(embeddingMatch.score());
+        retrieval.setId(TextSegmentConvert.getQueryId(embedded));
+        retrieval.setQuery(embedded.text());
+
+        Map<String, Object> metadata = new HashMap<>();
+        if (Objects.nonNull(embedded) && MapUtils.isNotEmpty(embedded.metadata().toMap())) {
+            metadata.putAll(embedded.metadata().toMap());
+        }
+        retrieval.setMetadata(metadata);
+        return retrieval;
+    }
 }

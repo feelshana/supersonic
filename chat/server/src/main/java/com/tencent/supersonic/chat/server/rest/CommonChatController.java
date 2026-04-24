@@ -7,6 +7,7 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.service.CommonChatService;
 import com.tencent.supersonic.common.pojo.User;
+import dev.langchain4j.store.embedding.Retrieval;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,5 +68,9 @@ public class CommonChatController {
     public String normalChat(String whereSql) {
         return commonChatService.normalChat(whereSql);
 
+    }
+    @GetMapping(value = "/recall")
+    public List<Retrieval> retrieveQuery(String query) {
+        return commonChatService.retrieveQuery(query);
     }
 }
