@@ -1,5 +1,6 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
+import com.amazonaws.services.dynamodbv2.xspec.S;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.service.AgentService;
@@ -9,7 +10,6 @@ import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.common.pojo.enums.DictWordType;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
-import com.tencent.supersonic.common.util.StringUtil;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -25,7 +25,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import javax.annotation.Resource;
@@ -158,42 +157,50 @@ public class CommonChatServiceImpl implements CommonChatService {
     private EmbeddingConfig embeddingConfig;
 
     @Override
-    public List<Retrieval> retrieveQuery(String query,String modelId) {
+    public List<Map<String, Object>> retrieveQuery(String query, String modelId, Integer topK) {
         String collectionName = embeddingConfig.getMetaCollectionName();
         EmbeddingStore<TextSegment> embeddingStore = EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
         EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
         Map<String, Object> filterCondition = new LinkedHashMap<>();
         Embedding embeddedText = embeddingModel.embed(query).content();
-        filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
+        filterCondition.put("type",TypeEnums.VALUE.name());
         filterCondition.put("modelId", modelId + DictWordType.NATURE_SPILT);
         Filter filter = createCombinedFilter(filterCondition);
-        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder().queryEmbedding(embeddedText).filter(filter).build();
+        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
+                .queryEmbedding(embeddedText)
+                .maxResults(topK)
+                .filter(filter)
+                .build();
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
-        return result.matches().stream().map(this::convertToRetrieval)
-                .sorted(Comparator.comparingDouble(Retrieval::getSimilarity).reversed())
+        return result.matches().stream()
+                .sorted(Comparator.comparingDouble((EmbeddingMatch<TextSegment> m) -> m.score()).reversed())
+                .map(x->convertToRetrieval(x,true))
+                .limit(topK)
                 .collect(Collectors.toList());
     }
 
 
     @Override
-    public List<Retrieval> findQuery(String query,String modelId, String dimId) {
+    public List<Map<String, Object>> findQuery(String query,String modelId, String dimId) {
         String collectionName = embeddingConfig.getMetaCollectionName();
         EmbeddingStore<TextSegment> embeddingStore = EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
         EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
         Map<String, Object> filterCondition = new LinkedHashMap<>();
         Embedding embeddedText = embeddingModel.embed(query).content();
-        filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
-        filterCondition.put("dimValue", query);
+        filterCondition.put("type", TypeEnums.VALUE.name());
         filterCondition.put("modelId", modelId + DictWordType.NATURE_SPILT);
         if (Objects.nonNull(dimId)) {
             filterCondition.put("dimId", Long.parseLong(dimId));
         }
 
         Filter filter = createCombinedFilter(filterCondition);
-        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder().queryEmbedding(embeddedText).filter(filter).build();
+        EmbeddingSearchRequest request = EmbeddingSearchRequest.builder().queryEmbedding(embeddedText).filter(filter)
+                .maxResults(1)
+                .build();
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
-        return result.matches().stream().map(this::convertToRetrieval)
-                .sorted(Comparator.comparingDouble(Retrieval::getSimilarity).reversed())
+        return result.matches().stream()
+                .filter(x->Objects.equals(x.embedded().text(),query))
+                .map(x->convertToRetrieval(x,false))
                 .collect(Collectors.toList());
     }
 
@@ -227,18 +234,17 @@ public class CommonChatServiceImpl implements CommonChatService {
         return combinedFilter;
     }
 
-    private Retrieval convertToRetrieval(EmbeddingMatch<TextSegment> embeddingMatch) {
-        Retrieval retrieval = new Retrieval();
+    private Map<String, Object> convertToRetrieval(EmbeddingMatch<TextSegment> embeddingMatch,boolean flag) {
+        Map<String, Object> retrieval = new LinkedHashMap<>();
         TextSegment embedded = embeddingMatch.embedded();
-        retrieval.setSimilarity(embeddingMatch.score());
-        retrieval.setId(TextSegmentConvert.getQueryId(embedded));
-        retrieval.setQuery(embedded.text());
-
-        Map<String, Object> metadata = new HashMap<>();
-        if (Objects.nonNull(embedded) && MapUtils.isNotEmpty(embedded.metadata().toMap())) {
-            metadata.putAll(embedded.metadata().toMap());
+        if (MapUtils.isNotEmpty(embedded.metadata().toMap())) {
+            retrieval.put("value",embedded.metadata().getString("newName"));
+            retrieval.put("recallText",embedded.metadata().getString("dimValue"));
         }
-        retrieval.setMetadata(metadata);
+        if (flag){
+            retrieval.put("similarity",embeddingMatch.score());
+        }
+
         return retrieval;
     }
 }
