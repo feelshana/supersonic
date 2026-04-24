@@ -70,12 +70,12 @@ public class CommonChatController {
 
     }
     @GetMapping(value = "/recall")
-    public List<Retrieval> retrieveQuery(String query) {
-        return commonChatService.retrieveQuery(query);
+    public List<Retrieval> retrieveQuery(String query,String modelId) {
+        return commonChatService.retrieveQuery(query,modelId);
     }
 
     @GetMapping(value = "/find")
-    public List<Retrieval> findQuery(String query,Long dimId) {
-        return commonChatService.findQuery(query,dimId);
+    public List<Retrieval> findQuery(String query,String modelId,String dimId) {
+        return commonChatService.findQuery(query,modelId,dimId);
     }
 }

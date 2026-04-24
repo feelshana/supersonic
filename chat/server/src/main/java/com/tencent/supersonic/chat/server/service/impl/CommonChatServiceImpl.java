@@ -7,6 +7,7 @@ import com.tencent.supersonic.chat.server.service.CommonChatService;
 import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.common.pojo.enums.DictWordType;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.StringUtil;
 import dev.langchain4j.data.embedding.Embedding;
@@ -157,13 +158,14 @@ public class CommonChatServiceImpl implements CommonChatService {
     private EmbeddingConfig embeddingConfig;
 
     @Override
-    public List<Retrieval> retrieveQuery(String query) {
+    public List<Retrieval> retrieveQuery(String query,String modelId) {
         String collectionName = embeddingConfig.getMetaCollectionName();
         EmbeddingStore<TextSegment> embeddingStore = EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
         EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
         Map<String, Object> filterCondition = new LinkedHashMap<>();
         Embedding embeddedText = embeddingModel.embed(query).content();
         filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
+        filterCondition.put("modelId", modelId + DictWordType.NATURE_SPILT);
         Filter filter = createCombinedFilter(filterCondition);
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder().queryEmbedding(embeddedText).filter(filter).build();
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
@@ -174,7 +176,7 @@ public class CommonChatServiceImpl implements CommonChatService {
 
 
     @Override
-    public List<Retrieval> findQuery(String query, Long dimId) {
+    public List<Retrieval> findQuery(String query,String modelId, String dimId) {
         String collectionName = embeddingConfig.getMetaCollectionName();
         EmbeddingStore<TextSegment> embeddingStore = EmbeddingStoreFactoryProvider.getFactory().create(collectionName);
         EmbeddingModel embeddingModel = ModelProvider.getEmbeddingModel();
@@ -182,8 +184,9 @@ public class CommonChatServiceImpl implements CommonChatService {
         Embedding embeddedText = embeddingModel.embed(query).content();
         filterCondition.put("type", Arrays.asList(TypeEnums.VALUE.name(), TypeEnums.DIMENSION_VALUE_ALIAS.name()));
         filterCondition.put("dimValue", query);
+        filterCondition.put("modelId", modelId + DictWordType.NATURE_SPILT);
         if (Objects.nonNull(dimId)) {
-            filterCondition.put("dimId", dimId);
+            filterCondition.put("dimId", Long.parseLong(dimId));
         }
 
         Filter filter = createCombinedFilter(filterCondition);

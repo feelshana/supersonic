@@ -22,7 +22,7 @@ public interface CommonChatService {
 
     String normalChat(String whereSql);
 
-    List<Retrieval> retrieveQuery(String query);
+    List<Retrieval> retrieveQuery(String query,String modelId);
 
-    List<Retrieval> findQuery(String query, Long dimId);
+    List<Retrieval> findQuery(String query, String modelId,String dimId);
 }
