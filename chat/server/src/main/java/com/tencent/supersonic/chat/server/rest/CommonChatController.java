@@ -1,14 +1,13 @@
 
 package com.tencent.supersonic.chat.server.rest;
 
-import javax.annotation.Resource;
-
 import com.alibaba.fastjson.JSON;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.service.CommonChatService;
 import com.tencent.supersonic.common.pojo.User;
+import dev.langchain4j.store.embedding.Retrieval;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -21,6 +20,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.Resource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,13 +41,21 @@ public class CommonChatController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> streamChat(@RequestBody @Valid CommonChatReq input) {
 
-        return commonChatService.streamChat(input).map(chunk -> {
-            Map<String, String> wrapper = Map.of("data", chunk);
-            String jsonData = JSON.toJSONString(wrapper);
-            return ServerSentEvent.<String>builder().data(jsonData).build();
-        }).concatWith(Mono.just(
-                // 发送结束事件
-                ServerSentEvent.<String>builder().event("complete").data("").build()))
+        return commonChatService.streamChat(input)
+                .map(chunk -> {
+                    Map<String, String> wrapper = Map.of("data", chunk);
+                    String jsonData = JSON.toJSONString(wrapper);
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonData)
+                            .build();
+                })
+                .concatWith(Mono.just(
+                        // 发送结束事件
+                        ServerSentEvent.<String>builder()
+                                .event("complete")
+                                .data("")
+                                .build()
+                ))
                 .doOnComplete(() -> log.info("SSE stream completed"))
                 .doOnError(error -> log.error("SSE stream error", error));
     }
@@ -59,5 +68,14 @@ public class CommonChatController {
     public String normalChat(String whereSql) {
         return commonChatService.normalChat(whereSql);
 
+    }
+    @GetMapping(value = "/recall")
+    public List<Map<String, Object>> retrieveQuery(String query,String modelId,Integer topK) {
+        return commonChatService.retrieveQuery(query,modelId,topK);
+    }
+
+    @GetMapping(value = "/find")
+    public List<Map<String, Object>> findQuery(String query,String modelId,String dimId) {
+        return commonChatService.findQuery(query,modelId,dimId);
     }
 }
