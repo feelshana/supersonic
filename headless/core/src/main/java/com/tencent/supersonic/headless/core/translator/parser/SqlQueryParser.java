@@ -328,6 +328,14 @@ public class SqlQueryParser implements QueryParser {
                 }
             });
         }
+        // 记录来自WHERE子句的维度bizName，供extractDefaultDimValue区分WHERE维度和SELECT-only维度
+        Set<String> whereDimBizNames = new HashSet<>();
+        Set<String> whereFieldSet = new HashSet<>(whereFields);
+        ontologyQuery.getDimensionMap().values().stream().flatMap(Collection::stream).filter(
+                d -> whereFieldSet.contains(d.getName()) || whereFieldSet.contains(d.getBizName()))
+                .forEach(d -> whereDimBizNames.add(d.getBizName()));
+        ontologyQuery.setWhereDimBizNames(whereDimBizNames);
+
         return ontologyQuery;
     }
 

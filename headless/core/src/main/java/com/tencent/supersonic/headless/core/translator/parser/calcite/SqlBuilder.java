@@ -201,6 +201,7 @@ public class SqlBuilder {
         TableView outerTable = new TableView();
         // Map<String, SqlNode> outerSelect = new HashMap<>();
         Map<String, String> beforeModels = new HashMap<>();
+        Set<String> whereDimBizNames = ontologyQuery.getWhereDimBizNames();
         // EngineType engineType =
         // EngineType.fromString(schema.getOntology().getDatabase().getType());
 
@@ -216,7 +217,7 @@ public class SqlBuilder {
             }
 
             TableView tableView = renderOne(queryMetrics, queryDimensions, dataModel, scope, schema,
-                    semanticSchema, dimensionRelations);
+                    semanticSchema, dimensionRelations, whereDimBizNames);
             log.info("【内层表的sql】:\n{}", StringUtils.normalizeSpace(tableView.getTable().toString()));
             String alias = Constants.JOIN_TABLE_PREFIX + dataModel.getName();
             tableView.setAlias(alias);
@@ -370,7 +371,7 @@ public class SqlBuilder {
     public static TableView renderOne(Set<MetricSchemaResp> queryMetrics,
             Set<DimSchemaResp> queryDimensions, ModelResp dataModel, SqlValidatorScope scope,
             S2CalciteSchema schema, SemanticSchemaResp semanticSchema,
-            List<BiReportConfigDO> dimensionRelations) {
+            List<BiReportConfigDO> dimensionRelations, Set<String> whereDimBizNames) {
         TableView tableView = new TableView();
         EngineType engineType = EngineType.fromString(schema.getOntology().getDatabase().getType());
         // Set<String> queryFields = tableView.getFields();
@@ -389,8 +390,8 @@ public class SqlBuilder {
 
             // tableView.getSelect().add(SqlIdentifier.STAR);
             tableView.setTable(DataModelNode.build(dataModel, scope, semanticSchema));
-            tableView.setWhere(
-                    extractDefaultDimValue(semanticSchema, queryDimensions, dimensionRelations));
+            tableView.setWhere(extractDefaultDimValue(semanticSchema, queryDimensions,
+                    dimensionRelations, whereDimBizNames));
         } catch (Exception e) {
             log.error("Failed to create sqlNode for table,tableQuery:{},SqlQuery:{}",
                     dataModel.getModelDetail().getTableQuery(),
@@ -401,7 +402,8 @@ public class SqlBuilder {
     }
 
     private static SqlNode extractDefaultDimValue(SemanticSchemaResp semanticSchema,
-            Set<DimSchemaResp> dimSchemaRespSet, List<BiReportConfigDO> dimensionRelations) {
+            Set<DimSchemaResp> dimSchemaRespSet, List<BiReportConfigDO> dimensionRelations,
+            Set<String> whereDimBizNames) {
 
         // 获取所有有默认值的维度
         Map<String, String> defaultDimNameMap = semanticSchema.getDimensions().stream()
@@ -431,13 +433,9 @@ public class SqlBuilder {
             }
         }
 
-
-        // 当前查询涉及的维度
-        Set<String> filterNameList = dimSchemaRespSet.stream().map(DimSchemaResp::getBizName)
-                .collect(Collectors.toSet());
-        List<SqlNode> andConditions = new ArrayList<>();
-
-        // 判断是否存在维度的维度值和默认值是一致的，存在就剔除筛选，不存在就继续后续的判断。
+        // WHERE子句中出现的维度bizName
+        Set<String> effectiveWhereDimBizNames = new HashSet<>(whereDimBizNames);
+        // 剔除用户已显式用=默认值的维度，避免对已筛选到默认值的维度追加!=条件
         Set<String> defaultDimFilterNameList = dimSchemaRespSet.stream().filter(dim -> {
             if (CollectionUtils.isEmpty(dim.getDefaultValues())) {
                 return false;
@@ -450,29 +448,28 @@ public class SqlBuilder {
             return defaultValue.equals(currentValue);
         }).map(DimSchemaResp::getBizName).collect(Collectors.toSet());
 
-        // 提取分词阶段提及的维度
-        // List<String> segmentDimBizNames = semanticSchema.getSegmentDimBizNames();
-
         if (!CollectionUtils.isEmpty(defaultDimFilterNameList)) {
-            filterNameList.removeAll(defaultDimFilterNameList);
-            // segmentDimBizNames.removeAll(defaultDimFilterNameList);
+            effectiveWhereDimBizNames.removeAll(defaultDimFilterNameList);
         }
-        log.info("需要进行默认值排除的维度:{}", filterNameList);
-        // log.info("用户问题涉及的维度:{}", segmentDimBizNames);
+
+        List<SqlNode> andConditions = new ArrayList<>();
+        log.info("需要进行默认值处理的WHERE维度:{}", effectiveWhereDimBizNames);
         for (Map.Entry<String, String> entry : defaultDimNameMap.entrySet()) {
             String defaultDimensionFiledName = entry.getKey();
-            if (filterNameList.contains(defaultDimensionFiledName)) {
+            // 用户指定了维度值（WHERE中）→ 排除默认值
+            if (effectiveWhereDimBizNames.contains(defaultDimensionFiledName)) {
                 SqlIdentifier column =
                         new SqlIdentifier(Arrays.asList(defaultDimensionFiledName), pos);
                 SqlCharStringLiteral value = SqlLiteral.createCharString(entry.getValue(), pos);
                 SqlNode notEqualsCall =
                         SqlStdOperatorTable.NOT_EQUALS.createCall(pos, column, value);
                 andConditions.add(notEqualsCall);
-            } else if ((!filterNameList.contains(defaultDimensionFiledName))
-                    && !hasProvinceCityRelation(defaultDimensionFiledName, filterNameList)
-                    && !hasChildCondtion(defaultDimensionFiledName, filterNameList,
+                // 用户未指定维度值 → 设为默认值筛选条件，联级关系则跳出
+            } else if (!hasProvinceCityRelation(defaultDimensionFiledName,
+                    effectiveWhereDimBizNames)
+                    && !hasChildCondtion(defaultDimensionFiledName, effectiveWhereDimBizNames,
                             childCondtionList)
-                    && !hasSiblingCondition(defaultDimensionFiledName, filterNameList,
+                    && !hasSiblingCondition(defaultDimensionFiledName, effectiveWhereDimBizNames,
                             siblingCondtionList)) {
 
                 SqlIdentifier column =
