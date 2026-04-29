@@ -5,10 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class   CommonChatReq {
+public class CommonChatReq {
 
     /**
-     * type  1: 报表申请 2: 取数申请,3:订阅报表
+     * type 1: 报表申请 2: 取数申请,3:订阅报表
      */
     @NotNull(message = "type 不能为空")
     private Integer type;
