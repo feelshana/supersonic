@@ -30,9 +30,10 @@ public class DefaultDimValueParser implements QueryParser {
 
     @Override
     public boolean accept(QueryStatement queryStatement) {
-        return Objects.nonNull(queryStatement.getSqlQuery())
-                && StringUtils.isNotBlank(queryStatement.getSqlQuery().getSql())
-                && !CollectionUtils.isEmpty(queryStatement.getOntology().getDimensions());
+        return false;
+        // return Objects.nonNull(queryStatement.getSqlQuery())
+        // && StringUtils.isNotBlank(queryStatement.getSqlQuery().getSql())
+        // && !CollectionUtils.isEmpty(queryStatement.getOntology().getDimensions());
     }
 
     @Override

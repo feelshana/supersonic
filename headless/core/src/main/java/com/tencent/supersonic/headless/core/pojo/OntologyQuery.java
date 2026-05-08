@@ -31,6 +31,16 @@ public class OntologyQuery {
     private AggOption aggOption = AggOption.NATIVE;
     private String sql;
 
+    private Set<String> whereDimBizNames = Sets.newHashSet();
+
+    public Set<String> getWhereDimBizNames() {
+        return whereDimBizNames;
+    }
+
+    public void setWhereDimBizNames(Set<String> whereDimBizNames) {
+        this.whereDimBizNames = whereDimBizNames;
+    }
+
     public Set<ModelResp> getModels() {
         return modelMap.values().stream().collect(Collectors.toSet());
     }
