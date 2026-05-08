@@ -2,9 +2,11 @@ package com.tencent.supersonic.chat.api.pojo.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+@AllArgsConstructor
 public class   CommonChatReq {
 
     /**

@@ -52,7 +52,7 @@ public class CommonChatServiceImpl implements CommonChatService {
      * 系统提示词模板：根据 type 和 description 生成对应内容
      */
     private static final String REPORT_USER_PROMPT = """
-            
+           
             你是一名专业的企业数据申请助手，需要根据用户输入内容，生成规范、专业、易审批的“申请理由”。
             
             【输入信息】
@@ -212,8 +212,7 @@ public class CommonChatServiceImpl implements CommonChatService {
     @Override
     public String normalChat(String whereSql) {
         // 1. 构建提示词
-        String typeName = TYPE_DATA;
-        String prompt = String.format(REPORT_USER_PROMPT, typeName, whereSql, "无");
+        String prompt = getPrompt(new CommonChatReq(2, whereSql, "无", null));
 
         log.info("生成申请理由的prompt: {}", prompt);
         ChatLanguageModel chatLanguageModel;
