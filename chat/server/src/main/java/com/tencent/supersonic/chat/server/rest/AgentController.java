@@ -4,7 +4,11 @@ import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
+import com.tencent.supersonic.chat.server.agent.DimensionValueCheckReq;
+import com.tencent.supersonic.chat.server.agent.DimensionValueCheckResp;
+import com.tencent.supersonic.chat.server.agent.TermDTO;
 import com.tencent.supersonic.chat.server.service.AgentService;
+import com.tencent.supersonic.chat.server.service.DimensionValueValidationService;
 import com.tencent.supersonic.common.config.SystemConfig;
 import com.tencent.supersonic.common.pojo.ResultData;
 import com.tencent.supersonic.common.pojo.User;
@@ -26,6 +30,9 @@ public class AgentController {
 
     @Autowired
     private AgentService agentService;
+
+    @Autowired
+    private DimensionValueValidationService dimensionValueValidationService;
 
     @PostMapping
     public Agent createAgent(@RequestBody Agent agent, HttpServletRequest httpServletRequest,
@@ -79,6 +86,15 @@ public class AgentController {
         return agentService.getAgentDataSetInfo(agentId, queryText, user);
     }
 
+    @GetMapping("/getAgentTerms")
+    public List<TermDTO> getAgentTerms(@RequestParam(value = "agentId") Integer agentId,
+            @RequestParam(value = "termName", required = false) String termName,
+            @RequestParam(value = "alias", required = false) String alias,
+            HttpServletRequest request, HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        return agentService.getAgentTerms(agentId, termName, alias, user);
+    }
+
     @GetMapping("/getRedSeaDataSetInfo")
     public List<AgentDataSetInfoDTO> getRedSeaDataSetInfo(
             @RequestParam("agentIds") List<Integer> agentIds,
@@ -108,6 +124,16 @@ public class AgentController {
         return ResultData.success(
                 agent.getAdmins().contains(userName) || agent.getViewers().contains(userName));
 
+    }
+
+    /**
+     * 维度值校验接口 用于校验用户问题中的维度值是否明确，支持三级匹配：预存值、向量库、数据库
+     */
+    @PostMapping("/validateDimensionValues")
+    public DimensionValueCheckResp validateDimensionValues(@RequestBody DimensionValueCheckReq req,
+            HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
+        User user = UserHolder.findUser(httpServletRequest, httpServletResponse);
+        return dimensionValueValidationService.validate(req, user);
     }
 
 }

@@ -9,6 +9,7 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
+import com.tencent.supersonic.chat.server.agent.TermDTO;
 import com.tencent.supersonic.chat.server.agent.VisualConfig;
 import com.tencent.supersonic.chat.server.persistence.dataobject.AgentDO;
 import com.tencent.supersonic.chat.server.persistence.mapper.AgentDOMapper;
@@ -19,6 +20,7 @@ import com.tencent.supersonic.chat.server.service.MemoryService;
 import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.config.GeneralManageConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
+import com.tencent.supersonic.common.pojo.DimensionConstants;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
@@ -237,8 +239,11 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
 
         Map<String, String> termsMap = new HashMap<>();
         if (semanticSchema.getTerms() != null) {
-            termsMap = semanticSchema.getTerms().stream().collect(Collectors
-                    .toMap(SchemaElement::getName, SchemaElement::getDescription, (a, b) -> a));
+            termsMap = semanticSchema.getTerms().stream()
+                    .filter(term -> term.getAlias() == null || term.getAlias().stream()
+                            .noneMatch(a -> a.toLowerCase().contains("rule")))
+                    .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription,
+                            (a, b) -> a));
         }
         // 构建维度信息，包括维度值
         StringBuilder dimensionsInfo = new StringBuilder();
@@ -325,6 +330,167 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
             }
         }
         // 仅当 queryText 非空时才执行语义映射，用于拼接第6项信息
+        List<SchemaElementMatch> schemaElementMatches = null;
+        if (StringUtils.isNotEmpty(queryText)) {
+            QueryNLReq queryNLReq = new QueryNLReq();
+            queryNLReq.setQueryText(queryText);
+            queryNLReq.setAgentId(agentId);
+            queryNLReq.setDataSetIds(dataSetIds);
+            queryNLReq.setText2SQLType(Text2SQLType.NONE);
+
+            MapResp map;
+            try {
+                map = chatLayerService.map(queryNLReq);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to call chatLayerService.", e);
+            }
+
+            SchemaMapInfo mapInfo = map != null ? map.getMapInfo() : null;
+            if (mapInfo != null && mapInfo.getDataSetElementMatches() != null
+                    && !dataSetIds.isEmpty()) {
+                Long firstDataSetId = dataSetIds.iterator().next();
+                schemaElementMatches = mapInfo.getDataSetElementMatches().get(firstDataSetId);
+            }
+        }
+
+        StringBuilder replyGuidelineBuilder = new StringBuilder();
+        replyGuidelineBuilder.append("当前报表包含以下数据集信息：\n").append("1. 维度列表：\n")
+                .append(dimensionsInfo.toString()).append("\n2. 指标列表：\n");
+
+        if (semanticSchema.getMetrics() != null) {
+            replyGuidelineBuilder.append(semanticSchema.getMetrics().stream()
+                    .map(m -> "   - " + m.getName()).collect(Collectors.joining("\n")));
+        }
+
+        replyGuidelineBuilder.append("\n3. 术语说明：\n");
+        replyGuidelineBuilder.append(
+                termsMap.entrySet().stream().map(e -> "   - " + e.getKey() + ": " + e.getValue())
+                        .collect(Collectors.joining("\n")));
+
+        replyGuidelineBuilder.append("\n4. 当前日期：").append(currentDate);
+
+        if (StringUtils.isNotEmpty(queryText)) {
+            replyGuidelineBuilder.append("\n5. 当前用户问题映射到的维度及其维度值：\n[");
+            if (!CollectionUtils.isEmpty(schemaElementMatches)) {
+                List<String> dimensionValuePairs = schemaElementMatches.stream()
+                        .filter(m -> Boolean.TRUE.equals(m.isFullMatched())
+                                && SchemaElementType.VALUE.equals(m.getElement().getType()))
+                        .map(m -> m.getElement().getName() + "：" + m.getWord())
+                        .collect(Collectors.toList());
+                replyGuidelineBuilder.append(String.join(",", dimensionValuePairs));
+            }
+            replyGuidelineBuilder.append("]");
+        }
+
+        return replyGuidelineBuilder.toString();
+    }
+
+    @Override
+    public String getAgentDataSetInfoForValidation(Integer agentId, String queryText, User user) {
+        Agent agent = convert(getById(agentId));
+        if (agent == null || agent.getDataSetIds() == null) {
+            return "";
+        }
+
+        Set<Long> dataSetIds = agent.getDataSetIds();
+        SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
+        String currentDate = LocalDate.now().format(formatter);
+
+        Map<String, String> termsMap = new HashMap<>();
+        if (semanticSchema.getTerms() != null) {
+            termsMap = semanticSchema.getTerms().stream()
+                    .filter(term -> term.getAlias() == null || term.getAlias().stream()
+                            .noneMatch(a -> a.toLowerCase().contains("rule")))
+                    .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription,
+                            (a, b) -> a));
+        }
+        // 构建维度信息，包括维度值（附加字段名 bizName）
+        StringBuilder dimensionsInfo = new StringBuilder();
+        if (semanticSchema.getDimensions() != null) {
+            for (SchemaElement dimension : semanticSchema.getDimensions()) {
+                String dimNameLower = dimension.getName().toLowerCase();
+                if (dimNameLower.contains("id")) {
+                    continue;
+                }
+
+                dimensionsInfo.append("   - ").append(dimension.getName());
+                // 附加实际数据库列名（bizName），供SQL查询使用
+                if (StringUtils.isNotBlank(dimension.getBizName())) {
+                    dimensionsInfo.append("（字段名：").append(dimension.getBizName()).append("）");
+                }
+                if (StringUtils.isNotEmpty(dimension.getTimeFormat())) {
+                    final String DAILY_FORMAT = "yyyyMMdd";
+                    final String MONTHLY_FORMAT = "yyyyMM";
+                    String granularityDesc = DAILY_FORMAT.equals(dimension.getTimeFormat()) ? "日表"
+                            : MONTHLY_FORMAT.equals(dimension.getTimeFormat()) ? "月表" : "";
+                    dimensionsInfo.append("（日期字段，格式：").append(dimension.getTimeFormat());
+                    if (!granularityDesc.isEmpty()) {
+                        dimensionsInfo.append("，").append(granularityDesc);
+                    }
+                    dimensionsInfo.append("）");
+                }
+                if (isSkipDimension(dimension)) {
+                    dimensionsInfo.append("\n");
+                    continue;
+                }
+                if (Boolean.TRUE.equals(dimension.isHasDimValues())
+                        || !CollectionUtils.isEmpty(dimension.getSchemaValueMaps())) {
+                    PageInfo<DictValueDimResp> pageInfo =
+                            onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
+                    if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
+                        List<String> dimensionValues =
+                                pageInfo.getList().stream().map(DictValueDimResp::getValue)
+                                        .limit(50).collect(Collectors.toList());
+                        if (!dimensionValues.isEmpty()) {
+                            dimensionsInfo.append("\n");
+                            boolean isProvinceDim = dimNameLower.contains("省份")
+                                    || dimNameLower.contains("province");
+                            if (isProvinceDim && dimensionValues.contains("全国")) {
+                                List<String> sampleProvinces =
+                                        dimensionValues.stream().filter(v -> !"全国".equals(v))
+                                                .limit(3).collect(Collectors.toList());
+                                dimensionsInfo.append("     说明：该维度包含'全国'");
+                                if (!sampleProvinces.isEmpty()) {
+                                    dimensionsInfo.append("和'")
+                                            .append(String.join("'、'", sampleProvinces))
+                                            .append("'等省份数据");
+                                }
+                                dimensionsInfo.append("，全国的数据不需要用各省来累加\n");
+                            } else {
+                                boolean isCityDim =
+                                        dimNameLower.contains("城市") || dimNameLower.contains("地市")
+                                                || dimNameLower.contains("city");
+                                if (isCityDim && dimensionValues.contains("全省")) {
+                                    List<String> sampleCities =
+                                            dimensionValues.stream().filter(v -> !"全省".equals(v))
+                                                    .limit(3).collect(Collectors.toList());
+                                    dimensionsInfo.append("     说明：该维度包含'全省'");
+                                    if (!sampleCities.isEmpty()) {
+                                        dimensionsInfo.append("和'")
+                                                .append(String.join("'、'", sampleCities))
+                                                .append("'等城市数据");
+                                    }
+                                    dimensionsInfo.append("，全省的数据不需要用各城市来累加\n");
+                                } else {
+                                    dimensionsInfo.append("     维度值: ")
+                                            .append(String.join(", ", dimensionValues))
+                                            .append("\n");
+                                }
+                            }
+                        } else {
+                            dimensionsInfo.append("\n");
+                        }
+                    } else {
+                        dimensionsInfo.append("\n");
+                    }
+                } else {
+                    dimensionsInfo.append("\n");
+                }
+            }
+        }
+        // 仅当 queryText 非空时才执行语义映射
         List<SchemaElementMatch> schemaElementMatches = null;
         if (StringUtils.isNotEmpty(queryText)) {
             QueryNLReq queryNLReq = new QueryNLReq();
@@ -545,6 +711,54 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
             }
         }
         return false;
+    }
+
+    @Override
+    public List<TermDTO> getAgentTerms(Integer agentId, String termName, String alias, User user) {
+        Agent agent = convert(getById(agentId));
+        if (agent == null || agent.getDataSetIds() == null) {
+            return new ArrayList<>();
+        }
+
+        Set<Long> dataSetIds = agent.getDataSetIds();
+        SemanticSchema semanticSchema = schemaService.getSemanticSchema(dataSetIds);
+
+        List<SchemaElement> terms = semanticSchema.getTerms();
+        if (CollectionUtils.isEmpty(terms)) {
+            return new ArrayList<>();
+        }
+
+        // 如果传入了术语名称，则按名称精确过滤
+        List<SchemaElement> filteredTerms;
+        if (StringUtils.isNotEmpty(termName)) {
+            filteredTerms = terms.stream().filter(term -> termName.equals(term.getName()))
+                    .collect(Collectors.toList());
+        } else {
+            filteredTerms = terms;
+        }
+
+        // 如果传入了别名关键词，则筛选别名中包含该值的术语
+        if (StringUtils.isNotEmpty(alias)) {
+            String aliasLower = alias.toLowerCase();
+            filteredTerms = filteredTerms.stream()
+                    .filter(term -> term.getAlias() != null && term.getAlias().stream()
+                            .anyMatch(a -> a.toLowerCase().contains(aliasLower)))
+                    .collect(Collectors.toList());
+        }
+
+        // 构建术语信息列表
+        return filteredTerms.stream().map(term -> {
+            TermDTO dto = new TermDTO();
+            dto.setName(term.getName());
+            dto.setDescription(term.getDescription());
+            dto.setAlias(term.getAlias());
+            dto.setDataSetId(term.getDataSetId());
+            dto.setDataSetName(term.getDataSetName());
+            if (term.getExtInfo() != null && !term.getExtInfo().isEmpty()) {
+                dto.setExtInfo(term.getExtInfo());
+            }
+            return dto;
+        }).collect(Collectors.toList());
     }
 
 }
