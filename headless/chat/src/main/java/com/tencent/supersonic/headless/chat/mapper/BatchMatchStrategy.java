@@ -192,7 +192,11 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
                             .map(String::trim).filter(StringUtils::isNotBlank).distinct().toList();
 
                     // Keep only dimensions that exist in schema and have defaultValues
-                    Set<String> validDimNamesWithDefault = dimensionDefaultValues.keySet();
+                    Set<String> validDimNamesWithDefault =
+                            new HashSet<>(dimensionDefaultValues.keySet());
+                    Set<String> termConfigDimNames = getTermConfigDimNames(semanticSchema);
+                    validDimNamesWithDefault.addAll(termConfigDimNames);
+
                     excludeDims = excludeDims.stream().filter(validDimNamesWithDefault::contains)
                             .toList();
                     chatQueryContext.setExcludeDefaultDimNames(excludeDims);
@@ -207,4 +211,35 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
 
     public abstract List<T> detectByBatch(ChatQueryContext chatQueryContext,
             Set<Long> detectDataSetIds, Set<String> detectSegments);
+
+    private static final String TERM_DEFAULT_CONFIG_NAME = "默认值配置";
+
+    private Set<String> getTermConfigDimNames(SemanticSchema semanticSchema) {
+        List<SchemaElement> terms = semanticSchema.getTerms();
+        if (CollectionUtils.isEmpty(terms)) {
+            return Collections.emptySet();
+        }
+        SchemaElement configTerm = terms.stream()
+                .filter(t -> TERM_DEFAULT_CONFIG_NAME.equals(t.getName())).findFirst().orElse(null);
+        if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
+            return Collections.emptySet();
+        }
+        try {
+            Map<String, String> bizNameToDefault =
+                    JSON.parseObject(configTerm.getDescription(), Map.class);
+            if (bizNameToDefault == null || bizNameToDefault.isEmpty()) {
+                return Collections.emptySet();
+            }
+            Set<String> bizNames = bizNameToDefault.keySet();
+            return semanticSchema.getDimensions().stream()
+                    .filter(d -> d != null && StringUtils.isNotBlank(d.getBizName())
+                            && bizNames.contains(d.getBizName()))
+                    .map(SchemaElement::getName).filter(StringUtils::isNotBlank)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("Failed to parse term '{}' description: {}", TERM_DEFAULT_CONFIG_NAME,
+                    configTerm.getDescription(), e);
+            return Collections.emptySet();
+        }
+    }
 }
