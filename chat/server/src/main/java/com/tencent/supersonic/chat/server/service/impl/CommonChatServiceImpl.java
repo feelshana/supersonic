@@ -29,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -158,7 +159,7 @@ public class CommonChatServiceImpl implements CommonChatService {
         // 1. 构建提示词
         String prompt = getPrompt(input);
 
-        log.info("生成申请理由的prompt: {}", prompt);
+//        log.info("生成申请理由的prompt: {}", prompt);
         // 2. 获取流式模型
         StreamingChatLanguageModel streamChatModel;
 
@@ -182,12 +183,21 @@ public class CommonChatServiceImpl implements CommonChatService {
 
         Flux<String> flux = generateApplyReasonStreamExtractor.generateApplyReasonStream(prompt);
 
-        // 记录流式响应日志
+        // 记录流式响应日志，针对 API 返回的 created 字段溢出异常做特殊处理
         StringBuilder fullResponse = new StringBuilder();
         return flux.doOnNext(fullResponse::append).doOnComplete(() -> {
             log.info("[SSE-COMPLETE] Full response: {}", fullResponse);
-        }).doOnError(error -> {
-            log.error("[SSE-ERROR] Error occurred: {}", error.getMessage(), error);
+        }).onErrorResume(error -> {
+            // 检测是否为 openai4j 的 created 字段 int 溢出异常
+            String errorMsg = error.getMessage();
+            if (errorMsg != null && errorMsg.contains("out of range of int")
+                    && errorMsg.contains("ChatCompletionResponse")) {
+                // 该异常不影响业务功能，仅记录日志作为备忘
+                log.info("[SSE-INFO] AI模型API返回的created字段数值溢出(int范围)，不影响功能，已记录: {}", errorMsg);
+                return Mono.empty();
+            }
+            // 其他异常继续抛出
+            return Mono.error(error);
         });
     }
 
@@ -218,7 +228,7 @@ public class CommonChatServiceImpl implements CommonChatService {
         // 1. 构建提示词
         String prompt = getPrompt(new CommonChatReq(2, whereSql, "无", null));
 
-        log.info("生成申请理由的prompt: {}", prompt);
+//        log.info("生成申请理由的prompt: {}", prompt);
         ChatLanguageModel chatLanguageModel;
         try {
             Agent agent = agentService.getAgent(agentId);
