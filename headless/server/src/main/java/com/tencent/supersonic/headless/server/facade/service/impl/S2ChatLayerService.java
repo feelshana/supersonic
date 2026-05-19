@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.server.facade.service.impl;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.headless.api.pojo.*;
@@ -16,6 +17,7 @@ import com.tencent.supersonic.headless.chat.corrector.SchemaCorrector;
 import com.tencent.supersonic.headless.chat.knowledge.builder.BaseWordBuilder;
 import com.tencent.supersonic.headless.chat.utils.ComponentFactory;
 import com.tencent.supersonic.headless.server.facade.service.ChatLayerService;
+import com.tencent.supersonic.headless.server.service.BiReportConfigService;
 import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.service.RetrieveService;
 import com.tencent.supersonic.headless.server.service.SchemaService;
@@ -41,6 +43,8 @@ public class S2ChatLayerService implements ChatLayerService {
     private RetrieveService retrieveService;
     @Autowired
     private ChatWorkflowEngine chatWorkflowEngine;
+    @Autowired
+    private BiReportConfigService biReportConfigService;
 
     @Override
     public MapResp map(QueryNLReq queryNLReq) {
@@ -108,6 +112,13 @@ public class S2ChatLayerService implements ChatLayerService {
         queryCtx.setModelIdToDataSetIds(modelIdToDataSetIds);
         queryCtx.setAgentId(queryNLReq.getAgentId());
         queryCtx.setRequestId(queryNLReq.getRequestId());
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(queryNLReq.getRequestId())) {
+            List<BiReportConfigDO> dimRelations =
+                    biReportConfigService.getBiReportConfig(queryNLReq.getRequestId());
+            if (!org.apache.commons.collections.CollectionUtils.isEmpty(dimRelations)) {
+                queryCtx.setDimensionRelations(dimRelations);
+            }
+        }
         return queryCtx;
     }
 

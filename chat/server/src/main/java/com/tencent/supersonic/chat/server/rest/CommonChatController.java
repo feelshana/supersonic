@@ -34,31 +34,27 @@ public class CommonChatController {
     public SseEmitter streamChat(@RequestBody @Valid CommonChatReq input) {
         SseEmitter emitter = new SseEmitter(120000L);
 
-        commonChatService.streamChat(input).subscribe(
-                chunk -> {
-                    try {
-                        Map<String, String> wrapper = Map.of("data", chunk);
-                        String jsonData = JSON.toJSONString(wrapper);
-                        emitter.send(SseEmitter.event().data(jsonData, MediaType.APPLICATION_JSON));
-                    } catch (IOException e) {
-                        emitter.completeWithError(e);
-                    }
-                },
-                error -> {
-                    log.error("SSE stream error", error);
-                    emitter.completeWithError(error);
-                },
-                () -> {
-                    try {
-                        // 发送结束事件
-                        emitter.send(SseEmitter.event().name("complete").data(""));
-                        emitter.complete();
-                        log.info("SSE stream completed");
-                    } catch (IOException e) {
-                        emitter.completeWithError(e);
-                    }
-                }
-        );
+        commonChatService.streamChat(input).subscribe(chunk -> {
+            try {
+                Map<String, String> wrapper = Map.of("data", chunk);
+                String jsonData = JSON.toJSONString(wrapper);
+                emitter.send(SseEmitter.event().data(jsonData, MediaType.APPLICATION_JSON));
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        }, error -> {
+            log.error("SSE stream error", error);
+            emitter.completeWithError(error);
+        }, () -> {
+            try {
+                // 发送结束事件
+                emitter.send(SseEmitter.event().name("complete").data(""));
+                emitter.complete();
+                log.info("SSE stream completed");
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        });
 
         emitter.onTimeout(() -> {
             log.warn("SSE stream timeout");

@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.corrector;
 
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
+    private static final String TERM_NAME = "默认值配置";
 
     @Override
     public void doCorrect(ChatQueryContext chatQueryContext, SemanticParseInfo semanticParseInfo) {
@@ -49,6 +51,7 @@ public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
         if (CollectionUtils.isEmpty(dimensions)) {
             return;
         }
+        Map<String, String> termDefaultValues = findTermDefaultValues(semanticSchema);
 
         Set<String> whereFields = new HashSet<>(SqlSelectHelper.getWhereFields(correctedS2SQL));
 
@@ -61,7 +64,18 @@ public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
             }
 
             SchemaElement dim = findDimension(dimensions, dimHint.trim());
-            if (dim == null || CollectionUtils.isEmpty(dim.getDefaultValues())) {
+            if (dim == null) {
+                continue;
+            }
+
+            List<String> defaultValues = dim.getDefaultValues();
+            if (CollectionUtils.isEmpty(defaultValues)) {
+                String bizName = dim.getBizName();
+                if (StringUtils.isNotBlank(bizName) && termDefaultValues.containsKey(bizName)) {
+                    defaultValues = Collections.singletonList(termDefaultValues.get(bizName));
+                }
+            }
+            if (CollectionUtils.isEmpty(defaultValues)) {
                 continue;
             }
 
@@ -75,7 +89,7 @@ public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
                 continue;
             }
 
-            String notInExpr = buildNotInExpr(dimName, dim.getDefaultValues());
+            String notInExpr = buildNotInExpr(dimName, defaultValues);
             if (StringUtils.isBlank(notInExpr)) {
                 continue;
             }
@@ -137,5 +151,29 @@ public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
         }
         String joined = values.stream().distinct().collect(Collectors.joining(","));
         return fieldName + " NOT IN (" + joined + ")";
+    }
+
+    private static Map<String, String> findTermDefaultValues(SemanticSchema semanticSchema) {
+        List<SchemaElement> terms = semanticSchema.getTerms();
+        if (CollectionUtils.isEmpty(terms)) {
+            return Collections.emptyMap();
+        }
+
+        SchemaElement configTerm =
+                terms.stream().filter(t -> TERM_NAME.equals(t.getName())).findFirst().orElse(null);
+
+        if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
+            return Collections.emptyMap();
+        }
+
+        try {
+            Map<String, String> result =
+                    JsonUtil.toMap(configTerm.getDescription(), String.class, String.class);
+            return result != null ? result : Collections.emptyMap();
+        } catch (Exception e) {
+            log.warn("DefaultDimValueExcludeCorrector failed to parse term description: {}",
+                    configTerm.getDescription(), e);
+            return Collections.emptyMap();
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.corrector;
 
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
@@ -64,11 +65,25 @@ public class TermBasedDefaultDimValueCorrector extends BaseSemanticCorrector {
                 dimensions.stream().filter(d -> StringUtils.isNotBlank(d.getBizName()))
                         .collect(Collectors.toMap(SchemaElement::getBizName, d -> d, (a, b) -> a));
 
+        // bizName -> name 映射，用于层级关系检查时将 dimRelation 中的 bizName 转换为 WHERE 中使用的 name
+        Map<String, String> bizNameToName = dimensions.stream().filter(
+                d -> StringUtils.isNotBlank(d.getBizName()) && StringUtils.isNotBlank(d.getName()))
+                .collect(Collectors.toMap(SchemaElement::getBizName, SchemaElement::getName,
+                        (a, b) -> a));
+
         Set<String> whereFields = new HashSet<>(SqlSelectHelper.getWhereFields(correctedS2SQL));
+        // 用于层级关系检查的原始 WHERE 集合（不包含本 corrector 后续添加的默认値条件）
+        Set<String> originalWhereFields = new HashSet<>(whereFields);
+
         List<String> excludeDefaultDimNames = chatQueryContext.getExcludeDefaultDimNames();
         Set<String> excludeDimNameSet =
                 CollectionUtils.isEmpty(excludeDefaultDimNames) ? Collections.emptySet()
                         : new HashSet<>(excludeDefaultDimNames);
+
+        // 解析层级关系（type=1）和同级关系（type=2）
+        List<BiReportConfigDO> dimensionRelations = chatQueryContext.getDimensionRelations();
+        List<List<String>> childHierarchies = parseRelationGroups(dimensionRelations, 1);
+        List<List<String>> siblingGroups = parseRelationGroups(dimensionRelations, 2);
 
         for (Map.Entry<String, String> entry : termDefaultValues.entrySet()) {
             String bizName = entry.getKey();
@@ -97,6 +112,27 @@ public class TermBasedDefaultDimValueCorrector extends BaseSemanticCorrector {
                 continue;
             }
 
+            // 层级维度（type=1）：如果层级链中有子级维度已出现在用户指定的 WHERE 中，则跳过该维度（上级）的默认値
+            if (hasChildInWhere(bizName, originalWhereFields, bizNameToName, childHierarchies)) {
+                log.info("TermBasedDefaultDimValueCorrector skipped [{}]: child dim in WHERE",
+                        dimName);
+                continue;
+            }
+
+            // 同级维度（type=2）：如果同组中有其他维度出现在用户指定的 WHERE 中，则跳过
+            if (hasSiblingInWhere(bizName, originalWhereFields, bizNameToName, siblingGroups)) {
+                log.info("TermBasedDefaultDimValueCorrector skipped [{}]: sibling dim in WHERE",
+                        dimName);
+                continue;
+            }
+
+            // 省市关系：WHERE 中含有城市相关字段时，跳过省份维度的默认値（与 hasProvinceCityRelation 逻辑一致）
+            if (hasProvinceCityRelation(bizName, originalWhereFields)) {
+                log.info("TermBasedDefaultDimValueCorrector skipped [{}]: city dim in WHERE",
+                        dimName);
+                continue;
+            }
+
             String escaped = defaultValue.replace("'", "''");
             String condExpr;
             if (excludeDimNameSet.contains(dimName)) {
@@ -119,6 +155,98 @@ public class TermBasedDefaultDimValueCorrector extends BaseSemanticCorrector {
         }
 
         semanticParseInfo.getSqlInfo().setCorrectedS2SQL(correctedS2SQL);
+    }
+
+    /**
+     * 解析 BiReportConfigDO 列表，提取指定 type 的维度关系组。 每个元素是一组按顺序排列的 bizName（对 type=1 表示层级链，高级在前）。
+     */
+    private static List<List<String>> parseRelationGroups(List<BiReportConfigDO> dimensionRelations,
+            int type) {
+        if (CollectionUtils.isEmpty(dimensionRelations)) {
+            return Collections.emptyList();
+        }
+        return dimensionRelations.stream().filter(c -> c.getType() != null && c.getType() == type)
+                .filter(c -> StringUtils.isNotBlank(c.getDimRelation()))
+                .flatMap(c -> Arrays.stream(c.getDimRelation().split(",")))
+                .filter(StringUtils::isNotBlank)
+                .map(relation -> Arrays.asList(relation.trim().split("/")))
+                .filter(list -> list.size() > 1).collect(Collectors.toList());
+    }
+
+    /**
+     * 层级关系检查（与原始 hasChildCondtion 逻辑一致）： 如果当前维度在层级链中存在子级维度（更低层）出现在 whereFields 中，则返回 true。
+     * 即：用户指定了子级维度 → 跳过上级维度的默认値。
+     */
+    private static boolean hasChildInWhere(String bizName, Set<String> whereFields,
+            Map<String, String> bizNameToName, List<List<String>> childHierarchies) {
+        if (childHierarchies.isEmpty()) {
+            return false;
+        }
+        for (List<String> hierarchy : childHierarchies) {
+            if (!hierarchy.contains(bizName)) {
+                continue;
+            }
+            int levelIndex = hierarchy.indexOf(bizName);
+            // 已是最层，没有子级
+            if (levelIndex == hierarchy.size() - 1) {
+                continue;
+            }
+            // 检查子级 bizName 对应的 name 是否在 WHERE 中
+            List<String> childBizNames = hierarchy.subList(levelIndex + 1, hierarchy.size());
+            for (String childBizName : childBizNames) {
+                String childName = bizNameToName.get(childBizName);
+                if (StringUtils.isNotBlank(childName) && whereFields.contains(childName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 省市关系检查（与 SqlBuilder.hasProvinceCityRelation 逻辑一致）： 如果当前维度是省份维度（bizName 匹配
+     * province/province_name/provinceName）， 且 whereFields 中存在城市相关字段，则返回 true，跳过省份默认値。 whereFields
+     * 中的字段可以是 name（中文）或 bizName（英文），两套模式均覆盖。
+     */
+    private static boolean hasProvinceCityRelation(String bizName, Set<String> whereFields) {
+        if (!(StringUtils.equalsIgnoreCase(bizName, "provinceName")
+                || StringUtils.equalsIgnoreCase(bizName, "province_name")
+                || StringUtils.equalsIgnoreCase(bizName, "province"))) {
+            return false;
+        }
+        return whereFields.stream()
+                .anyMatch(name -> StringUtils.equalsIgnoreCase(name, "city_name")
+                        || StringUtils.equalsIgnoreCase(name, "cityName")
+                        || StringUtils.equalsIgnoreCase(name, "city")
+                        || StringUtils.equalsIgnoreCase(name, "城市")
+                        || StringUtils.equalsIgnoreCase(name, "城市名称")
+                        || StringUtils.equalsIgnoreCase(name, "地市")
+                        || StringUtils.equalsIgnoreCase(name, "地市名称"));
+    }
+
+    /**
+     * 同级关系检查（与原始 hasSiblingCondition 逻辑一致）： 如果同组中有其他维度出现在 whereFields 中，则返回 true。
+     */
+    private static boolean hasSiblingInWhere(String bizName, Set<String> whereFields,
+            Map<String, String> bizNameToName, List<List<String>> siblingGroups) {
+        if (siblingGroups.isEmpty()) {
+            return false;
+        }
+        for (List<String> group : siblingGroups) {
+            if (!group.contains(bizName)) {
+                continue;
+            }
+            for (String memberBizName : group) {
+                if (memberBizName.equals(bizName)) {
+                    continue;
+                }
+                String memberName = bizNameToName.get(memberBizName);
+                if (StringUtils.isNotBlank(memberName) && whereFields.contains(memberName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static Map<String, String> findTermDefaultValues(SemanticSchema semanticSchema) {
