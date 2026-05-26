@@ -1,6 +1,7 @@
 package com.tencent.supersonic.headless.chat;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.tencent.supersonic.common.pojo.BiReportConfigDO;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
@@ -38,6 +39,7 @@ public class ChatQueryContext implements Serializable {
     private List<String> queryFilters;
     private List<String> segmentDimBizNames = new ArrayList<>();
     private List<String> excludeDefaultDimNames = new ArrayList<>();
+    private List<BiReportConfigDO> dimensionRelations = new ArrayList<>();
 
     public ChatQueryContext() {
         this(new QueryNLReq());

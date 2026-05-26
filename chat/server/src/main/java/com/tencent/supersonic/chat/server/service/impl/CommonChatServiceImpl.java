@@ -159,7 +159,7 @@ public class CommonChatServiceImpl implements CommonChatService {
         // 1. 构建提示词
         String prompt = getPrompt(input);
 
-//        log.info("生成申请理由的prompt: {}", prompt);
+        // log.info("生成申请理由的prompt: {}", prompt);
         // 2. 获取流式模型
         StreamingChatLanguageModel streamChatModel;
 
@@ -228,7 +228,7 @@ public class CommonChatServiceImpl implements CommonChatService {
         // 1. 构建提示词
         String prompt = getPrompt(new CommonChatReq(2, whereSql, "无", null));
 
-//        log.info("生成申请理由的prompt: {}", prompt);
+        // log.info("生成申请理由的prompt: {}", prompt);
         ChatLanguageModel chatLanguageModel;
         try {
             Agent agent = agentService.getAgent(agentId);
