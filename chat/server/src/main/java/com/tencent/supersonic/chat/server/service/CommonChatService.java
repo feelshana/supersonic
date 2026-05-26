@@ -1,7 +1,6 @@
 package com.tencent.supersonic.chat.server.service;
 
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
-import dev.langchain4j.store.embedding.Retrieval;
 import reactor.core.publisher.Flux;
 
 import java.util.List;

@@ -17,6 +17,7 @@ com.tencent.supersonic.headless.chat.parser.SemanticParser=\
 
 com.tencent.supersonic.headless.chat.corrector.SemanticCorrector=\
     com.tencent.supersonic.headless.chat.corrector.RuleSqlCorrector,\
+    com.tencent.supersonic.headless.chat.corrector.MandatorySelectFieldCorrector,\
     com.tencent.supersonic.headless.chat.corrector.DefaultDimValueExcludeCorrector,\
     com.tencent.supersonic.headless.chat.corrector.TermBasedDefaultDimValueCorrector,\
     com.tencent.supersonic.headless.chat.corrector.LLMSqlCorrector,\

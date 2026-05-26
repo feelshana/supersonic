@@ -245,13 +245,18 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                     .collect(Collectors.toMap(SchemaElement::getName, SchemaElement::getDescription,
                             (a, b) -> a));
         }
+
+        // 解析"无需排除id的维度"术语配置：key=维度名, value=limit条数(1~50)
+        Map<String, Integer> noExcludeIdDimMap = parseNoExcludeIdDimConfig(semanticSchema);
+
         // 构建维度信息，包括维度值
         StringBuilder dimensionsInfo = new StringBuilder();
         if (semanticSchema.getDimensions() != null) {
             for (SchemaElement dimension : semanticSchema.getDimensions()) {
-                // 跳过名称含id的维度（如省份id、内容ID、分组Id等）
+                // 跳过名称含id的维度（如省份id、内容ID、分组Id等），但术语配置的白名单维度除外
                 String dimNameLower = dimension.getName().toLowerCase();
-                if (dimNameLower.contains("id")) {
+                if (dimNameLower.contains("id")
+                        && !noExcludeIdDimMap.containsKey(dimension.getName())) {
                     continue;
                 }
 
@@ -276,9 +281,12 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                     PageInfo<DictValueDimResp> pageInfo =
                             onePassSCSqlGenStrategy.getDimensionValuesFromDict(dimension);
                     if (pageInfo != null && !CollectionUtils.isEmpty(pageInfo.getList())) {
+                        // 根据术语配置取limit；未配置则默认50；最大上限50，最小1
+                        int dimLimit = noExcludeIdDimMap.getOrDefault(dimension.getName(), 50);
+                        dimLimit = Math.max(1, Math.min(dimLimit, 50));
                         List<String> dimensionValues =
                                 pageInfo.getList().stream().map(DictValueDimResp::getValue)
-                                        .limit(50).collect(Collectors.toList());
+                                        .limit(dimLimit).collect(Collectors.toList());
                         if (!dimensionValues.isEmpty()) {
                             dimensionsInfo.append("\n");
                             // 省份维度：含“全国”时只输出说明，不列维度值
@@ -575,6 +583,30 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         String dimensionName = dimension.getName().toLowerCase();
         return dimensionName.contains("日期") || dimensionName.contains("时间")
                 || dimensionName.contains("date") || dimensionName.contains("time");
+    }
+
+    /**
+     * 解析"无需排除id的维度"术语配置。 description 格式为 JSON Map: {"维度名": limit条数, ...}
+     * 配置了的维度即使name含"id"也不会被排除；limit范围1~50，超出按50截断。
+     */
+    private Map<String, Integer> parseNoExcludeIdDimConfig(SemanticSchema semanticSchema) {
+        if (semanticSchema == null || CollectionUtils.isEmpty(semanticSchema.getTerms())) {
+            return Collections.emptyMap();
+        }
+        SchemaElement configTerm = semanticSchema.getTerms().stream()
+                .filter(t -> "无需排除id的维度".equals(t.getName())).findFirst().orElse(null);
+        if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
+            return Collections.emptyMap();
+        }
+        try {
+            Map<String, Integer> result =
+                    JsonUtil.toMap(configTerm.getDescription(), String.class, Integer.class);
+            return result != null ? result : Collections.emptyMap();
+        } catch (Exception e) {
+            log.warn("parseNoExcludeIdDimConfig failed to parse term description: {}",
+                    configTerm.getDescription(), e);
+            return Collections.emptyMap();
+        }
     }
 
     /**

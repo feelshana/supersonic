@@ -158,7 +158,7 @@ public class CommonChatServiceImpl implements CommonChatService {
     public Flux<String> streamChat(CommonChatReq input) {
         // 1. 构建提示词
         String prompt = getPrompt(input);
-
+        log.info("入参: {}", input);
         // log.info("生成申请理由的prompt: {}", prompt);
         // 2. 获取流式模型
         StreamingChatLanguageModel streamChatModel;
