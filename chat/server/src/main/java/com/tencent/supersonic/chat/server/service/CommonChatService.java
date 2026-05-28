@@ -20,4 +20,8 @@ public interface CommonChatService {
     List<Map<String, Object>> retrieveQuery(String query, String modelId, Integer topK);
 
     List<Map<String, Object>> findQuery(String query, String modelId, String dimId);
+
+    Flux<String> flamesStreamChat(CommonChatReq input) throws Exception;
+
+    String flamesChat(String whereSql) throws Exception;
 }

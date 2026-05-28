@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -84,5 +85,54 @@ public class CommonChatController {
     @GetMapping(value = "/find")
     public List<Map<String, Object>> findQuery(String query, String modelId, String dimId) {
         return commonChatService.findQuery(query, modelId, dimId);
+    }
+
+
+    /**
+     * 流式对话（SSE）
+     */
+    @PostMapping(value = "/flamesStreamChat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter flamesStreamChat(@RequestBody @Valid CommonChatReq input) throws Exception {
+        SseEmitter emitter = new SseEmitter(120000L);
+
+        var subscription = commonChatService.flamesStreamChat(input).subscribe(chunk -> {
+            try {
+                Map<String, String> wrapper = Map.of("data", chunk);
+                String jsonData = JSON.toJSONString(wrapper);
+                emitter.send(SseEmitter.event().data(jsonData, MediaType.APPLICATION_JSON));
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        }, error -> {
+            log.error("SSE stream error", error);
+            emitter.completeWithError(error);
+        }, () -> {
+            try {
+                emitter.send(SseEmitter.event().name("complete").data(""));
+                emitter.complete();
+                log.info("SSE stream completed");
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        });
+
+        emitter.onTimeout(() -> {
+            log.warn("SSE stream timeout");
+            subscription.dispose();
+            emitter.complete();
+        });
+
+        emitter.onCompletion(subscription::dispose);
+
+        return emitter;
+    }
+
+
+    /**
+     * 流式对话（SSE）
+     */
+    @PostMapping(value = "/flamesChat")
+    public String flamesChat(String whereSql) throws Exception {
+        return commonChatService.flamesChat(whereSql);
     }
 }
