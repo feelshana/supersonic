@@ -94,6 +94,7 @@ public class CommonChatController {
     @PostMapping(value = "/flamesStreamChat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter flamesStreamChat(@RequestBody @Valid CommonChatReq input) throws Exception {
         SseEmitter emitter = new SseEmitter(120000L);
+        log.info("flamesStreamChat start");
 
         var subscription = commonChatService.flamesStreamChat(input).subscribe(chunk -> {
             try {
@@ -133,6 +134,7 @@ public class CommonChatController {
      */
     @PostMapping(value = "/flamesChat")
     public String flamesChat(String whereSql) throws Exception {
+        log.info("flamesChat start");
         return commonChatService.flamesChat(whereSql);
     }
 }
