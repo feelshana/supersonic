@@ -59,7 +59,7 @@
         <!-- flames-api-sdk 运行期依赖 Hutool 的 cn.hutool.core.util.ObjectUtil 等工具类 -->
         <dependency>
             <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
+            <artifactId>hutool-core</artifactId>
             <version>5.8.27</version>
         </dependency>
     </dependencies>
