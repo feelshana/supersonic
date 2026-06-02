@@ -42,6 +42,8 @@ public class ClientOpenApi extends OpenApi {
                         .baseUrl(baseUrl)
                         .appId(appId)
                         .appSecret(appSecret)
+                        .modelId("x-key")
+                        .modelSource("x-source")
                         .assistantCode(assistantCode)
                         .build();
             } catch (NoSuchAlgorithmException | KeyManagementException e) {
