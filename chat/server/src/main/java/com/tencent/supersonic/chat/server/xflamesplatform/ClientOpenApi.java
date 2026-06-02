@@ -55,7 +55,7 @@ public class ClientOpenApi extends OpenApi {
                 model.generate(content, new StreamingResponseHandler<AgentResPayload>() {
                     @Override
                     public void onResponse(FlamesResponse<AgentResPayload> response) {
-                        log.debug("response={}", response);
+                        log.info("response={}", response);
                         for (ChatTextData text : response.getPayload().getChoices().getText()) {
                             if (ContentType.TEXT == text.contentType) {
                                 sink.next(text.getContent());
@@ -64,7 +64,7 @@ public class ClientOpenApi extends OpenApi {
                         if (response.getHeader().getCode() != 0
                                 || (response.getPayload().getChoices() != null
                                     && response.getPayload().getChoices().isFinish())) {
-                            log.debug("the last one message");
+                            log.info("the last one message");
                             sink.complete();
                         }
                     }
@@ -77,7 +77,7 @@ public class ClientOpenApi extends OpenApi {
 
                     @Override
                     public void onCompleted() {
-                        log.debug("onComplete");
+                        log.info("onComplete");
                         sink.complete();
                     }
                 });
@@ -95,13 +95,15 @@ public class ClientOpenApi extends OpenApi {
                 .baseUrl(baseUrl)
                 .appId(appId)
                 .appSecret(appSecret)
+                .modelId("x-key")
+                .modelSource("x-source")
                 .assistantCode(assistantCode)
                 .build();
 
         model.generate(content, new StreamingResponseHandler<AgentResPayload>() {
             @Override
             public void onResponse(FlamesResponse<AgentResPayload> response) {
-                log.debug("response={}", response);
+                log.info("response={}", response);
                 for (ChatTextData text : response.getPayload().getChoices().getText()) {
                     if (ContentType.TEXT == text.contentType) {
                         responseContent.append(text.getContent());
@@ -110,21 +112,21 @@ public class ClientOpenApi extends OpenApi {
                 if (response.getHeader().getCode() != 0
                         || (response.getPayload().getChoices() != null
                             && response.getPayload().getChoices().isFinish())) {
-                    log.debug("the last one message");
-                    log.debug("receive message content:{}", responseContent);
+                    log.info("the last one message");
+                    log.info("receive message content:{}", responseContent);
                     countDownLatch.countDown();
                 }
             }
 
             @Override
             public void onError(Throwable t) {
-                log.error(t.getMessage());
+                log.info(t.getMessage());
                 countDownLatch.countDown();
             }
 
             @Override
             public void onCompleted() {
-                log.debug("onComplete");
+                log.info("onComplete");
                 countDownLatch.countDown();
             }
         });
