@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -36,6 +37,8 @@ public class ClientOpenApi extends OpenApi {
 
     @Value("${s2.flames.platform.assistant-code:}")
     private String assistantCode;
+
+    private static final Pattern STAGE_PATTERN = Pattern.compile("^\\s*【[^】]+】[:：]?\\s*");
 
 
     /** 打字机効果：每个字符/字符串片段之间的间隔（毫秒）。可按需提到配置。 */
@@ -64,16 +67,31 @@ public class ClientOpenApi extends OpenApi {
                     @Override
                     public void onResponse(FlamesResponse<AgentResPayload> response) {
                         log.info("[chat-stream] onResponse, response={}", response);
+                        if (response.getPayload() == null || response.getPayload().getChoices() == null || response.getPayload().getChoices().getText() == null) {
+                            return;
+                        }
                         for (ChatTextData text : response.getPayload().getChoices().getText()) {
-                            if (ContentType.TEXT == text.contentType) {
-                                sink.next(text.getContent());
+                            if (ContentType.TEXT != text.contentType) {
+                                continue;
                             }
-                            if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
-                                log.info("[chat-stream-assistant] onResponse, response={}", response);
+                            String chunk = text.getContent();
+
+                            // 去掉类似：【生成下载申请理由处理】：
+                            chunk = STAGE_PATTERN.matcher(chunk).replaceFirst("");
+
+                            // 清洗后为空则忽略
+                            if (chunk.isBlank()) {
+                                log.debug("[chat-stream] skip stage tag");
+                                continue;
+                            }
+
+                            sink.next(chunk);
+
+                            if (text.getRole() == ChatRole.ASSISTANT) {
+                                log.info("[chat-stream-assistant] clear content={}", chunk);
                             }
                         }
-                        if (response.getHeader().getCode() != 0
-                                || (response.getPayload().getChoices() != null
+                        if (response.getHeader().getCode() != 0 || (response.getPayload().getChoices() != null
                                     && response.getPayload().getChoices().isFinish())) {
                             log.info("[chat-stream] receive last message, complete sink");
                             sink.complete();
@@ -139,14 +157,41 @@ public class ClientOpenApi extends OpenApi {
             @Override
             public void onResponse(FlamesResponse<AgentResPayload> response) {
                 log.info("[chat-sync] onResponse, response={}", response);
-                    for (ChatTextData text : response.getPayload().getChoices().getText()) {
-                    if (ContentType.TEXT == text.contentType) {
-                        responseContent.append(text.getContent());
+
+
+                for (ChatTextData text : response.getPayload().getChoices().getText()) {
+                    if (ContentType.TEXT != text.contentType) {
+                        continue;
                     }
-                        if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
-                            log.info("[chat-sync-assistant] onResponse, response={}", response);
-                        }
+                    String chunk = text.getContent();
+
+                    // 去掉类似：【生成下载申请理由处理】：
+                    chunk = STAGE_PATTERN.matcher(chunk).replaceFirst("");
+
+                    // 清洗后为空则忽略
+                    if (chunk.isBlank()) {
+                        log.info("[chat-sync] skip stage tag");
+                        continue;
+                    }
+
+                    responseContent.append(chunk);
+
+                    if (text.getRole() == ChatRole.ASSISTANT) {
+                        log.info("[chat-sync-assistant] clear content={}", chunk);
+                    }
                 }
+
+
+
+
+//                    for (ChatTextData text : response.getPayload().getChoices().getText()) {
+//                    if (ContentType.TEXT == text.contentType) {
+//                        responseContent.append(text.getContent());
+//                    }
+//                        if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
+//                            log.info("[chat-sync-assistant] onResponse, response={}", response);
+//                        }
+//                }
                 if (response.getHeader().getCode() != 0 || (response.getPayload().getChoices() != null && response.getPayload().getChoices().isFinish())) {
                     log.info("[chat-sync] receive full message content: {}", responseContent);
                     countDownLatch.countDown();
