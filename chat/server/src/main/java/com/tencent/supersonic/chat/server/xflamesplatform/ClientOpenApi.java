@@ -1,6 +1,7 @@
 package com.tencent.supersonic.chat.server.xflamesplatform;
 
 import com.iflytek.flames.data.chat.agent.AgentResPayload;
+import com.iflytek.flames.data.chat.base.ChatRole;
 import com.iflytek.flames.data.chat.base.ChatTextData;
 import com.iflytek.flames.data.chat.base.ContentType;
 import com.iflytek.flames.data.common.FlamesResponse;
@@ -66,6 +67,9 @@ public class ClientOpenApi extends OpenApi {
                         for (ChatTextData text : response.getPayload().getChoices().getText()) {
                             if (ContentType.TEXT == text.contentType) {
                                 sink.next(text.getContent());
+                            }
+                            if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
+                                log.info("[chat-stream-assistant] onResponse, response={}", response);
                             }
                         }
                         if (response.getHeader().getCode() != 0
@@ -139,6 +143,9 @@ public class ClientOpenApi extends OpenApi {
                     if (ContentType.TEXT == text.contentType) {
                         responseContent.append(text.getContent());
                     }
+                        if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
+                            log.info("[chat-sync-assistant] onResponse, response={}", response);
+                        }
                 }
                 if (response.getHeader().getCode() != 0 || (response.getPayload().getChoices() != null && response.getPayload().getChoices().isFinish())) {
                     log.info("[chat-sync] receive full message content: {}", responseContent);
