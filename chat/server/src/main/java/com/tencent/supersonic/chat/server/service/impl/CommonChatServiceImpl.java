@@ -63,18 +63,18 @@ public class CommonChatServiceImpl implements CommonChatService {
      * 系统提示词模板：根据 type 和 description 生成对应内容
      */
     private static final String REPORT_USER_PROMPT = """
-            
+
              你是一名专业的企业数据申请助手，需要根据用户输入内容，生成规范、专业、易审批的“申请理由”。
-            
+
              【输入信息】
              当前任务类型：%s
              任务描述：%s
              where条件：%s
              上一次生成理由：%s
-            
+
              【核心目标】
              请结合任务信息，生成一段真实、准确、简洁的申请理由，用于企业内部审批场景。
-            
+
              【通用输出要求】
              1. 理由必须与任务描述、业务用途、查询条件强相关。
              2. 表达需自然、专业、清晰，符合企业内部申请语境。
@@ -88,7 +88,7 @@ public class CommonChatServiceImpl implements CommonChatService {
                 - 如果生成后自查发现不足20字，必须立即补充业务目的或数据类型描述，直至达标。
                 - 禁止为了凑字数而添加无意义的虚词或重复内容。
              6. 仅输出最终理由，不输出解释、分析过程或其它内容。
-            
+
              【避免与上次重复的强制策略】
              如果“上一次生成理由”不为空，你必须严格遵循以下策略，生成一个业务含义一致但表达完全不同的新理由：
              1. 结构性变化：必须彻底改变句子的主谓宾结构或表达视角，仅替换单个动词（如将“下载”改为“获取”）将被判定为无效变化。
@@ -103,9 +103,9 @@ public class CommonChatServiceImpl implements CommonChatService {
                 - 无效重复：“用于产品评估下载全国全场景活跃用户数据”（仅调整语序）
                 - 无效重复：完全照搬上一次理由，一字不改。
              5. 生成后内部自检：在输出前，必须对比“上一次生成理由”。如果新理由仅通过替换1-2个非实质性词语或调整语序得到，请立即重新构思，直至结构明显不同。
-            
+
              【不同任务类型生成规则】
-            
+
              一、取数申请理由
              场景说明：用户提供的“任务描述”通常为SQL执行语句。
              生成要求：
@@ -114,7 +114,7 @@ public class CommonChatServiceImpl implements CommonChatService {
              3. 不允许输出任何SQL相关内容。
              4. 理由必须完整包含：查询什么业务数据，用于什么业务事项。
              5. 若需应用避免重复策略，可改变业务事项的描述角度（如“核对”变为“整理记录”，“分析”变为“确认结果”），但不得省略数据描述。
-            
+
              二、报表申请理由
              场景说明：报表申请的本质是“下载数据”。
              生成要求：
@@ -122,7 +122,7 @@ public class CommonChatServiceImpl implements CommonChatService {
              2. 结合任务描述与where条件，明确下载的数据对象。
              3. 建议采用“为……（业务事项），下载……（数据描述）”的框架，自然满足字数要求。
              4. 若需应用避免重复策略，优先改变“业务事项”的表述方式，不得简化“数据描述”部分。
-            
+
              三、订阅报表理由
              场景说明：订阅报表会将相关数据定期发送给订阅人。
              生成要求：
@@ -130,7 +130,7 @@ public class CommonChatServiceImpl implements CommonChatService {
              2. 结合任务描述与where条件，说明关注的数据内容。
              3. 理由必须包含：为什么需要持续关注，订阅接收什么数据。
              4. 若需应用避免重复策略，优先通过更换“持续关注”的具体原因或动作，以及“数据内容”的同义描述来实现（如“监控销售动态”对“追踪业绩变化”），确保信息完整。
-            
+
             【最终要求与自检】
             输出内容必须：简洁专业、贴近真实业务、易于审批人员理解、避免模板化表达。
             在输出最终理由前，必须执行以下自检，不通过的必须重新调整直至全部满足：
@@ -249,8 +249,8 @@ public class CommonChatServiceImpl implements CommonChatService {
                 break;
         }
         String whereClause = input.getWhere() != null ? input.getWhere() : "无";
-        return String.format(FLAMES_REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause,
-                input.getLastReason());
+        return String.format(FLAMES_REPORT_USER_PROMPT, typeName, input.getDescription(),
+                whereClause, input.getLastReason());
     }
 
 
@@ -362,7 +362,7 @@ public class CommonChatServiceImpl implements CommonChatService {
     }
 
     private Map<String, Object> convertToRetrieval(EmbeddingMatch<TextSegment> embeddingMatch,
-                                                   boolean flag) {
+            boolean flag) {
         Map<String, Object> retrieval = new LinkedHashMap<>();
         TextSegment embedded = embeddingMatch.embedded();
         if (MapUtils.isNotEmpty(embedded.metadata().toMap())) {

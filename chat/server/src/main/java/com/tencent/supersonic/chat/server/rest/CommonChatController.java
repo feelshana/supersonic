@@ -28,54 +28,54 @@ public class CommonChatController {
     @Resource
     private CommonChatService commonChatService;
 
-//    /**
-//     * 流式对话（SSE）
-//     */
-//    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-//    public SseEmitter streamChat(@RequestBody @Valid CommonChatReq input) {
-//        SseEmitter emitter = new SseEmitter(120000L);
-//
-//        var subscription = commonChatService.streamChat(input).subscribe(chunk -> {
-//            try {
-//                Map<String, String> wrapper = Map.of("data", chunk);
-//                String jsonData = JSON.toJSONString(wrapper);
-//                emitter.send(SseEmitter.event().data(jsonData, MediaType.APPLICATION_JSON));
-//            } catch (IOException e) {
-//                emitter.completeWithError(e);
-//            }
-//        }, error -> {
-//            log.error("SSE stream error", error);
-//            emitter.completeWithError(error);
-//        }, () -> {
-//            try {
-//                emitter.send(SseEmitter.event().name("complete").data(""));
-//                emitter.complete();
-//                log.info("SSE stream completed");
-//            } catch (IOException e) {
-//                emitter.completeWithError(e);
-//            }
-//        });
-//
-//        emitter.onTimeout(() -> {
-//            log.warn("SSE stream timeout");
-//            subscription.dispose();
-//            emitter.complete();
-//        });
-//
-//        emitter.onCompletion(subscription::dispose);
-//
-//        return emitter;
-//    }
-//
-//
-//    /**
-//     * 流式对话（SSE）
-//     */
-//    @PostMapping(value = "/normalChat")
-//    public String normalChat(String whereSql) {
-//        return commonChatService.normalChat(whereSql);
-//
-//    }
+    // /**
+    // * 流式对话（SSE）
+    // */
+    // @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    // public SseEmitter streamChat(@RequestBody @Valid CommonChatReq input) {
+    // SseEmitter emitter = new SseEmitter(120000L);
+    //
+    // var subscription = commonChatService.streamChat(input).subscribe(chunk -> {
+    // try {
+    // Map<String, String> wrapper = Map.of("data", chunk);
+    // String jsonData = JSON.toJSONString(wrapper);
+    // emitter.send(SseEmitter.event().data(jsonData, MediaType.APPLICATION_JSON));
+    // } catch (IOException e) {
+    // emitter.completeWithError(e);
+    // }
+    // }, error -> {
+    // log.error("SSE stream error", error);
+    // emitter.completeWithError(error);
+    // }, () -> {
+    // try {
+    // emitter.send(SseEmitter.event().name("complete").data(""));
+    // emitter.complete();
+    // log.info("SSE stream completed");
+    // } catch (IOException e) {
+    // emitter.completeWithError(e);
+    // }
+    // });
+    //
+    // emitter.onTimeout(() -> {
+    // log.warn("SSE stream timeout");
+    // subscription.dispose();
+    // emitter.complete();
+    // });
+    //
+    // emitter.onCompletion(subscription::dispose);
+    //
+    // return emitter;
+    // }
+    //
+    //
+    // /**
+    // * 流式对话（SSE）
+    // */
+    // @PostMapping(value = "/normalChat")
+    // public String normalChat(String whereSql) {
+    // return commonChatService.normalChat(whereSql);
+    //
+    // }
 
     @GetMapping(value = "/recall")
     public List<Map<String, Object>> retrieveQuery(String query, String modelId, Integer topK) {

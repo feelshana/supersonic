@@ -49,14 +49,9 @@ public class ClientOpenApi extends OpenApi {
         Flux<String> rawChunks = Flux.create(sink -> {
             AgentStreamingLanguageModel model;
             try {
-                model = AgentStreamingLanguageModel.builder()
-                        .baseUrl(baseUrl)
-                        .appId(appId)
-                        .appSecret(appSecret)
-                        .modelId("x-key")
-                        .modelSource("x-source")
-                        .assistantCode(assistantCode)
-                        .build();
+                model = AgentStreamingLanguageModel.builder().baseUrl(baseUrl).appId(appId)
+                        .appSecret(appSecret).modelId("x-key").modelSource("x-source")
+                        .assistantCode(assistantCode).build();
             } catch (NoSuchAlgorithmException | KeyManagementException e) {
                 sink.error(new RuntimeException(e));
                 return;
@@ -67,7 +62,9 @@ public class ClientOpenApi extends OpenApi {
                     @Override
                     public void onResponse(FlamesResponse<AgentResPayload> response) {
                         log.info("[chat-stream] onResponse, response={}", response);
-                        if (response.getPayload() == null || response.getPayload().getChoices() == null || response.getPayload().getChoices().getText() == null) {
+                        if (response.getPayload() == null
+                                || response.getPayload().getChoices() == null
+                                || response.getPayload().getChoices().getText() == null) {
                             return;
                         }
                         for (ChatTextData text : response.getPayload().getChoices().getText()) {
@@ -91,8 +88,9 @@ public class ClientOpenApi extends OpenApi {
                                 log.info("[chat-stream-assistant] clear content={}", chunk);
                             }
                         }
-                        if (response.getHeader().getCode() != 0 || (response.getPayload().getChoices() != null
-                                    && response.getPayload().getChoices().isFinish())) {
+                        if (response.getHeader().getCode() != 0
+                                || (response.getPayload().getChoices() != null
+                                        && response.getPayload().getChoices().isFinish())) {
                             log.info("[chat-stream] receive last message, complete sink");
                             sink.complete();
                         }
@@ -116,14 +114,12 @@ public class ClientOpenApi extends OpenApi {
         }, FluxSink.OverflowStrategy.BUFFER);
 
         // 2) 将每个大 chunk 拆成“字符粒度”，并以固定间隔向下游推送，营造打字机效果
-        return rawChunks
-                .concatMap(chunk -> Flux.fromIterable(splitToGraphemes(chunk))
-                        .delayElements(Duration.ofMillis(TYPING_INTERVAL_MS)));
+        return rawChunks.concatMap(chunk -> Flux.fromIterable(splitToGraphemes(chunk))
+                .delayElements(Duration.ofMillis(TYPING_INTERVAL_MS)));
     }
 
     /**
-     * 按 Unicode code point 拆分，避免 emoji / 补充平面字符被拆出乱码。
-     * 如果只需ASCII中文，也可以直接 chunk.split("")。
+     * 按 Unicode code point 拆分，避免 emoji / 补充平面字符被拆出乱码。 如果只需ASCII中文，也可以直接 chunk.split("")。
      */
     private static List<String> splitToGraphemes(String chunk) {
         if (chunk == null || chunk.isEmpty()) {
@@ -144,14 +140,9 @@ public class ClientOpenApi extends OpenApi {
         CountDownLatch countDownLatch = new CountDownLatch(1);
         StringBuilder responseContent = new StringBuilder();
 
-        AgentStreamingLanguageModel model = AgentStreamingLanguageModel.builder()
-                .baseUrl(baseUrl)
-                .appId(appId)
-                .appSecret(appSecret)
-                .modelId("x-key")
-                .modelSource("x-source")
-                .assistantCode(assistantCode)
-                .build();
+        AgentStreamingLanguageModel model = AgentStreamingLanguageModel.builder().baseUrl(baseUrl)
+                .appId(appId).appSecret(appSecret).modelId("x-key").modelSource("x-source")
+                .assistantCode(assistantCode).build();
 
         model.generate(content, new StreamingResponseHandler<AgentResPayload>() {
             @Override
@@ -183,16 +174,18 @@ public class ClientOpenApi extends OpenApi {
 
 
 
-
-//                    for (ChatTextData text : response.getPayload().getChoices().getText()) {
-//                    if (ContentType.TEXT == text.contentType) {
-//                        responseContent.append(text.getContent());
-//                    }
-//                        if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT == text.contentType){
-//                            log.info("[chat-sync-assistant] onResponse, response={}", response);
-//                        }
-//                }
-                if (response.getHeader().getCode() != 0 || (response.getPayload().getChoices() != null && response.getPayload().getChoices().isFinish())) {
+                // for (ChatTextData text : response.getPayload().getChoices().getText()) {
+                // if (ContentType.TEXT == text.contentType) {
+                // responseContent.append(text.getContent());
+                // }
+                // if (text.getRole() == ChatRole.ASSISTANT && ContentType.TEXT ==
+                // text.contentType){
+                // log.info("[chat-sync-assistant] onResponse, response={}", response);
+                // }
+                // }
+                if (response.getHeader().getCode() != 0
+                        || (response.getPayload().getChoices() != null
+                                && response.getPayload().getChoices().isFinish())) {
                     log.info("[chat-sync] receive full message content: {}", responseContent);
                     countDownLatch.countDown();
                 }
