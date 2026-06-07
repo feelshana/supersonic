@@ -2,11 +2,11 @@ package com.tencent.supersonic.chat.server.service.impl;
 
 import javax.annotation.Resource;
 
-import com.amazonaws.services.dynamodbv2.xspec.S;
 import com.tencent.supersonic.chat.api.pojo.request.CommonChatReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.CommonChatService;
+import com.tencent.supersonic.chat.server.xflamesplatform.ClientOpenApi;
 import com.tencent.supersonic.common.config.EmbeddingConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
@@ -49,6 +49,15 @@ public class CommonChatServiceImpl implements CommonChatService {
     private AgentService agentService;
 
     public static final String APP_KEY = "S2SQL_PARSER";
+
+
+    private static final String FLAMES_REPORT_USER_PROMPT = """
+            当前任务类型：%s
+            任务描述：%s
+            where条件：%s
+            上一次生成理由：%s
+            """;
+
 
     /**
      * 系统提示词模板：根据 type 和 description 生成对应内容
@@ -130,7 +139,7 @@ public class CommonChatServiceImpl implements CommonChatService {
             3. 差异度检查（最关键）：
                - 若“上一次生成理由”不为空，请逐字对比。新理由绝不能与上一次理由完全相同。
                - 如果发现完全一致，或者仅仅改变了标点符号、空格位置，必须立刻推翻，改用全新的动作或不同的业务视角重新生成。
-             """;
+            """;
 
 
     private static final String TYPE_REPORT = "报表申请理由";
@@ -220,6 +229,28 @@ public class CommonChatServiceImpl implements CommonChatService {
         String whereClause = input.getWhere() != null ? input.getWhere() : "无";
         return String.format(REPORT_USER_PROMPT, typeName, input.getDescription(), whereClause,
                 input.getLastReason());
+    }
+
+
+    @NotNull
+    private static String getFlamesPrompt(CommonChatReq input) {
+        String typeName = "";
+        switch (input.getType()) {
+            case 1:
+                typeName = TYPE_REPORT;
+                break;
+            case 2:
+                typeName = TYPE_DATA;
+                break;
+            case 3:
+                typeName = TYPE_SUBSCRIBE;
+                break;
+            default:
+                break;
+        }
+        String whereClause = input.getWhere() != null ? input.getWhere() : "无";
+        return String.format(FLAMES_REPORT_USER_PROMPT, typeName, input.getDescription(),
+                whereClause, input.getLastReason());
     }
 
 
@@ -344,4 +375,27 @@ public class CommonChatServiceImpl implements CommonChatService {
 
         return retrieval;
     }
+
+
+    @Resource
+    private ClientOpenApi clientOpenApi;
+
+
+    @Override
+    public Flux<String> flamesStreamChat(CommonChatReq input) throws Exception {
+        // 1. 构建提示词
+        String prompt = getFlamesPrompt(input);
+        return clientOpenApi.chat(prompt);
+
+    }
+
+
+    @Override
+    public String flamesChat(String whereSql) throws Exception {
+        // 1. 构建提示词
+        String prompt = getFlamesPrompt(new CommonChatReq(2, whereSql, "无", null));
+        return clientOpenApi.chatAsString(prompt);
+
+    }
+
 }

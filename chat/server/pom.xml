@@ -40,6 +40,28 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>com.iflytek.flames</groupId>
+            <artifactId>flames-platform-data</artifactId>
+            <version>2.2.3-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/flames-platform-data-2.2.3-SNAPSHOT.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.iflytek.flames</groupId>
+            <artifactId>flames-api-sdk</artifactId>
+            <version>2.2.3-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/flames-api-sdk-2.2.3-SNAPSHOT.jar</systemPath>
+        </dependency>
+
+        <!-- flames-api-sdk 运行期依赖 Hutool 的 cn.hutool.core.util.ObjectUtil 等工具类 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-core</artifactId>
+            <version>5.8.27</version>
+        </dependency>
     </dependencies>
 
 </project>
