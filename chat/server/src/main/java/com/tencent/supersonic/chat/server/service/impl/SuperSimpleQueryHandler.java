@@ -52,6 +52,7 @@ public class SuperSimpleQueryHandler {
     private static final String PLACEHOLDER_DATE = "{{CURRENT_DATE}}";
     private static final String PLACEHOLDER_SCHEMA = "{{SCHEMA_INFO}}";
     private static final String PLACEHOLDER_QUERY = "{{QUERY_TEXT}}";
+    private static final String VIRTUAL_TABLE_NAME = "__virtual_table__";
     private final AgentService agentService;
     private final SemanticLayerService semanticLayerService;
 
@@ -114,6 +115,13 @@ public class SuperSimpleQueryHandler {
             }
             // 清理 LLM 可能输出的 markdown 代码块标记
             sql = cleanSql(sql);
+
+            // 如果使用了虚拟表名（sqlQuery 子查询场景），将虚拟表名替换为实际子查询
+            String sqlQuerySubquery = resolveSqlQuery(resolvedModelId);
+            if (StringUtils.isNotBlank(sqlQuerySubquery)) {
+                sql = replaceVirtualTable(sql, sqlQuerySubquery);
+                log.info("[SUPER_SIMPLE] 虚拟表名已替换为子查询，最终SQL: {}", sql);
+            }
 
             // Step 5: 将物理 SQL 通过 sqlInfo.querySQL 交给 semanticLayerService 执行
             // queryByReq 检测到 sqlInfo.querySQL 非空时，会直接 setSql + setIsTranslated(true)，
@@ -277,6 +285,7 @@ public class SuperSimpleQueryHandler {
     /**
      * 根据 modelId 获取物理表名（tableQuery 字段）。 直接返回原始 tableQuery（含 db.table 格式），由 JdbcExecutor 通过
      * ontology.getDatabase() 正确定位数据库。
+     * 当 tableQuery 为空但 sqlQuery 不为空时（子查询场景），返回虚拟表名供 LLM 使用。
      */
     private String resolvePhysicalTableName(Long modelId) {
         if (modelId == null) {
@@ -293,11 +302,60 @@ public class SuperSimpleQueryHandler {
                     log.info("[SUPER_SIMPLE] 获取到物理表名: {}", tableQuery);
                     return tableQuery;
                 }
+                // tableQuery 为空但 sqlQuery 不为空：子查询场景，返回虚拟表名
+                String sqlQuery = models.get(0).getModelDetail() != null
+                        ? models.get(0).getModelDetail().getSqlQuery()
+                        : null;
+                if (StringUtils.isNotBlank(sqlQuery)) {
+                    log.info("[SUPER_SIMPLE] tableQuery为空，sqlQuery不为空，使用虚拟表名: {}", VIRTUAL_TABLE_NAME);
+                    return VIRTUAL_TABLE_NAME;
+                }
             }
         } catch (Exception e) {
             log.warn("[SUPER_SIMPLE] 获取物理表名失败，将跳过", e);
         }
         return null;
+    }
+
+    /**
+     * 根据 modelId 获取 sqlQuery（子查询SQL）。
+     * 仅当 tableQuery 为空且 sqlQuery 不为空时返回 sqlQuery，否则返回 null。
+     */
+    private String resolveSqlQuery(Long modelId) {
+        if (modelId == null) {
+            return null;
+        }
+        try {
+            SchemaService schemaService = ContextUtils.getBean(SchemaService.class);
+            List<ModelResp> models = schemaService.getModelList(List.of(modelId));
+            if (models != null && !models.isEmpty() && models.get(0).getModelDetail() != null) {
+                String tableQuery = models.get(0).getModelDetail().getTableQuery();
+                String sqlQuery = models.get(0).getModelDetail().getSqlQuery();
+                // 仅在 tableQuery 为空且 sqlQuery 不为空时返回
+                if (StringUtils.isBlank(tableQuery) && StringUtils.isNotBlank(sqlQuery)) {
+                    return sqlQuery;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SUPER_SIMPLE] 获取 sqlQuery 失败", e);
+        }
+        return null;
+    }
+
+    /**
+     * 将 SQL 中的虚拟表名替换为实际子查询。
+     * 支持 `__virtual_table__`、__virtual_table__、"__virtual_table__" 等各种引用格式。
+     */
+    private String replaceVirtualTable(String sql, String sqlQuery) {
+        String subquery = "(" + sqlQuery + ") AS " + VIRTUAL_TABLE_NAME;
+        if (sql.contains("`" + VIRTUAL_TABLE_NAME + "`")) {
+            // 替换带反引号的形式: `__virtual_table__`
+            sql = sql.replace("`" + VIRTUAL_TABLE_NAME + "`", subquery);
+        } else {
+            // 替换不带反引号的形式: __virtual_table__
+            sql = sql.replace(VIRTUAL_TABLE_NAME, subquery);
+        }
+        return sql;
     }
 
     /**
