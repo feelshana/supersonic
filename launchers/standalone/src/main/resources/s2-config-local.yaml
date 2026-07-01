@@ -77,6 +77,19 @@ s2:
       dataSet: 4
     database:
       name: "supersonic"
+    # 维度值校验配置
+    value:
+      validation:
+        enabled: true
+        fallback-db-limit: 20
+        similarity-threshold: 0.85
+
+  flames:
+    platform:
+      base-url: "http://36.155.97.100:31111"
+      app-id: "B8D5D785DF4C4BFF8596"
+      app-secret: "702C75499B03473C9A93F08C1D218B96"
+      assistant-code: "botserverdialog@2059162290901098496"
 
   #BI智能报表
   bi:

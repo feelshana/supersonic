@@ -52,7 +52,7 @@ public class SuperSimpleQueryHandler {
     private static final String PLACEHOLDER_DATE = "{{CURRENT_DATE}}";
     private static final String PLACEHOLDER_SCHEMA = "{{SCHEMA_INFO}}";
     private static final String PLACEHOLDER_QUERY = "{{QUERY_TEXT}}";
-    private static final String VIRTUAL_TABLE_NAME = "__virtual_table__";
+    private static final String VIRTUAL_TABLE_NAME = "virtual_table";
     private final AgentService agentService;
     private final SemanticLayerService semanticLayerService;
 
@@ -284,8 +284,7 @@ public class SuperSimpleQueryHandler {
 
     /**
      * 根据 modelId 获取物理表名（tableQuery 字段）。 直接返回原始 tableQuery（含 db.table 格式），由 JdbcExecutor 通过
-     * ontology.getDatabase() 正确定位数据库。
-     * 当 tableQuery 为空但 sqlQuery 不为空时（子查询场景），返回虚拟表名供 LLM 使用。
+     * ontology.getDatabase() 正确定位数据库。 当 tableQuery 为空但 sqlQuery 不为空时（子查询场景），返回虚拟表名供 LLM 使用。
      */
     private String resolvePhysicalTableName(Long modelId) {
         if (modelId == null) {
@@ -307,7 +306,8 @@ public class SuperSimpleQueryHandler {
                         ? models.get(0).getModelDetail().getSqlQuery()
                         : null;
                 if (StringUtils.isNotBlank(sqlQuery)) {
-                    log.info("[SUPER_SIMPLE] tableQuery为空，sqlQuery不为空，使用虚拟表名: {}", VIRTUAL_TABLE_NAME);
+                    log.info("[SUPER_SIMPLE] tableQuery为空，sqlQuery不为空，使用虚拟表名: {}",
+                            VIRTUAL_TABLE_NAME);
                     return VIRTUAL_TABLE_NAME;
                 }
             }
@@ -318,8 +318,7 @@ public class SuperSimpleQueryHandler {
     }
 
     /**
-     * 根据 modelId 获取 sqlQuery（子查询SQL）。
-     * 仅当 tableQuery 为空且 sqlQuery 不为空时返回 sqlQuery，否则返回 null。
+     * 根据 modelId 获取 sqlQuery（子查询SQL）。 仅当 tableQuery 为空且 sqlQuery 不为空时返回 sqlQuery，否则返回 null。
      */
     private String resolveSqlQuery(Long modelId) {
         if (modelId == null) {
@@ -343,8 +342,7 @@ public class SuperSimpleQueryHandler {
     }
 
     /**
-     * 将 SQL 中的虚拟表名替换为实际子查询。
-     * 支持 `__virtual_table__`、__virtual_table__、"__virtual_table__" 等各种引用格式。
+     * 将 SQL 中的虚拟表名替换为实际子查询。 支持 `__virtual_table__`、__virtual_table__、"__virtual_table__" 等各种引用格式。
      */
     private String replaceVirtualTable(String sql, String sqlQuery) {
         String subquery = "(" + sqlQuery + ") AS " + VIRTUAL_TABLE_NAME;

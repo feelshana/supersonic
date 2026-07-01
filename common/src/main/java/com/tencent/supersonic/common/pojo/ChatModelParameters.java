@@ -35,29 +35,46 @@ public class ChatModelParameters {
     public static final Parameter CHAT_MODEL_TIMEOUT =
             new Parameter("timeOut", "60", "超时时间(秒)", "", "number", MODULE_NAME);
 
+    public static final Parameter CHAT_MODEL_THINKING_TYPE =
+            new Parameter("thinkingType", "disabled", "思考模式", "", "list", MODULE_NAME,
+                    Lists.newArrayList("disabled", "enabled"), getThinkingTypeDependency());
+
+    public static final Parameter CHAT_MODEL_THINKING_BUDGET =
+            new Parameter("thinkingBudgetTokens", "8000", "思考Token预算", "", "number", MODULE_NAME,
+                    null, getThinkingBudgetDependency());
+
+    public static final Parameter CHAT_MODEL_REASONING_EFFORT =
+            new Parameter("reasoningEffort", "high", "思考强度", "", "list", MODULE_NAME,
+                    Lists.newArrayList("high", "max"), getReasoningEffortDependency());
+
     public static List<Parameter> getParameters() {
         return Lists.newArrayList(CHAT_MODEL_PROVIDER, CHAT_MODEL_BASE_URL, CHAT_MODEL_API_KEY,
                 CHAT_MODEL_NAME, CHAT_MODEL_API_VERSION, CHAT_MODEL_TEMPERATURE,
-                CHAT_MODEL_TIMEOUT);
+                CHAT_MODEL_TIMEOUT, CHAT_MODEL_THINKING_TYPE, CHAT_MODEL_THINKING_BUDGET,
+                CHAT_MODEL_REASONING_EFFORT);
     }
 
     private static List<String> getCandidateProviders() {
         return Lists.newArrayList(OpenAiModelFactory.PROVIDER, OllamaModelFactory.PROVIDER,
-                DifyModelFactory.PROVIDER);
+                DifyModelFactory.PROVIDER, DeepSeekModelFactory.PROVIDER);
     }
 
     private static List<Parameter.Dependency> getBaseUrlDependency() {
         return getDependency(CHAT_MODEL_PROVIDER.getName(), getCandidateProviders(),
                 ImmutableMap.of(OpenAiModelFactory.PROVIDER, OpenAiModelFactory.DEFAULT_BASE_URL,
                         OllamaModelFactory.PROVIDER, OllamaModelFactory.DEFAULT_BASE_URL,
-                        DifyModelFactory.PROVIDER, DifyModelFactory.DEFAULT_BASE_URL));
+                        DifyModelFactory.PROVIDER, DifyModelFactory.DEFAULT_BASE_URL,
+                        DeepSeekModelFactory.PROVIDER, DeepSeekModelFactory.DEFAULT_BASE_URL));
     }
 
     private static List<Parameter.Dependency> getApiKeyDependency() {
         return getDependency(CHAT_MODEL_PROVIDER.getName(),
-                Lists.newArrayList(OpenAiModelFactory.PROVIDER, DifyModelFactory.PROVIDER),
+                Lists.newArrayList(OpenAiModelFactory.PROVIDER, DifyModelFactory.PROVIDER,
+                        DeepSeekModelFactory.PROVIDER),
                 ImmutableMap.of(OpenAiModelFactory.PROVIDER,
                         ModelProvider.DEMO_CHAT_MODEL.getApiKey(), DifyModelFactory.PROVIDER,
+                        ModelProvider.DEMO_CHAT_MODEL.getApiKey(),
+                        DeepSeekModelFactory.PROVIDER,
                         ModelProvider.DEMO_CHAT_MODEL.getApiKey()));
     }
 
@@ -71,7 +88,8 @@ public class ChatModelParameters {
         return getDependency(CHAT_MODEL_PROVIDER.getName(), getCandidateProviders(),
                 ImmutableMap.of(OpenAiModelFactory.PROVIDER, OpenAiModelFactory.DEFAULT_MODEL_NAME,
                         OllamaModelFactory.PROVIDER, OllamaModelFactory.DEFAULT_MODEL_NAME,
-                        DifyModelFactory.PROVIDER, DifyModelFactory.DEFAULT_MODEL_NAME));
+                        DifyModelFactory.PROVIDER, DifyModelFactory.DEFAULT_MODEL_NAME,
+                        DeepSeekModelFactory.PROVIDER, DeepSeekModelFactory.DEFAULT_MODEL_NAME));
     }
 
     private static List<Parameter.Dependency> getEndpointDependency() {
@@ -90,6 +108,24 @@ public class ChatModelParameters {
         return getDependency(CHAT_MODEL_PROVIDER.getName(),
                 Lists.newArrayList(OpenAiModelFactory.PROVIDER), ImmutableMap.of(
                         OpenAiModelFactory.PROVIDER, ModelProvider.DEMO_CHAT_MODEL.getApiKey()));
+    }
+
+    private static List<Parameter.Dependency> getThinkingTypeDependency() {
+        return getDependency(CHAT_MODEL_PROVIDER.getName(),
+                Lists.newArrayList(DeepSeekModelFactory.PROVIDER),
+                ImmutableMap.of(DeepSeekModelFactory.PROVIDER, "disabled"));
+    }
+
+    private static List<Parameter.Dependency> getReasoningEffortDependency() {
+        return getDependency(CHAT_MODEL_PROVIDER.getName(),
+                Lists.newArrayList(DeepSeekModelFactory.PROVIDER),
+                ImmutableMap.of(DeepSeekModelFactory.PROVIDER, "high"));
+    }
+
+    private static List<Parameter.Dependency> getThinkingBudgetDependency() {
+        return getDependency(CHAT_MODEL_PROVIDER.getName(),
+                Lists.newArrayList(DeepSeekModelFactory.PROVIDER),
+                ImmutableMap.of(DeepSeekModelFactory.PROVIDER, "8000"));
     }
 
     private static List<Parameter.Dependency> getDependency(String dependencyParameterName,
