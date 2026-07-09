@@ -30,7 +30,10 @@ public class ChatModelConfig implements Serializable {
     private Boolean enableSearch = false;
     private Boolean jsonFormat = false;
     private String jsonFormatType = "json_schema";
-    /** DeepSeek thinking mode: "disabled"/"enabled". Defaults to disabled for V4 (V4 defaults to enabled if not sent). */
+    /**
+     * DeepSeek thinking mode: "disabled"/"enabled". Defaults to disabled for V4 (V4 defaults to
+     * enabled if not sent).
+     */
     private String thinkingType = "disabled";
     /** DeepSeek thinking budget tokens, only effective when thinkingType=enabled */
     private Integer thinkingBudgetTokens = 8000;

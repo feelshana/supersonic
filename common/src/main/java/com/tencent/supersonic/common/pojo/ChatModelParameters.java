@@ -39,9 +39,8 @@ public class ChatModelParameters {
             new Parameter("thinkingType", "disabled", "思考模式", "", "list", MODULE_NAME,
                     Lists.newArrayList("disabled", "enabled"), getThinkingTypeDependency());
 
-    public static final Parameter CHAT_MODEL_THINKING_BUDGET =
-            new Parameter("thinkingBudgetTokens", "8000", "思考Token预算", "", "number", MODULE_NAME,
-                    null, getThinkingBudgetDependency());
+    public static final Parameter CHAT_MODEL_THINKING_BUDGET = new Parameter("thinkingBudgetTokens",
+            "8000", "思考Token预算", "", "number", MODULE_NAME, null, getThinkingBudgetDependency());
 
     public static final Parameter CHAT_MODEL_REASONING_EFFORT =
             new Parameter("reasoningEffort", "high", "思考强度", "", "list", MODULE_NAME,
@@ -49,9 +48,8 @@ public class ChatModelParameters {
 
     public static List<Parameter> getParameters() {
         return Lists.newArrayList(CHAT_MODEL_PROVIDER, CHAT_MODEL_BASE_URL, CHAT_MODEL_API_KEY,
-                CHAT_MODEL_NAME, CHAT_MODEL_API_VERSION, CHAT_MODEL_TEMPERATURE,
-                CHAT_MODEL_TIMEOUT, CHAT_MODEL_THINKING_TYPE, CHAT_MODEL_THINKING_BUDGET,
-                CHAT_MODEL_REASONING_EFFORT);
+                CHAT_MODEL_NAME, CHAT_MODEL_API_VERSION, CHAT_MODEL_TEMPERATURE, CHAT_MODEL_TIMEOUT,
+                CHAT_MODEL_THINKING_TYPE, CHAT_MODEL_THINKING_BUDGET, CHAT_MODEL_REASONING_EFFORT);
     }
 
     private static List<String> getCandidateProviders() {
@@ -73,8 +71,7 @@ public class ChatModelParameters {
                         DeepSeekModelFactory.PROVIDER),
                 ImmutableMap.of(OpenAiModelFactory.PROVIDER,
                         ModelProvider.DEMO_CHAT_MODEL.getApiKey(), DifyModelFactory.PROVIDER,
-                        ModelProvider.DEMO_CHAT_MODEL.getApiKey(),
-                        DeepSeekModelFactory.PROVIDER,
+                        ModelProvider.DEMO_CHAT_MODEL.getApiKey(), DeepSeekModelFactory.PROVIDER,
                         ModelProvider.DEMO_CHAT_MODEL.getApiKey()));
     }
 

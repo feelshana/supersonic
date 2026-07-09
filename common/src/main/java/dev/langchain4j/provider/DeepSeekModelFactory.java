@@ -19,16 +19,12 @@ public class DeepSeekModelFactory implements ModelFactory, InitializingBean {
 
     @Override
     public ChatLanguageModel createChatModel(ChatModelConfig modelConfig) {
-        return DeepSeekChatModel.builder()
-                .baseUrl(modelConfig.getBaseUrl())
-                .apiKey(modelConfig.keyDecrypt())
-                .modelName(modelConfig.getModelName())
-                .temperature(modelConfig.getTemperature())
-                .timeoutSeconds(modelConfig.getTimeOut())
+        return DeepSeekChatModel.builder().baseUrl(modelConfig.getBaseUrl())
+                .apiKey(modelConfig.keyDecrypt()).modelName(modelConfig.getModelName())
+                .temperature(modelConfig.getTemperature()).timeoutSeconds(modelConfig.getTimeOut())
                 .thinkingType(modelConfig.getThinkingType())
                 .thinkingBudgetTokens(modelConfig.getThinkingBudgetTokens())
-                .reasoningEffort(modelConfig.getReasoningEffort())
-                .build();
+                .reasoningEffort(modelConfig.getReasoningEffort()).build();
     }
 
     @Override
@@ -39,16 +35,12 @@ public class DeepSeekModelFactory implements ModelFactory, InitializingBean {
 
     @Override
     public StreamingChatLanguageModel createStreamChatModel(ChatModelConfig modelConfig) {
-        return DeepSeekStreamingChatModel.builder()
-                .baseUrl(modelConfig.getBaseUrl())
-                .apiKey(modelConfig.keyDecrypt())
-                .modelName(modelConfig.getModelName())
-                .temperature(modelConfig.getTemperature())
-                .timeoutSeconds(modelConfig.getTimeOut())
+        return DeepSeekStreamingChatModel.builder().baseUrl(modelConfig.getBaseUrl())
+                .apiKey(modelConfig.keyDecrypt()).modelName(modelConfig.getModelName())
+                .temperature(modelConfig.getTemperature()).timeoutSeconds(modelConfig.getTimeOut())
                 .thinkingType(modelConfig.getThinkingType())
                 .thinkingBudgetTokens(modelConfig.getThinkingBudgetTokens())
-                .reasoningEffort(modelConfig.getReasoningEffort())
-                .build();
+                .reasoningEffort(modelConfig.getReasoningEffort()).build();
     }
 
     @Override
