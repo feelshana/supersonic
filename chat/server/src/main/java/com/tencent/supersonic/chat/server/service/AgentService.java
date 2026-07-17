@@ -1,6 +1,7 @@
 package com.tencent.supersonic.chat.server.service;
 
 import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.agent.AgentContextResp;
 import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
 import com.tencent.supersonic.chat.server.agent.TermDTO;
 import com.tencent.supersonic.common.pojo.User;
@@ -49,4 +50,17 @@ public interface AgentService {
      * @return 术语信息列表
      */
     List<TermDTO> getAgentTerms(Integer agentId, String termName, String alias, User user);
+
+    /**
+     * 合并获取数据集信息 + 术语信息，一次调用返回全部 Agent 上下文。
+     *
+     * @param agentId Agent ID
+     * @param queryText 用户问题（可选），传入时会执行语义映射
+     * @param termName 术语名称（可选），传入时按名称过滤术语
+     * @param alias 别名关键词（可选），传入时按别名模糊过滤术语
+     * @param user 当前用户
+     * @return 包含 dataSetInfo、terms、currentDate 的统一响应
+     */
+    AgentContextResp getAgentContext(Integer agentId, String queryText, String termName,
+            String alias, User user);
 }

@@ -8,6 +8,7 @@ import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.agent.AgentContextResp;
 import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
 import com.tencent.supersonic.chat.server.agent.TermDTO;
 import com.tencent.supersonic.chat.server.agent.VisualConfig;
@@ -791,6 +792,19 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
             }
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    public AgentContextResp getAgentContext(Integer agentId, String queryText, String termName,
+            String alias, User user) {
+        String dataSetInfo = getAgentDataSetInfo(agentId, queryText, user);
+        List<TermDTO> terms = getAgentTerms(agentId, termName, alias, user);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
+        String currentDate = LocalDate.now().format(formatter);
+
+        return AgentContextResp.builder().dataSetInfo(dataSetInfo).terms(terms)
+                .currentDate(currentDate).build();
     }
 
 }

@@ -2,6 +2,7 @@ package com.tencent.supersonic.chat.server.rest;
 
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.server.agent.Agent;
+import com.tencent.supersonic.chat.server.agent.AgentContextResp;
 import com.tencent.supersonic.chat.server.agent.AgentDataSetInfoDTO;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.agent.DimensionValueCheckReq;
@@ -93,6 +94,16 @@ public class AgentController {
             HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return agentService.getAgentTerms(agentId, termName, alias, user);
+    }
+
+    @GetMapping("/getAgentContext")
+    public AgentContextResp getAgentContext(@RequestParam(value = "agentId") Integer agentId,
+            @RequestParam(value = "queryText", required = false) String queryText,
+            @RequestParam(value = "termName", required = false) String termName,
+            @RequestParam(value = "alias", required = false) String alias,
+            HttpServletRequest request, HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        return agentService.getAgentContext(agentId, queryText, termName, alias, user);
     }
 
     @GetMapping("/getRedSeaDataSetInfo")
