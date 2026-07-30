@@ -99,7 +99,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     private TermService termService;
 
     @Override
-    @Transactional
+    // @Transactional
     public Agent createBiAgent(BiAgentConfig config) throws Exception {
         BiModelConfig modelConfig = config.getModel();
         BiPageConfig pageConfig = config.getPageConfig();

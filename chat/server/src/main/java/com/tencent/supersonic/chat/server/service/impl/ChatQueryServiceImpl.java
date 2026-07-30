@@ -33,6 +33,7 @@ import com.tencent.supersonic.common.pojo.FileInfo;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
+import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
@@ -432,6 +433,17 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                 return failResult;
             }
 
+            // SQL执行失败且错误可重试：通过 errorFeedback 通道传递错误信息，重新走完整 parse+execute 链路，
+            // 不污染 queryText，不影响 MAPPING 向量召回、多轮改写和聊天历史
+            if (StringUtils.isBlank(chatParseReq.getErrorFeedback())
+                    && isRetryableFailure(queryResult)) {
+                QueryResult retryResult =
+                        retryWithErrorFeedback(chatParseReq, parseResp, queryResult);
+                if (retryResult != null) {
+                    queryResult = retryResult;
+                }
+            }
+
             long totalTime = System.currentTimeMillis() - totalStart;
             log.info(
                     "[PERFORMANCE-TOTAL] /parseAndExecute 总耗时: {}ms (PARSE: {}ms, EXECUTE: {}ms), 问题: {}",
@@ -448,6 +460,92 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             errorResult.setErrorMsg("查询处理异常：" + e.getMessage());
             return errorResult;
         }
+    }
+
+    /**
+     * 判断查询失败是否可通过重新生成 SQL 修复。 可重试：SQL语法错误、字段/表不存在、类型不匹配、连接异常；
+     * 不可重试：结果为空（SQL没错确实无数据）、权限拒绝、解析失败等。
+     */
+    private boolean isRetryableFailure(QueryResult queryResult) {
+        if (queryResult == null
+                || !QueryState.INVALID.equals(queryResult.getQueryState())
+                || StringUtils.isBlank(queryResult.getErrorMsg())) {
+            return false;
+        }
+        String errMsg = queryResult.getErrorMsg().toLowerCase();
+        return errMsg.contains("syntax") || errMsg.contains("sql语法")
+                || errMsg.contains("unknown column") || errMsg.contains("unknown table")
+                || errMsg.contains("doesn't exist") || errMsg.contains("not found")
+                || errMsg.contains("no database selected")
+                || errMsg.contains("truncated incorrect")
+                || errMsg.contains("incorrect double") || errMsg.contains("incorrect date")
+                || errMsg.contains("communications link")
+                || errMsg.contains("connection refused") || errMsg.contains("timeout");
+    }
+
+    /**
+     * 带错误反馈重试：构建新的 ChatParseReq（queryText 保持不变，错误信息走 errorFeedback 专用通道），
+     * 重新走 MAPPING → PARSING → CORRECTING → TRANSLATING 全链路后执行。 重试成功返回新结果，重试失败返回 null（由调用方保留原失败结果）。
+     */
+    private QueryResult retryWithErrorFeedback(ChatParseReq chatParseReq, ChatParseResp parseResp,
+            QueryResult failedResult) {
+        long retryStart = System.currentTimeMillis();
+        try {
+            log.info("[RETRY] SQL执行失败，带错误反馈重新解析。错误: {}", failedResult.getErrorMsg());
+            ChatParseReq retryReq = new ChatParseReq();
+            BeanMapper.mapper(chatParseReq, retryReq);
+            // 强制创建新 queryId，避免覆盖原解析记录
+            retryReq.setQueryId(null);
+            retryReq.setErrorFeedback(buildErrorFeedback(failedResult, parseResp));
+
+            ChatParseResp retryParseResp = parse(retryReq);
+            if (CollectionUtils.isEmpty(retryParseResp.getSelectedParses())) {
+                log.warn("[RETRY] 重试解析未生成有效查询，保留原失败结果");
+                return null;
+            }
+            ChatExecuteReq retryExecuteReq = new ChatExecuteReq();
+            retryExecuteReq.setQueryId(retryParseResp.getQueryId());
+            retryExecuteReq.setParseId(retryParseResp.getSelectedParses().get(0).getId());
+            retryExecuteReq.setQueryText(chatParseReq.getQueryText());
+            retryExecuteReq.setChatId(chatParseReq.getChatId());
+            retryExecuteReq.setUser(User.getDefaultUser());
+            retryExecuteReq.setAgentId(chatParseReq.getAgentId());
+            retryExecuteReq.setSaveAnswer(true);
+
+            QueryResult retryResult = execute(retryExecuteReq);
+            log.info("[RETRY] 重试完成，耗时: {}ms, 结果状态: {}", System.currentTimeMillis() - retryStart,
+                    retryResult != null ? retryResult.getQueryState() : "null");
+            if (retryResult != null && QueryState.SUCCESS.equals(retryResult.getQueryState())) {
+                return retryResult;
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("[RETRY] 重试过程异常，保留原失败结果", e);
+            return null;
+        }
+    }
+
+    /**
+     * 构建错误反馈文本：失败SQL + 错误信息，注入 PARSING 阶段 LLM 提示词的 SideInfo。
+     */
+    private String buildErrorFeedback(QueryResult failedResult, ChatParseResp parseResp) {
+        String failedSql = failedResult.getQuerySql();
+        if (StringUtils.isBlank(failedSql) && parseResp != null
+                && !CollectionUtils.isEmpty(parseResp.getSelectedParses())) {
+            SqlInfo sqlInfo = parseResp.getSelectedParses().get(0).getSqlInfo();
+            if (sqlInfo != null) {
+                failedSql = StringUtils.isNotBlank(sqlInfo.getQuerySQL()) ? sqlInfo.getQuerySQL()
+                        : sqlInfo.getCorrectedS2SQL();
+            }
+        }
+        StringBuilder feedback = new StringBuilder();
+        feedback.append("#重试提示：上次针对该问题生成的SQL执行报错\n");
+        if (StringUtils.isNotBlank(failedSql)) {
+            feedback.append("失败SQL: ").append(failedSql).append("\n");
+        }
+        feedback.append("错误信息: ").append(failedResult.getErrorMsg()).append("\n");
+        feedback.append("请分析错误原因，避免重复同样的错误，重新生成正确的SQL。");
+        return feedback.toString();
     }
 
     private ParseContext buildParseContext(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {

@@ -42,6 +42,11 @@ public class QueryNLReq extends SemanticQueryReq implements Serializable {
      * MAPPING。
      */
     private String queryType;
+    /**
+     * SQL执行失败重试时的错误反馈信息，透传自 ChatParseReq（BeanMapper 同名字段自动复制）， 最终由
+     * LLMRequestService 注入 LLMReq 供 PARSING 阶段提示词使用。
+     */
+    private String errorFeedback;
 
     @Override
     public String toCustomizedString() {

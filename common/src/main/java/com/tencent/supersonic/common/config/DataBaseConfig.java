@@ -31,6 +31,15 @@ public class DataBaseConfig {
         druidDataSource.setTestOnBorrow(true);
         druidDataSource.setTestOnReturn(false);
 
+        // 连接池容量：Druid 默认 maxActive=8，训练并发即可吃满，必须显式加大
+        druidDataSource.setInitialSize(5);
+        druidDataSource.setMinIdle(10);
+        druidDataSource.setMaxActive(40);
+        // 获取连接最长等待 10 秒，避免默认 -1 导致请求线程无限挂起
+        druidDataSource.setMaxWait(10_000);
+        // 空闲连接保活，配合 wait_timeout 避免被服务端掐断
+        druidDataSource.setKeepAlive(true);
+
         return druidDataSource;
     }
 }

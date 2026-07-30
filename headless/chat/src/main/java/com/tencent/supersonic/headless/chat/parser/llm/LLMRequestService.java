@@ -88,6 +88,8 @@ public class LLMRequestService {
         llmReq.setAgentId(queryCtx.getRequest().getAgentId());
         // SIMPLE 模式标记透传，供 OnePassSCSqlGenStrategy 判断是否跳过向量召回走直接生成路径
         llmReq.setQueryType(queryCtx.getRequest().getQueryType());
+        // SQL执行失败重试的错误反馈透传，供 OnePassSCSqlGenStrategy 注入提示词
+        llmReq.setErrorFeedback(queryCtx.getRequest().getErrorFeedback());
         return llmReq;
     }
 

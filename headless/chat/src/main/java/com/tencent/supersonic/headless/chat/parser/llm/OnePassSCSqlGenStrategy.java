@@ -366,6 +366,11 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         }
         String dataSemantics = promptHelper.buildSchemaStr(llmReq);
         String sideInformation = promptHelper.buildSideInformation(llmReq);
+        // SQL执行失败重试：将错误反馈追加到 SideInfo，引导 LLM 避免重复同样的错误
+        if (StringUtils.isNotBlank(llmReq.getErrorFeedback())) {
+            sideInformation = sideInformation + "\n" + llmReq.getErrorFeedback();
+            log.info("[RETRY] PARSING阶段注入错误反馈:\n{}", llmReq.getErrorFeedback());
+        }
         llmResp.setSchema(dataSemantics);
         llmResp.setSideInfo(sideInformation);
         String dimensionValueInfo = buildDimensionValueInfo(llmReq);

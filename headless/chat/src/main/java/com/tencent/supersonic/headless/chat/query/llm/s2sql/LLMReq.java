@@ -34,6 +34,11 @@ public class LLMReq {
      * 据此判断是否走 handleDirectLinkMode 路径。
      */
     private String queryType;
+    /**
+     * SQL执行失败重试时的错误反馈信息，由 LLMRequestService 从 ChatQueryContext 透传，
+     * OnePassSCSqlGenStrategy 将其注入提示词，引导 LLM 避免重复同样的错误。
+     */
+    private String errorFeedback;
 
     @Data
     public static class ElementValue {

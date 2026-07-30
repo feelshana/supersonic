@@ -141,7 +141,12 @@ public class SqlExecutor implements ChatQueryExecutor {
                 queryResult.setQuerySql(finalSql);
                 queryResult.setQueryResults(queryResp.getResultList());
                 queryResult.setQueryColumns(queryResp.getColumns());
-                queryResult.setQueryState(QueryState.SUCCESS);
+                // SQL执行报错时置为 INVALID，供上层 parseAndExecute 判断是否带错误反馈重试
+                if (StringUtils.isBlank(queryResp.getErrorMsg())) {
+                    queryResult.setQueryState(QueryState.SUCCESS);
+                } else {
+                    queryResult.setQueryState(QueryState.INVALID);
+                }
                 queryResult.setErrorMsg(queryResp.getErrorMsg());
                 queryResult.setResultType(queryResp.getResultType());
 

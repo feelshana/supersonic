@@ -27,4 +27,9 @@ public class ChatParseReq {
      * 查询模式，"SIMPLE" 表示简易模式：跳过 MAPPING 向量召回环节， 直接将完整 Schema 传给 LLM 生成 SQL，适用于问题已高度结构化的外部调用场景。
      */
     private String queryType;
+    /**
+     * SQL执行失败重试时的错误反馈信息（失败SQL+错误原因）。 独立于 queryText 传递，不影响 MAPPING 向量召回、多轮改写和聊天历史，
+     * 最终注入 PARSING 阶段 LLM 提示词，引导重新生成正确的 SQL。
+     */
+    private String errorFeedback;
 }
