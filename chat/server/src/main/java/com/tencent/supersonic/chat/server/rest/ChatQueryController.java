@@ -1,6 +1,7 @@
 package com.tencent.supersonic.chat.server.rest;
 
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.chat.api.pojo.request.ChatBatchParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatQueryDataReq;
@@ -56,6 +57,13 @@ public class ChatQueryController {
             HttpServletRequest request, HttpServletResponse response) throws Exception {
         chatParseReq.setUser(UserHolder.findUser(request, response));
         return chatQueryService.parseAndExecute(chatParseReq);
+    }
+
+    @PostMapping("batchParseAndExecute")
+    public Object batchParseAndExecute(@RequestBody ChatBatchParseReq batchReq,
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
+        batchReq.setUser(UserHolder.findUser(request, response));
+        return chatQueryService.batchParseAndExecute(batchReq);
     }
 
     @PostMapping("streamExecute")

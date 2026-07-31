@@ -3,10 +3,12 @@ package com.tencent.supersonic.chat.server.service.impl;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.chat.api.pojo.enums.JsqlParserType;
 import com.tencent.supersonic.chat.api.pojo.enums.MemoryStatus;
+import com.tencent.supersonic.chat.api.pojo.request.ChatBatchParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatQueryDataReq;
 import com.tencent.supersonic.chat.api.pojo.request.TextVoiceReq;
+import com.tencent.supersonic.chat.api.pojo.response.ChatBatchParseResp;
 import com.tencent.supersonic.chat.api.pojo.response.ChatParseResp;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.server.agent.Agent;
@@ -77,7 +79,10 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.chat.server.parser.NL2SQLParser.APP_KEY_MULTI_TURN;
@@ -546,6 +551,181 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         feedback.append("错误信息: ").append(failedResult.getErrorMsg()).append("\n");
         feedback.append("请分析错误原因，避免重复同样的错误，重新生成正确的SQL。");
         return feedback.toString();
+    }
+
+    // ==================== 批量并发查询 ====================
+
+    @Override
+    public ChatBatchParseResp batchParseAndExecute(ChatBatchParseReq batchReq) {
+        User user = batchReq.getUser();
+        List<String> queryTexts = batchReq.getQueryTexts();
+        if (CollectionUtils.isEmpty(queryTexts)) {
+            ChatBatchParseResp resp = new ChatBatchParseResp();
+            resp.setResults(Collections.emptyList());
+            return resp;
+        }
+
+        log.info("[BATCH] 开始批量执行, agentId:{}, chatId:{}, 子任务数:{}, 合并:{}",
+                batchReq.getAgentId(), batchReq.getChatId(), queryTexts.size(),
+                batchReq.isMerge());
+
+        // 并发执行：每个子任务提交到 chatExecutor 线程池
+        List<CompletableFuture<String>> futures = queryTexts.stream()
+                .map(qt -> CompletableFuture.supplyAsync(() -> {
+                    long start = System.currentTimeMillis();
+                    try {
+                        ChatParseReq req = new ChatParseReq();
+                        req.setAgentId(batchReq.getAgentId());
+                        req.setChatId(batchReq.getChatId());
+                        req.setQueryText(qt);
+                        req.setQueryType(batchReq.getQueryType());
+                        req.setUser(user);
+                        QueryResult result = parseAndExecute(req);
+                        String formatted = formatResultAsText(result);
+                        log.info("[BATCH] 子任务完成, 耗时:{}ms, 问题:{}",
+                                System.currentTimeMillis() - start,
+                                StringUtils.abbreviate(qt, 50));
+                        return formatted;
+                    } catch (Exception e) {
+                        log.error("[BATCH] 子任务执行异常: {}", qt, e);
+                        return "[FAILED]执行异常: " + e.getMessage();
+                    }
+                }, chatExecutor))
+                .collect(Collectors.toList());
+
+        // 等待全部完成，超时120秒
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(120, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            long done = futures.stream().filter(CompletableFuture::isDone).count();
+            log.error("[BATCH] 批量执行超时(120s), 已完成:{}/{}", done, futures.size());
+        } catch (Exception e) {
+            log.error("[BATCH] 批量执行异常", e);
+        }
+
+        // 收集结果
+        List<String> results = futures.stream()
+                .map(f -> {
+                    try {
+                        return f.isDone() ? f.get() : "[FAILED]执行超时";
+                    } catch (Exception e) {
+                        return "[FAILED]执行异常: " + e.getMessage();
+                    }
+                })
+                .collect(Collectors.toList());
+
+        // 构建响应
+        ChatBatchParseResp resp = new ChatBatchParseResp();
+        resp.setResults(results);
+
+        // 合并模式：按 indexMap 替换/追加
+        if (batchReq.isMerge() && batchReq.getOriginalResults() != null) {
+            List<String> mergedResults = new ArrayList<>(batchReq.getOriginalResults());
+            List<String> mergedDetails = batchReq.getOriginalQueryDetails() != null
+                    ? new ArrayList<>(batchReq.getOriginalQueryDetails())
+                    : new ArrayList<>();
+
+            for (int j = 0; j < results.size(); j++) {
+                String idx = (batchReq.getIndexMap() != null
+                        && j < batchReq.getIndexMap().size())
+                                ? batchReq.getIndexMap().get(j)
+                                : "new";
+                if ("new".equals(idx)) {
+                    mergedResults.add(results.get(j));
+                    mergedDetails.add(queryTexts.get(j));
+                } else {
+                    try {
+                        int i = Integer.parseInt(idx) - 1;
+                        if (i >= 0 && i < mergedResults.size()) {
+                            mergedResults.set(i, results.get(j));
+                            if (i < mergedDetails.size()) {
+                                mergedDetails.set(i, queryTexts.get(j));
+                            }
+                        }
+                    } catch (NumberFormatException e) {
+                        mergedResults.add(results.get(j));
+                        mergedDetails.add(queryTexts.get(j));
+                    }
+                }
+            }
+
+            resp.setFinalResults(String.join("\n\n---\n\n", mergedResults));
+
+            // 构建结构化文本
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < mergedDetails.size(); i++) {
+                if (i > 0) {
+                    sb.append("\n\n---\n\n");
+                }
+                String desc = mergedDetails.get(i);
+                String resultText =
+                        i < mergedResults.size() ? mergedResults.get(i) : "";
+                String clean = resultText;
+                if (clean.startsWith("[SUCCESS]")) {
+                    clean = clean.substring("[SUCCESS]".length()).trim();
+                } else if (clean.startsWith("[FAILED]")) {
+                    clean = "⚠️ " + clean.substring("[FAILED]".length()).trim();
+                }
+                sb.append("### 子任务").append(i + 1).append(": ").append(desc)
+                        .append("\n查询结果:\n").append(clean);
+            }
+            resp.setStructuredResult(sb.toString());
+        }
+
+        log.info("[BATCH] 批量执行完成, 子任务数:{}, 合并:{}",
+                results.size(), batchReq.isMerge());
+        return resp;
+    }
+
+    /**
+     * 将 QueryResult 格式化为 Dify 迭代节点兼容的文本格式。 与 Dify "查询结果处理中" 代码节点的逻辑一致：
+     * 有数据 → [SUCCESS]csv，无数据+有errorMsg → [FAILED]错误信息，无数据+无错误 → [FAILED]无数据。
+     */
+    private String formatResultAsText(QueryResult result) {
+        if (result == null) {
+            return "[FAILED]查询未返回结果";
+        }
+        List<Map<String, Object>> queryResults = result.getQueryResults();
+        boolean isEmpty = queryResults == null || queryResults.isEmpty();
+
+        if (isEmpty) {
+            String errorMsg = result.getErrorMsg();
+            if (StringUtils.isNotBlank(errorMsg)) {
+                return "[FAILED]查询执行出错：" + errorMsg;
+            }
+            String textResult = result.getTextResult();
+            if (StringUtils.isNotBlank(textResult)) {
+                return "[FAILED]查询未返回数据，提示：" + textResult;
+            }
+            return "[FAILED]查询未返回任何数据，请尝试调整问题后重试。";
+        }
+
+        return "[SUCCESS]" + formatAsCsv(queryResults);
+    }
+
+    /**
+     * 将查询结果列表格式化为 CSV 文本（表头+数据行），与 Dify format_as_table 函数一致。
+     */
+    private String formatAsCsv(List<Map<String, Object>> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return "";
+        }
+        Map<String, Object> firstRow = rows.get(0);
+        List<String> headers = new ArrayList<>(firstRow.keySet());
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.join(",", headers));
+        for (Map<String, Object> row : rows) {
+            sb.append("\n");
+            String line = headers.stream()
+                    .map(h -> {
+                        Object v = row.get(h);
+                        return v == null ? "" : String.valueOf(v);
+                    })
+                    .collect(Collectors.joining(","));
+            sb.append(line);
+        }
+        return sb.toString();
     }
 
     private ParseContext buildParseContext(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {
