@@ -28,8 +28,8 @@ public class ChatParseReq {
      */
     private String queryType;
     /**
-     * SQL执行失败重试时的错误反馈信息（失败SQL+错误原因）。 独立于 queryText 传递，不影响 MAPPING 向量召回、多轮改写和聊天历史，
-     * 最终注入 PARSING 阶段 LLM 提示词，引导重新生成正确的 SQL。
+     * SQL执行失败重试时的错误反馈信息（失败SQL+错误原因）。 独立于 queryText 传递，不影响 MAPPING 向量召回、多轮改写和聊天历史， 最终注入 PARSING 阶段
+     * LLM 提示词，引导重新生成正确的 SQL。
      */
     private String errorFeedback;
 }

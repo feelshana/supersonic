@@ -8,8 +8,7 @@ import java.util.List;
 /**
  * 批量查询响应。
  * <p>
- * 非合并模式：使用 results（各子任务结果文本）。
- * 合并模式：使用 finalResults（合并后最终文本）和 structuredResult（结构化展示文本）。
+ * 非合并模式：使用 results（各子任务结果文本）。 合并模式：使用 finalResults（合并后最终文本）和 structuredResult（结构化展示文本）。
  */
 @Data
 public class ChatBatchParseResp implements Serializable {

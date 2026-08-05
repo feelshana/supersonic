@@ -59,7 +59,7 @@ public class DeepSeekChatModel implements ChatLanguageModel {
     public Response<AiMessage> generate(List<ChatMessage> messages) {
         try {
             String requestBody = buildRequestBody(messages);
-            log.debug("DeepSeekChatModel request body: {}", requestBody);
+            // log.debug("DeepSeekChatModel request body: {}", requestBody);
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(timeoutSeconds)).build();

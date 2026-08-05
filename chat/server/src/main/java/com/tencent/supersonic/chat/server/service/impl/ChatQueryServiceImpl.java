@@ -468,12 +468,10 @@ public class ChatQueryServiceImpl implements ChatQueryService {
     }
 
     /**
-     * 判断查询失败是否可通过重新生成 SQL 修复。 可重试：SQL语法错误、字段/表不存在、类型不匹配、连接异常；
-     * 不可重试：结果为空（SQL没错确实无数据）、权限拒绝、解析失败等。
+     * 判断查询失败是否可通过重新生成 SQL 修复。 可重试：SQL语法错误、字段/表不存在、类型不匹配、连接异常； 不可重试：结果为空（SQL没错确实无数据）、权限拒绝、解析失败等。
      */
     private boolean isRetryableFailure(QueryResult queryResult) {
-        if (queryResult == null
-                || !QueryState.INVALID.equals(queryResult.getQueryState())
+        if (queryResult == null || !QueryState.INVALID.equals(queryResult.getQueryState())
                 || StringUtils.isBlank(queryResult.getErrorMsg())) {
             return false;
         }
@@ -481,16 +479,15 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         return errMsg.contains("syntax") || errMsg.contains("sql语法")
                 || errMsg.contains("unknown column") || errMsg.contains("unknown table")
                 || errMsg.contains("doesn't exist") || errMsg.contains("not found")
-                || errMsg.contains("no database selected")
-                || errMsg.contains("truncated incorrect")
+                || errMsg.contains("no database selected") || errMsg.contains("truncated incorrect")
                 || errMsg.contains("incorrect double") || errMsg.contains("incorrect date")
-                || errMsg.contains("communications link")
-                || errMsg.contains("connection refused") || errMsg.contains("timeout");
+                || errMsg.contains("communications link") || errMsg.contains("connection refused")
+                || errMsg.contains("timeout");
     }
 
     /**
-     * 带错误反馈重试：构建新的 ChatParseReq（queryText 保持不变，错误信息走 errorFeedback 专用通道），
-     * 重新走 MAPPING → PARSING → CORRECTING → TRANSLATING 全链路后执行。 重试成功返回新结果，重试失败返回 null（由调用方保留原失败结果）。
+     * 带错误反馈重试：构建新的 ChatParseReq（queryText 保持不变，错误信息走 errorFeedback 专用通道）， 重新走 MAPPING → PARSING →
+     * CORRECTING → TRANSLATING 全链路后执行。 重试成功返回新结果，重试失败返回 null（由调用方保留原失败结果）。
      */
     private QueryResult retryWithErrorFeedback(ChatParseReq chatParseReq, ChatParseResp parseResp,
             QueryResult failedResult) {
@@ -565,13 +562,12 @@ public class ChatQueryServiceImpl implements ChatQueryService {
             return resp;
         }
 
-        log.info("[BATCH] 开始批量执行, agentId:{}, chatId:{}, 子任务数:{}, 合并:{}",
-                batchReq.getAgentId(), batchReq.getChatId(), queryTexts.size(),
-                batchReq.isMerge());
+        log.info("[BATCH] 开始批量执行, agentId:{}, chatId:{}, 子任务数:{}, 合并:{}", batchReq.getAgentId(),
+                batchReq.getChatId(), queryTexts.size(), batchReq.isMerge());
 
         // 并发执行：每个子任务提交到 chatExecutor 线程池
-        List<CompletableFuture<String>> futures = queryTexts.stream()
-                .map(qt -> CompletableFuture.supplyAsync(() -> {
+        List<CompletableFuture<String>> futures =
+                queryTexts.stream().map(qt -> CompletableFuture.supplyAsync(() -> {
                     long start = System.currentTimeMillis();
                     try {
                         ChatParseReq req = new ChatParseReq();
@@ -583,20 +579,18 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                         QueryResult result = parseAndExecute(req);
                         String formatted = formatResultAsText(result);
                         log.info("[BATCH] 子任务完成, 耗时:{}ms, 问题:{}",
-                                System.currentTimeMillis() - start,
-                                StringUtils.abbreviate(qt, 50));
+                                System.currentTimeMillis() - start, StringUtils.abbreviate(qt, 50));
                         return formatted;
                     } catch (Exception e) {
                         log.error("[BATCH] 子任务执行异常: {}", qt, e);
                         return "[FAILED]执行异常: " + e.getMessage();
                     }
-                }, chatExecutor))
-                .collect(Collectors.toList());
+                }, chatExecutor)).collect(Collectors.toList());
 
         // 等待全部完成，超时120秒
         try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                    .get(120, TimeUnit.SECONDS);
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(120,
+                    TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             long done = futures.stream().filter(CompletableFuture::isDone).count();
             log.error("[BATCH] 批量执行超时(120s), 已完成:{}/{}", done, futures.size());
@@ -605,15 +599,13 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         }
 
         // 收集结果
-        List<String> results = futures.stream()
-                .map(f -> {
-                    try {
-                        return f.isDone() ? f.get() : "[FAILED]执行超时";
-                    } catch (Exception e) {
-                        return "[FAILED]执行异常: " + e.getMessage();
-                    }
-                })
-                .collect(Collectors.toList());
+        List<String> results = futures.stream().map(f -> {
+            try {
+                return f.isDone() ? f.get() : "[FAILED]执行超时";
+            } catch (Exception e) {
+                return "[FAILED]执行异常: " + e.getMessage();
+            }
+        }).collect(Collectors.toList());
 
         // 构建响应
         ChatBatchParseResp resp = new ChatBatchParseResp();
@@ -627,10 +619,9 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                     : new ArrayList<>();
 
             for (int j = 0; j < results.size(); j++) {
-                String idx = (batchReq.getIndexMap() != null
-                        && j < batchReq.getIndexMap().size())
-                                ? batchReq.getIndexMap().get(j)
-                                : "new";
+                String idx = (batchReq.getIndexMap() != null && j < batchReq.getIndexMap().size())
+                        ? batchReq.getIndexMap().get(j)
+                        : "new";
                 if ("new".equals(idx)) {
                     mergedResults.add(results.get(j));
                     mergedDetails.add(queryTexts.get(j));
@@ -659,28 +650,26 @@ public class ChatQueryServiceImpl implements ChatQueryService {
                     sb.append("\n\n---\n\n");
                 }
                 String desc = mergedDetails.get(i);
-                String resultText =
-                        i < mergedResults.size() ? mergedResults.get(i) : "";
+                String resultText = i < mergedResults.size() ? mergedResults.get(i) : "";
                 String clean = resultText;
                 if (clean.startsWith("[SUCCESS]")) {
                     clean = clean.substring("[SUCCESS]".length()).trim();
                 } else if (clean.startsWith("[FAILED]")) {
                     clean = "⚠️ " + clean.substring("[FAILED]".length()).trim();
                 }
-                sb.append("### 子任务").append(i + 1).append(": ").append(desc)
-                        .append("\n查询结果:\n").append(clean);
+                sb.append("### 子任务").append(i + 1).append(": ").append(desc).append("\n查询结果:\n")
+                        .append(clean);
             }
             resp.setStructuredResult(sb.toString());
         }
 
-        log.info("[BATCH] 批量执行完成, 子任务数:{}, 合并:{}",
-                results.size(), batchReq.isMerge());
+        log.info("[BATCH] 批量执行完成, 子任务数:{}, 合并:{}", results.size(), batchReq.isMerge());
         return resp;
     }
 
     /**
-     * 将 QueryResult 格式化为 Dify 迭代节点兼容的文本格式。 与 Dify "查询结果处理中" 代码节点的逻辑一致：
-     * 有数据 → [SUCCESS]csv，无数据+有errorMsg → [FAILED]错误信息，无数据+无错误 → [FAILED]无数据。
+     * 将 QueryResult 格式化为 Dify 迭代节点兼容的文本格式。 与 Dify "查询结果处理中" 代码节点的逻辑一致： 有数据 →
+     * [SUCCESS]csv，无数据+有errorMsg → [FAILED]错误信息，无数据+无错误 → [FAILED]无数据。
      */
     private String formatResultAsText(QueryResult result) {
         if (result == null) {
@@ -717,12 +706,10 @@ public class ChatQueryServiceImpl implements ChatQueryService {
         sb.append(String.join(",", headers));
         for (Map<String, Object> row : rows) {
             sb.append("\n");
-            String line = headers.stream()
-                    .map(h -> {
-                        Object v = row.get(h);
-                        return v == null ? "" : String.valueOf(v);
-                    })
-                    .collect(Collectors.joining(","));
+            String line = headers.stream().map(h -> {
+                Object v = row.get(h);
+                return v == null ? "" : String.valueOf(v);
+            }).collect(Collectors.joining(","));
             sb.append(line);
         }
         return sb.toString();

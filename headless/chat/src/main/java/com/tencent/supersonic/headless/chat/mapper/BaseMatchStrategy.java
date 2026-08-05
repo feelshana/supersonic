@@ -75,7 +75,10 @@ public abstract class BaseMatchStrategy<T extends MapResult> implements MatchStr
 
     protected void executeTasks(List<Callable<Void>> tasks) {
         try {
+            long invokeStart = System.currentTimeMillis();
             executor.invokeAll(tasks);
+            log.info("[PERFORMANCE] invokeAll cost:{}ms, taskSize:{}",
+                    System.currentTimeMillis() - invokeStart, tasks.size());
             // for (Callable<Void> future : tasks) {
             // future.call();
             // }

@@ -24,6 +24,8 @@ public class ChromaEmbeddingStoreFactory extends BaseEmbeddingStoreFactory {
 
     @Override
     public EmbeddingStore createEmbeddingStore(String collectionName) {
+        log.info("[PERFORMANCE] create ChromaEmbeddingStore, collection:{}, factoryHash:{}",
+                collectionName, this.hashCode());
         return ChromaEmbeddingStore.builder().baseUrl(storeProperties.getBaseUrl())
                 .collectionName(collectionName).timeout(storeProperties.getTimeout()).build();
     }

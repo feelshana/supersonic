@@ -62,7 +62,7 @@ public class DeepSeekStreamingChatModel implements StreamingChatLanguageModel {
     public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
         try {
             String requestBody = buildRequestBody(messages);
-            log.debug("DeepSeekStreamingChatModel request body: {}", requestBody);
+            // log.debug("DeepSeekStreamingChatModel request body: {}", requestBody);
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(timeoutSeconds)).build();

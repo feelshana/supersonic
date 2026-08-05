@@ -29,8 +29,8 @@ public interface ChatQueryService {
     /**
      * 批量并发执行多个子任务，可选合并到原始结果中。
      * <p>
-     * 非合并模式：只传 queryTexts，返回各子任务结果（results）。
-     * 合并模式：额外传 originalResults + indexMap，按序号替换/追加，返回 finalResults 和 structuredResult。
+     * 非合并模式：只传 queryTexts，返回各子任务结果（results）。 合并模式：额外传 originalResults + indexMap，按序号替换/追加，返回
+     * finalResults 和 structuredResult。
      */
     ChatBatchParseResp batchParseAndExecute(ChatBatchParseReq batchReq);
 
