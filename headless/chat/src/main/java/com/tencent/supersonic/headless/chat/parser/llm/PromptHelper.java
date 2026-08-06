@@ -53,6 +53,11 @@ public class PromptHelper {
         }
 
         List<List<Text2SQLExemplar>> results = new ArrayList<>();
+        // 兜底：如果向量和动态示例都为空，至少返回一个空列表，确保 LLM 仍被调用一次
+        if (CollectionUtils.isEmpty(exemplars)) {
+            results.add(new ArrayList<>());
+            return results;
+        }
         // use random collection of exemplars for each self-consistency inference
         for (int i = 0; i < selfConsistencyNumber; i++) {
             List<Text2SQLExemplar> shuffledList = new ArrayList<>(exemplars);

@@ -35,6 +35,11 @@ public class ExemplarServiceImpl implements ExemplarService, CommandLineRunner {
 
     private final ObjectMapper objectMapper = JsonUtil.INSTANCE.getObjectMapper();
 
+    /**
+     * 系统兜底 FewShot 示例，启动时从 s2-exemplar.json 加载到内存。 当向量召回失败时，直接返回这些兜底示例，避免整个查询流程中断。
+     */
+    private List<Text2SQLExemplar> sysExemplars = Lists.newArrayList();
+
     @Autowired
     private EmbeddingConfig embeddingConfig;
 
@@ -65,21 +70,26 @@ public class ExemplarServiceImpl implements ExemplarService, CommandLineRunner {
     }
 
     public List<Text2SQLExemplar> recallExemplars(String collection, String query, int num) {
-        List<Text2SQLExemplar> exemplars = Lists.newArrayList();
-        RetrieveQuery retrieveQuery =
-                RetrieveQuery.builder().queryTextsList(Lists.newArrayList(query)).build();
-        List<RetrieveQueryResult> results =
-                embeddingService.retrieveQuery(collection, retrieveQuery, num);
-        results.forEach(ret -> {
-            ret.getRetrieval().forEach(r -> {
-                Text2SQLExemplar tmp = // 传递相似度，可以作为样本筛选的依据
-                        JsonUtil.mapToObject(r.getMetadata(), Text2SQLExemplar.class);
-                tmp.setSimilarity(r.getSimilarity());
-                exemplars.add(tmp);
+        try {
+            List<Text2SQLExemplar> exemplars = Lists.newArrayList();
+            RetrieveQuery retrieveQuery =
+                    RetrieveQuery.builder().queryTextsList(Lists.newArrayList(query)).build();
+            List<RetrieveQueryResult> results =
+                    embeddingService.retrieveQuery(collection, retrieveQuery, num);
+            results.forEach(ret -> {
+                ret.getRetrieval().forEach(r -> {
+                    Text2SQLExemplar tmp = // 传递相似度，可以作为样本筛选的依据
+                            JsonUtil.mapToObject(r.getMetadata(), Text2SQLExemplar.class);
+                    tmp.setSimilarity(r.getSimilarity());
+                    exemplars.add(tmp);
+                });
             });
-        });
-
-        return exemplars;
+            return exemplars;
+        } catch (Exception e) {
+            log.warn("[RAG] 向量召回失败，返回系统兜底示例，collection={}，query={}，num={}", collection, query, num,
+                    e);
+            return Lists.newArrayList(sysExemplars);
+        }
     }
 
     @Override
@@ -92,8 +102,11 @@ public class ExemplarServiceImpl implements ExemplarService, CommandLineRunner {
             ClassPathResource resource = new ClassPathResource(SYS_EXEMPLAR_FILE);
             InputStream inputStream = resource.getInputStream();
             List<Text2SQLExemplar> exemplars = objectMapper.readValue(inputStream, valueTypeRef);
+            // 同时保留到内存，作为向量召回失败时的兜底
+            sysExemplars = Lists.newArrayList(exemplars);
             String collection = embeddingConfig.getText2sqlCollectionName();
             exemplars.stream().forEach(e -> storeExemplar(collection, e));
+            log.info("[RAG] 系统兜底 FewShot 示例已加载，数量: {}", sysExemplars.size());
         } catch (Exception e) {
             log.error("Failed to load system exemplars", e);
         }

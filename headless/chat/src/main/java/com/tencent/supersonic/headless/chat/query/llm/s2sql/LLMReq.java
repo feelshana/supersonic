@@ -35,8 +35,8 @@ public class LLMReq {
      */
     private String queryType;
     /**
-     * SQL执行失败重试时的错误反馈信息，由 LLMRequestService 从 ChatQueryContext 透传，
-     * OnePassSCSqlGenStrategy 将其注入提示词，引导 LLM 避免重复同样的错误。
+     * SQL执行失败重试时的错误反馈信息，由 LLMRequestService 从 ChatQueryContext 透传， OnePassSCSqlGenStrategy
+     * 将其注入提示词，引导 LLM 避免重复同样的错误。
      */
     private String errorFeedback;
 

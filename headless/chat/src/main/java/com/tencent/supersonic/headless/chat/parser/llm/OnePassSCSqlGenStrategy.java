@@ -419,8 +419,8 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
                     getDimensionValuesFromDict(dimension);
             List<DictValueDimResp> list = dimensionValuesFromDict.getList();
             List<String> dimensionValues = list.stream().map(DictValueDimResp::getValue).toList();
-            // 筛选条件4：跳过维度值数量为0和数量大于等于50的维度
-            if (CollectionUtils.isEmpty(dimensionValues) || dimensionValues.size() >= 50) {
+            // 筛选条件4：跳过维度值数量为0的维度（允许50个维度值注入提示词）
+            if (CollectionUtils.isEmpty(dimensionValues) || dimensionValues.size() > 50) {
                 continue;
             }
             dimensionValueInfo.append(dimension.getName()).append("包含如下维度值: ")

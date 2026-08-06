@@ -10,25 +10,11 @@ public class ListMergeTool {
 
     public static void main(String[] args) {
         // 初始集合
-        List<String> list = new ArrayList<>(Arrays.asList("zouyizhan", "putao", "liuyuxuan",
-                "liaokun_pt", "wangchao_yy1", "xileiyx", "zhuyunchun", "shengyuwei", "kongtianshu",
-                "lixia", "dongxiaojian", "wuxingrong", "wencong", "zhaoqin", "jiangjiqipt",
-                "RedSeaTest01", "lvhept", "gaomeng", "liyi", "liujuan_wh", "lili_wh", "sunyanqing",
-                "jubin", "wangconggang", "chenxuexs", "zhoujianhong", "wangliang3", "taojiawei",
-                "libinpt", "zhujiawei", "zhangxuewei", "suyi_hy", "sunlei", "shanlei",
-                "miaoxiangbin", "liwenzhou", "lijun", "wangle", "zhuhong", "zhuangwenyun",
-                "zhaoqian", "chendifei", "liuming", "xuyue", "zhangyanpeng", "maliyong",
-                "liuguoxin", "yuhang", "yuanmin", "zhaoying", "liaozhiyong_ciyuan", "liuyuxing",
-                "zhongyong", "guming", "leijie", "jialei", "xujie", "lifang", "fangzhongjun",
-                "zhoubing", "liushiming", "fenglin", "wangling", "shenwenhai", "zhangxinpengpt",
-                "liqianqian", "dengtingting", "tangshaojie", "wangqiqi_yx", "lilin_sx",
-                "dongfangning", "lizhe_sx", "huyi", "xiliang", "lilin", "xiangyang", "yanzhongwei",
-                "kuangtiemei", "yangcang", "wanggang", "beiyue", "hesong", "husu", "sunhai",
-                "zhanghongying", "xufei", "xiezhongtao"));
+        List<String> list = new ArrayList<>(Arrays.asList("zouyizhan", "putao", "liuyuxuan", "liaokun_pt", "wangchao_yy1", "xileiyx", "zhuyunchun", "shengyuwei", "kongtianshu", "lixia", "dongxiaojian", "wuxingrong", "wencong", "zhaoqin", "jiangjiqipt", "RedSeaTest01", "lvhept", "gaomeng", "liyi", "liujuan_wh", "lili_wh", "sunyanqing", "jubin", "wangconggang", "chenxuexs", "zhoujianhong", "wangliang3", "taojiawei", "libinpt", "zhujiawei", "zhangxuewei", "suyi_hy", "sunlei", "shanlei", "miaoxiangbin", "liwenzhou", "lijun", "wangle", "zhuhong", "zhuangwenyun", "zhaoqian", "chendifei", "liuming", "xuyue", "zhangyanpeng", "maliyong", "liuguoxin", "yuhang", "yuanmin", "zhaoying", "liaozhiyong_ciyuan", "liuyuxing", "zhongyong", "guming", "leijie", "jialei", "xujie", "lifang", "fangzhongjun", "zhoubing", "liushiming", "fenglin", "wangling", "shenwenhai", "zhangxinpengpt", "liqianqian", "dengtingting", "tangshaojie", "wangqiqi_yx", "lilin_sx", "dongfangning", "lizhe_sx", "huyi", "xiliang", "lilin", "xiangyang", "yanzhongwei", "kuangtiemei", "yangcang", "wanggang", "beiyue", "hesong", "husu", "sunhai", "zhanghongying", "xufei", "xiezhongtao", "zechenchen_sx", "chenhao_sx", "yangle_xs", "guoyi", "caojinwei", "zhangjian", "aiyang", "lvfang", "zhoulin", "zhoulinyx", "liubeiyu", "haozhaoxs", "mashuai", "xilei", "chenwangdu", "zhangqingqing_jl", "hexiaorui", "duxiaofu", "xiezhenxin", "tianshu_ll", "niulei", "chenyunyi", "xiaosa", "xumeng", "tangkunpeng", "chenhuiyun", "heweilin", "yaoxueling", "chenling_sx2", "lijinzhi", "renhuaqiang", "guoxiao", "likang", "zhangwenting", "shangyuxiang", "nieguoliang", "sunjiayue", "luxia", "lilisx", "zongguiqinjc", "dengwenbojs", "hujin", "wanghaoran_yy", "huangqiongfeng", "tangle_yy", "fuqiang"));
 
         // 待比对的字符串
         String str =
-                "zechenchen_sx,chenhao_sx,yangle_xs,guoyi,caojinwei,zhangjian,aiyang,lvfang,zhoulin,zhoulinyx,liubeiyu,haozhaoxs,mashuai,xilei,xileiyx,chenwangdu,zhangqingqing_jl,hexiaorui,duxiaofu,xiezhenxin,tianshu_ll,niulei,chenyunyi,xiaosa,xumeng,tangkunpeng,chenhuiyun,heweilin,yaoxueling,chenling_sx2,lijinzhi,renhuaqiang,guoxiao,likang,zhangwenting,shangyuxiang,nieguoliang,sunjiayue,luxia,lilisx,zongguiqinjc,dengwenbojs,hujin,wanghaoran_yy,huangqiongfeng,tangle_yy,fuqiang";
+                "zhuzhenya,xiatian,wangsiyuan,liyaru,renwenjunyx,zhangyimeng,zhangqiaochu,liyunjie,maaobo,chaixiaoping,guolvteng,gaohuilingnr,yushunqing,qianyueqing,zoujianbo,renwenjun,zhaobo,zouyi_hy1,sulingxiu,hanjiaming";
 
         // 用 LinkedHashSet 保持插入顺序且自动去重
         Set<String> set = new LinkedHashSet<>(list);

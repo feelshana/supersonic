@@ -8,11 +8,13 @@ import dev.langchain4j.inmemory.spring.InMemoryEmbeddingStoreFactory;
 import dev.langchain4j.milvus.spring.MilvusEmbeddingStoreFactory;
 import dev.langchain4j.opensearch.spring.OpenSearchEmbeddingStoreFactory;
 import dev.langchain4j.pgvector.spring.PgvectorEmbeddingStoreFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 public class EmbeddingStoreFactoryProvider {
     protected static final Map<EmbeddingStoreConfig, EmbeddingStoreFactory> factoryMap =
             new ConcurrentHashMap<>();
@@ -20,7 +22,10 @@ public class EmbeddingStoreFactoryProvider {
     public static EmbeddingStoreFactory getFactory() {
         EmbeddingStoreParameterConfig parameterConfig =
                 ContextUtils.getBean(EmbeddingStoreParameterConfig.class);
-        return getFactory(parameterConfig.convert());
+        EmbeddingStoreConfig config = parameterConfig.convert();
+        log.info("[PERFORMANCE] getFactory config hash:{}, factoryMap size:{}, containsKey:{}",
+                config.hashCode(), factoryMap.size(), factoryMap.containsKey(config));
+        return getFactory(config);
     }
 
     public static EmbeddingStoreFactory getFactory(EmbeddingStoreConfig embeddingStoreConfig) {

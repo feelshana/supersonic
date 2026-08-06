@@ -157,11 +157,16 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 || queryText.contains("重庆")) {
             num = 2;
         }
+        long embedStart = System.currentTimeMillis();
         Embedding embeddedText = embeddingModel.embed(queryText).content();
+        log.info("[PERFORMANCE] embed cost:{}ms, text:{}", System.currentTimeMillis() - embedStart,
+                queryText);
         Filter filter = createCombinedFilter(filterCondition);
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
                 .queryEmbedding(embeddedText).filter(filter).maxResults(num).build();
+        long searchStart = System.currentTimeMillis();
         EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
+        log.info("[PERFORMANCE] search cost:{}ms", System.currentTimeMillis() - searchStart);
         List<Retrieval> retrievals = result.matches().stream().map(this::convertToRetrieval)
                 .sorted(Comparator.comparingDouble(Retrieval::getSimilarity).reversed()).limit(num)
                 .collect(Collectors.toList());

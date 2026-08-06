@@ -141,6 +141,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
      */
     public List<EmbeddingResult> detectByBatch(ChatQueryContext chatQueryContext,
             Set<Long> detectDataSetIds, Set<String> detectSegments, boolean useLlm) {
+        long batchStart = System.currentTimeMillis();
         Set<EmbeddingResult> results = ConcurrentHashMap.newKeySet();
         int embeddingMapperBatch = Integer
                 .valueOf(mapperConfig.getParameterValue(MapperConfig.EMBEDDING_MAPPER_BATCH));
@@ -160,6 +161,8 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
                     createTask(chatQueryContext, detectDataSetIds, queryTextsSub, results, useLlm));
         }
         executeTasks(tasks);
+        log.info("[PERFORMANCE] detectByBatch cost:{}ms, segments:{}, batches:{}",
+                System.currentTimeMillis() - batchStart, queryTextsList.size(), tasks.size());
 
         // Apply LLM filtering if enabled
         if (useLlm) {

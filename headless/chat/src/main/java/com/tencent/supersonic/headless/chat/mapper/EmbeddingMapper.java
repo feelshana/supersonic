@@ -33,86 +33,91 @@ public class EmbeddingMapper extends BaseMapper {
     }
 
     public void doMap(ChatQueryContext chatQueryContext) {
-        log.info("embedding mapper start");
-        // TODO: 如果是在LOOSE执行过了，那么在LLM_OR_RULE阶段可以不用执行，所以这里缺乏一个状态来传递，暂时先忽略这个浪费行为吧
-        SchemaMapInfo mappedInfo = chatQueryContext.getMapInfo();
+        log.info(
+                "embedding mapper skipped (vector recall disabled, dimension values injected via prompt)");
 
-        // 1. Query from embedding by queryText
-        EmbeddingMatchStrategy matchStrategy = ContextUtils.getBean(EmbeddingMatchStrategy.class);
-        List<EmbeddingResult> matchResults = getMatches(chatQueryContext, matchStrategy);
-
-        // Process match results
-        HanlpHelper.transLetterOriginal(matchResults);
-
-        // 2. Build SchemaElementMatch based on match results
-        for (EmbeddingResult matchResult : matchResults) {
-            Long elementId = Retrieval.getLongId(matchResult.getId());
-            Long dataSetId = Retrieval.getLongId(matchResult.getMetadata().get("dataSetId"));
-
-            // Skip if dataSetId is null
-            if (Objects.isNull(dataSetId)) {
-                continue;
-            }
-            SchemaElementType elementType =
-                    SchemaElementType.valueOf(matchResult.getMetadata().get("type"));
-            SchemaElement schemaElement = getSchemaElement(dataSetId, elementType, elementId,
-                    chatQueryContext.getSemanticSchema());
-
-            // Skip if schemaElement is null
-            if (schemaElement == null) {
-                continue;
-            }
-
-
-            // Build SchemaElementMatch object
-            SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
-                    .element(schemaElement).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
-                    .word(matchResult.getName()).similarity(matchResult.getSimilarity())
-                    .detectWord(matchResult.getDetectWord()).build();
-            schemaElementMatch.setLlmMatched(matchResult.isLlmMatched());
-            // 转化一下,判断一下type为DIMENSION_VALUE_ALIAS
-            doDimValueAliasLogic(schemaElementMatch, matchResult.getMetadata(),
-                    chatQueryContext.getSemanticSchema().getDimensionValues(), elementType);
-
-            // 3. Add SchemaElementMatch to mapInfo
-            addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
-        }
-        if (CollectionUtils.isEmpty(matchResults)) {
-            if (!CollectionUtils.isEmpty(chatQueryContext.getQueryFilters())) {
-                for (String queryFilter : chatQueryContext.getQueryFilters()) {
-                    List<SchemaElement> list =
-                            (List<SchemaElement>) org.apache.commons.collections.CollectionUtils
-                                    .union(chatQueryContext.getSemanticSchema().getDimensions(),
-                                            chatQueryContext.getSemanticSchema().getMetrics());
-
-                    SchemaElement matched =
-                            list.stream().filter(element -> element.getName().equals(queryFilter))
-                                    .findFirst().orElse(null);
-                    if (matched != null) {
-                        SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
-                                .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
-                                .detectWord(matched.getName()).word(matched.getName()).similarity(1)
-                                .build();
-
-                        Long dataSetId = chatQueryContext.getSemanticSchema().getDataSets().get(0)
-                                .getDataSetId();
-
-                        addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId,
-                                schemaElementMatch);
-
-                    }
-                }
-
-
-            }
-
-        } else {
-            // for (EmbeddingResult matchResult : matchResults) {
-            // log.info("embedding match name=[{}],detectWord=[{}],similarity=[{}],metadata=[{}]",
-            // matchResult.getName(), matchResult.getDetectWord(),
-            // matchResult.getSimilarity(), JsonUtil.toString(matchResult.getMetadata()));
-            // }
-        }
+        // ======================== 以下为原始向量召回逻辑，已禁用，如需恢复请取消注释 ========================
+        // // TODO: 如果是在LOOSE执行过了，那么在LLM_OR_RULE阶段可以不用执行，所以这里缺乏一个状态来传递，暂时先忽略这个浪费行为吧
+        // SchemaMapInfo mappedInfo = chatQueryContext.getMapInfo();
+        //
+        // // 1. Query from embedding by queryText
+        // EmbeddingMatchStrategy matchStrategy =
+        // ContextUtils.getBean(EmbeddingMatchStrategy.class);
+        // List<EmbeddingResult> matchResults = getMatches(chatQueryContext, matchStrategy);
+        //
+        // // Process match results
+        // HanlpHelper.transLetterOriginal(matchResults);
+        //
+        // // 2. Build SchemaElementMatch based on match results
+        // for (EmbeddingResult matchResult : matchResults) {
+        // Long elementId = Retrieval.getLongId(matchResult.getId());
+        // Long dataSetId = Retrieval.getLongId(matchResult.getMetadata().get("dataSetId"));
+        //
+        // // Skip if dataSetId is null
+        // if (Objects.isNull(dataSetId)) {
+        // continue;
+        // }
+        // SchemaElementType elementType =
+        // SchemaElementType.valueOf(matchResult.getMetadata().get("type"));
+        // SchemaElement schemaElement = getSchemaElement(dataSetId, elementType, elementId,
+        // chatQueryContext.getSemanticSchema());
+        //
+        // // Skip if schemaElement is null
+        // if (schemaElement == null) {
+        // continue;
+        // }
+        //
+        //
+        // // Build SchemaElementMatch object
+        // SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
+        // .element(schemaElement).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+        // .word(matchResult.getName()).similarity(matchResult.getSimilarity())
+        // .detectWord(matchResult.getDetectWord()).build();
+        // schemaElementMatch.setLlmMatched(matchResult.isLlmMatched());
+        // // 转化一下,判断一下type为DIMENSION_VALUE_ALIAS
+        // doDimValueAliasLogic(schemaElementMatch, matchResult.getMetadata(),
+        // chatQueryContext.getSemanticSchema().getDimensionValues(), elementType);
+        //
+        // // 3. Add SchemaElementMatch to mapInfo
+        // addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
+        // }
+        // if (CollectionUtils.isEmpty(matchResults)) {
+        // if (!CollectionUtils.isEmpty(chatQueryContext.getQueryFilters())) {
+        // for (String queryFilter : chatQueryContext.getQueryFilters()) {
+        // List<SchemaElement> list =
+        // (List<SchemaElement>) org.apache.commons.collections.CollectionUtils
+        // .union(chatQueryContext.getSemanticSchema().getDimensions(),
+        // chatQueryContext.getSemanticSchema().getMetrics());
+        //
+        // SchemaElement matched =
+        // list.stream().filter(element -> element.getName().equals(queryFilter))
+        // .findFirst().orElse(null);
+        // if (matched != null) {
+        // SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
+        // .element(matched).frequency(BaseWordBuilder.DEFAULT_FREQUENCY)
+        // .detectWord(matched.getName()).word(matched.getName()).similarity(1)
+        // .build();
+        //
+        // Long dataSetId = chatQueryContext.getSemanticSchema().getDataSets().get(0)
+        // .getDataSetId();
+        //
+        // addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId,
+        // schemaElementMatch);
+        //
+        // }
+        // }
+        //
+        //
+        // }
+        //
+        // } else {
+        // // for (EmbeddingResult matchResult : matchResults) {
+        // // log.info("embedding match name=[{}],detectWord=[{}],similarity=[{}],metadata=[{}]",
+        // // matchResult.getName(), matchResult.getDetectWord(),
+        // // matchResult.getSimilarity(), JsonUtil.toString(matchResult.getMetadata()));
+        // // }
+        // }
+        // ======================== 原始向量召回逻辑结束 ========================
     }
 
     @Override
@@ -120,40 +125,40 @@ public class EmbeddingMapper extends BaseMapper {
         return false;
     }
 
-
-
-    private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch,
-            Map<String, String> dimValueAlias, List<SchemaElement> dimensionValues,
-            SchemaElementType elementType) {
-        SchemaElement element = schemaElementMatch.getElement();
-        boolean matched = false;
-        if (SchemaElementType.DIMENSION_VALUE_ALIAS.equals(elementType)) {
-            Long dimId = element.getId();
-            String word = schemaElementMatch.getWord();
-            if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word)
-                    && dimValueAlias.containsKey(dimId.toString())) {
-                String id = dimValueAlias.get("id");
-                if (Objects.nonNull(id) && id.contains(word)) {
-                    String wordTech = dimValueAlias.get("dimValue");
-                    schemaElementMatch.setWord(wordTech);
-                    matched = true;
-                }
-            }
-            if (!matched) {
-                SchemaElement dimensionValue =
-                        dimensionValues.stream().filter(dimValue -> dimId.equals(dimValue.getId()))
-                                .findFirst().orElse(null);
-                if (dimensionValue != null) {
-                    SchemaValueMap dimValue = dimensionValue.getSchemaValueMaps().stream().filter(
-                            schemaValueMap -> StringUtils.equals(schemaValueMap.getBizName(), word)
-                                    || schemaValueMap.getAlias().contains(word))
-                            .findFirst().orElse(null);
-                    if (dimValue != null) {
-                        schemaElementMatch.setWord(dimValue.getTechName());
-                    }
-                }
-            }
-
-        }
-    }
+    // ======================== 以下为原始维度值别名转换逻辑，已禁用，如需恢复请取消注释 ========================
+    // private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch,
+    // Map<String, String> dimValueAlias, List<SchemaElement> dimensionValues,
+    // SchemaElementType elementType) {
+    // SchemaElement element = schemaElementMatch.getElement();
+    // boolean matched = false;
+    // if (SchemaElementType.DIMENSION_VALUE_ALIAS.equals(elementType)) {
+    // Long dimId = element.getId();
+    // String word = schemaElementMatch.getWord();
+    // if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word)
+    // && dimValueAlias.containsKey(dimId.toString())) {
+    // String id = dimValueAlias.get("id");
+    // if (Objects.nonNull(id) && id.contains(word)) {
+    // String wordTech = dimValueAlias.get("dimValue");
+    // schemaElementMatch.setWord(wordTech);
+    // matched = true;
+    // }
+    // }
+    // if (!matched) {
+    // SchemaElement dimensionValue =
+    // dimensionValues.stream().filter(dimValue -> dimId.equals(dimValue.getId()))
+    // .findFirst().orElse(null);
+    // if (dimensionValue != null) {
+    // SchemaValueMap dimValue = dimensionValue.getSchemaValueMaps().stream().filter(
+    // schemaValueMap -> StringUtils.equals(schemaValueMap.getBizName(), word)
+    // || schemaValueMap.getAlias().contains(word))
+    // .findFirst().orElse(null);
+    // if (dimValue != null) {
+    // schemaElementMatch.setWord(dimValue.getTechName());
+    // }
+    // }
+    // }
+    //
+    // }
+    // }
+    // ======================== 原始维度值别名转换逻辑结束 ========================
 }
