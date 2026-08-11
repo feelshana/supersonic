@@ -3,6 +3,7 @@ package com.tencent.supersonic.headless.core.translator.parser.calcite;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.tencent.supersonic.common.calcite.Configuration;
+import com.tencent.supersonic.common.jsqlparser.SqlReplaceHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.enums.EngineType;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
@@ -65,6 +66,14 @@ public class DataModelNode extends SemanticNode {
             } else {
                 sqlTable = String.format("%s WHERE %s", sqlTable, filterSql);
             }
+        }
+
+        // MySQL/Doris 允许 AS '别名' 的写法，但 Calcite 解析器要求别名使用反引号。
+        // 这里把单引号别名统一转成反引号别名，避免 Calcite 解析失败。
+        try {
+            sqlTable = SqlReplaceHelper.replaceAliasWithBackticks(sqlTable);
+        } catch (Exception e) {
+            log.warn("Failed to replace alias with backticks, use original sqlTable: {}", sqlTable, e);
         }
 
         if (sqlTable.isEmpty()) {

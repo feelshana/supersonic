@@ -621,6 +621,43 @@ public class SqlBuilder {
     }
 
     /**
+     * 创建标识符节点。如果标识符包含中文、特殊字符或不符合 Calcite 未引用标识符规则，
+     * 则使用反引号包裹，避免 Calcite 解析失败。
+     *
+     * @param name 标识符名称
+     * @param pos 解析位置
+     * @return 标识符节点
+     */
+    private static SqlIdentifier createIdentifier(String name, SqlParserPos pos) {
+        if (StringUtils.isBlank(name) || isSimpleIdentifier(name)) {
+            return new SqlIdentifier(Arrays.asList(name), pos);
+        }
+        try {
+            // 对反引号本身做转义，避免注入问题
+            String quoted = "`" + name.replace("`", "``") + "`";
+            SqlNode parsed = SqlParser.create(quoted).parseExpression();
+            if (parsed instanceof SqlIdentifier) {
+                return (SqlIdentifier) parsed;
+            }
+        } catch (SqlParseException e) {
+            log.warn("Failed to parse quoted identifier: {}", name, e);
+        }
+        // 兜底：按原方式创建
+        return new SqlIdentifier(Arrays.asList(name), pos);
+    }
+
+    /**
+     * 判断是否为 Calcite 可直接识别的未引用标识符：
+     * 以字母或下划线开头，后续仅包含字母、数字、下划线。
+     *
+     * @param name 标识符名称
+     * @return true 表示不需要加引号
+     */
+    private static boolean isSimpleIdentifier(String name) {
+        return name.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
+    }
+
+    /**
      * 为表达式创建别名节点
      * 
      * @param expr 原始表达式
@@ -641,7 +678,7 @@ public class SqlBuilder {
             if (selectList.size() > 0) {
                 SqlNode exprNode = selectList.get(0);
                 // 创建别名标识符
-                SqlIdentifier alias = new SqlIdentifier(Arrays.asList(aliasName), pos);
+                SqlIdentifier alias = createIdentifier(aliasName, pos);
 
                 // 使用AS操作符创建带别名的表达式
                 return SqlStdOperatorTable.AS.createCall(pos, exprNode, alias);
@@ -652,7 +689,7 @@ public class SqlBuilder {
 
     public static SqlNode createColumn(String name, SqlParserPos pos) {
         // 创建别名标识符
-        SqlIdentifier column = new SqlIdentifier(Arrays.asList(name), pos);
+        SqlIdentifier column = createIdentifier(name, pos);
 
         // 使用AS操作符创建带别名的表达式
         return column;
