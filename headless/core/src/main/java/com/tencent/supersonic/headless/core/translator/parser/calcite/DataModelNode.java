@@ -3,7 +3,6 @@ package com.tencent.supersonic.headless.core.translator.parser.calcite;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.tencent.supersonic.common.calcite.Configuration;
-import com.tencent.supersonic.common.jsqlparser.SqlReplaceHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.enums.EngineType;
 import com.tencent.supersonic.headless.api.pojo.Dimension;
@@ -54,7 +53,8 @@ public class DataModelNode extends SemanticNode {
             // } else {
             // sqlTable = "SELECT * FROM " + dataModel.getModelDetail().getTableQuery();
             // }
-            sqlTable = SqlBuilder.createTableSql(semanticSchemaResp);
+            sqlTable = SqlBuilder.createTableSql(semanticSchemaResp,
+                    EngineType.fromString(dataModel.getModelDetail().getDbType()));
         }
 
         // String filterSql = dataModel.getFilterSql();
@@ -69,11 +69,12 @@ public class DataModelNode extends SemanticNode {
         }
 
         // MySQL/Doris 允许 AS '别名' 的写法，但 Calcite 解析器要求别名使用反引号。
-        // 这里把单引号别名统一转成反引号别名，避免 Calcite 解析失败。
+        // 这里把 SELECT 列表中的 AS '别名' 统一转成 AS `别名`，避免 Calcite 解析失败。
+        // 注意：只处理 SELECT 里的单引号别名，不改动 WHERE 中的字符串字面量。
         try {
-            sqlTable = SqlReplaceHelper.replaceAliasWithBackticks(sqlTable);
+            sqlTable = sqlTable.replaceAll("(?i)\\bAS\\s+'((?:[^']|'')*)'", "AS `$1`");
         } catch (Exception e) {
-            log.warn("Failed to replace alias with backticks, use original sqlTable: {}", sqlTable, e);
+            log.warn("Failed to normalize alias quoting, use original sqlTable: {}", sqlTable, e);
         }
 
         if (sqlTable.isEmpty()) {

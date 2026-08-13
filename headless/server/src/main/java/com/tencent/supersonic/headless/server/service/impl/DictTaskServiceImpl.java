@@ -270,7 +270,8 @@ public class DictTaskServiceImpl implements DictTaskService {
                 .comparing((DimensionValueDO v) -> Optional.ofNullable(v.getFrequency()).orElse(0L))
                 .reversed().thenComparing(DimensionValueDO::getDimValue))
                 .filter(v -> StringUtils.isNotBlank(v.getDimValue()))
-                .filter(v -> StringUtils.length(v.getDimValue()) <= 20).limit(50).map(v -> {
+                .filter(v -> StringUtils.length(v.getDimValue()) <= 20)
+                .filter(v -> !containsSurrogatePair(v.getDimValue())).limit(50).map(v -> {
                     String value = v.getDimValue();
                     DimValueMap dimValueMap = new DimValueMap();
                     dimValueMap.setValue(value);
@@ -287,6 +288,22 @@ public class DictTaskServiceImpl implements DictTaskService {
                     }
                     return dimValueMap;
                 }).collect(Collectors.toList());
+    }
+
+    /**
+     * 判断字符串是否包含4字节UTF-8字符（如emoji），这类字符无法存入utf8mb3字段。
+     * Java中4字节Unicode以代理对（surrogate pair）表示。
+     */
+    private static boolean containsSurrogatePair(String value) {
+        if (value == null) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isHighSurrogate(value.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -50,15 +50,16 @@ public class SqlBuilder {
         this.scope = SchemaBuilder.getScope(schema);
     }
 
-    public static String createTableSql(SemanticSchemaResp semanticSchema) throws Exception {
+    public static String createTableSql(SemanticSchemaResp semanticSchema, EngineType engineType)
+            throws Exception {
         List<SqlNode> selectList = new ArrayList<>();
         for (DimSchemaResp dimSchemaResp : semanticSchema.getDimensions()) {
             if (StringUtils.isNotBlank(dimSchemaResp.getExpr()) && !StringUtils
                     .equalsIgnoreCase(dimSchemaResp.getExpr(), dimSchemaResp.getBizName())) {
-                selectList
-                        .add(createAlias(dimSchemaResp.getExpr(), dimSchemaResp.getBizName(), pos));
+                selectList.add(createAlias(dimSchemaResp.getExpr(), dimSchemaResp.getBizName(),
+                        pos, engineType));
             } else {
-                selectList.add(createColumn(dimSchemaResp.getBizName(), pos));
+                selectList.add(createColumn(dimSchemaResp.getBizName(), pos, engineType));
             }
 
         }
@@ -66,9 +67,9 @@ public class SqlBuilder {
             if (StringUtils.isNotBlank(metricSchemaResp.getExpr()) && !StringUtils
                     .equalsIgnoreCase(metricSchemaResp.getExpr(), metricSchemaResp.getBizName())) {
                 selectList.add(createAlias(metricSchemaResp.getExpr(),
-                        metricSchemaResp.getBizName(), pos));
+                        metricSchemaResp.getBizName(), pos, engineType));
             } else {
-                selectList.add(createColumn(metricSchemaResp.getBizName(), pos));
+                selectList.add(createColumn(metricSchemaResp.getBizName(), pos, engineType));
             }
         }
         SqlNodeList selectListNode = new SqlNodeList(selectList, pos);
@@ -621,21 +622,22 @@ public class SqlBuilder {
     }
 
     /**
-     * 创建标识符节点。如果标识符包含中文、特殊字符或不符合 Calcite 未引用标识符规则，
-     * 则使用反引号包裹，避免 Calcite 解析失败。
+     * 创建标识符节点。如果标识符包含中文、特殊字符或不符合 Calcite 未引用标识符规则， 则使用反引号包裹，避免 Calcite 解析失败。
      *
      * @param name 标识符名称
      * @param pos 解析位置
      * @return 标识符节点
      */
-    private static SqlIdentifier createIdentifier(String name, SqlParserPos pos) {
+    private static SqlIdentifier createIdentifier(String name, SqlParserPos pos,
+            EngineType engineType) {
         if (StringUtils.isBlank(name) || isSimpleIdentifier(name)) {
             return new SqlIdentifier(Arrays.asList(name), pos);
         }
         try {
             // 对反引号本身做转义，避免注入问题
             String quoted = "`" + name.replace("`", "``") + "`";
-            SqlNode parsed = SqlParser.create(quoted).parseExpression();
+            SqlNode parsed = SqlParser.create(quoted,
+                    Configuration.getParserConfig(engineType)).parseExpression();
             if (parsed instanceof SqlIdentifier) {
                 return (SqlIdentifier) parsed;
             }
@@ -647,14 +649,28 @@ public class SqlBuilder {
     }
 
     /**
-     * 判断是否为 Calcite 可直接识别的未引用标识符：
-     * 以字母或下划线开头，后续仅包含字母、数字、下划线。
+     * 判断是否为 Calcite 可直接识别的未引用标识符： 以字母或下划线开头，后续仅包含字母、数字、下划线。
      *
      * @param name 标识符名称
      * @return true 表示不需要加引号
      */
     private static boolean isSimpleIdentifier(String name) {
         return name.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
+    }
+
+    /**
+     * 对 SQL 表达式中的常见全角符号做半角转换。
+     * 只处理 SQL 语法符号（括号、逗号、算数符等），不处理中文文字。
+     * 防止 Calcite 解析 expr 时遇到全角符号报词法错误。
+     */
+    private static String normalizeExprSymbols(String expr) {
+        if (StringUtils.isBlank(expr)) {
+            return expr;
+        }
+        return expr.replace('（', '(').replace('）', ')').replace('，', ',')
+                .replace('；', ';').replace('＝', '=').replace('＞', '>')
+                .replace('＜', '<').replace('＋', '+').replace('－', '-')
+                .replace('＊', '*').replace('／', '/');
     }
 
     /**
@@ -665,11 +681,13 @@ public class SqlBuilder {
      * @param pos 解析位置
      * @return 带别名的表达式节点
      */
-    public static SqlNode createAlias(String expr, String aliasName, SqlParserPos pos)
-            throws SqlParseException {
+    public static SqlNode createAlias(String expr, String aliasName, SqlParserPos pos,
+            EngineType engineType) throws SqlParseException {
 
+        expr = normalizeExprSymbols(expr);
         String exprPlusSql = "select " + expr + " from dual";
-        SqlNode parsedNode = SqlParser.create(exprPlusSql).parseQuery();
+        SqlNode parsedNode = SqlParser.create(exprPlusSql,
+                Configuration.getParserConfig(engineType)).parseQuery();
         // 提取表达式部分
         // 这里对内层sql的表达式做了别名，与外层的表达式保持一致，如果此处变动，外层表达式（getDimensionExpressions方法）也要变动
         if (parsedNode instanceof SqlSelect) {
@@ -678,7 +696,7 @@ public class SqlBuilder {
             if (selectList.size() > 0) {
                 SqlNode exprNode = selectList.get(0);
                 // 创建别名标识符
-                SqlIdentifier alias = createIdentifier(aliasName, pos);
+                SqlIdentifier alias = createIdentifier(aliasName, pos, engineType);
 
                 // 使用AS操作符创建带别名的表达式
                 return SqlStdOperatorTable.AS.createCall(pos, exprNode, alias);
@@ -687,9 +705,9 @@ public class SqlBuilder {
         return null;
     }
 
-    public static SqlNode createColumn(String name, SqlParserPos pos) {
+    public static SqlNode createColumn(String name, SqlParserPos pos, EngineType engineType) {
         // 创建别名标识符
-        SqlIdentifier column = createIdentifier(name, pos);
+        SqlIdentifier column = createIdentifier(name, pos, engineType);
 
         // 使用AS操作符创建带别名的表达式
         return column;

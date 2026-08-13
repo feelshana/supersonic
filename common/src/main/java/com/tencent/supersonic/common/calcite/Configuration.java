@@ -77,7 +77,7 @@ public class Configuration {
         parserConfig.setLex(Lex.BIG_QUERY);
         parserConfig.setParserFactory(SqlParserImpl.FACTORY).setCaseSensitive(false)
                 .setIdentifierMaxLength(Integer.MAX_VALUE).setQuoting(Quoting.BACK_TICK)
-                .setQuoting(Quoting.SINGLE_QUOTE).setQuotedCasing(Casing.TO_UPPER)
+                .setQuotedCasing(Casing.TO_UPPER)
                 .setUnquotedCasing(Casing.TO_UPPER).setConformance(sqlDialect.getConformance())
                 .setLex(Lex.BIG_QUERY);
         if (EngineType.HANADB.equals(engineType)) {
