@@ -22,6 +22,7 @@ import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.config.GeneralManageConfig;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.DimensionConstants;
+import com.tencent.supersonic.common.pojo.TermConstants;
 import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.Text2SQLType;
@@ -595,7 +596,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
             return Collections.emptyMap();
         }
         SchemaElement configTerm = semanticSchema.getTerms().stream()
-                .filter(t -> "无需排除id的维度".equals(t.getName())).findFirst().orElse(null);
+                .filter(t -> TermConstants.NO_EXCLUDE_ID_DIMENSIONS.equals(t.getName())).findFirst()
+                .orElse(null);
         if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
             return Collections.emptyMap();
         }

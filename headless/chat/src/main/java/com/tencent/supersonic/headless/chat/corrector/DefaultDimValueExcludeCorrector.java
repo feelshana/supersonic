@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.chat.corrector;
 
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.pojo.TermConstants;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
@@ -31,7 +32,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
-    private static final String TERM_NAME = "默认值配置";
 
     @Override
     public void doCorrect(ChatQueryContext chatQueryContext, SemanticParseInfo semanticParseInfo) {
@@ -159,8 +159,9 @@ public class DefaultDimValueExcludeCorrector extends BaseSemanticCorrector {
             return Collections.emptyMap();
         }
 
-        SchemaElement configTerm =
-                terms.stream().filter(t -> TERM_NAME.equals(t.getName())).findFirst().orElse(null);
+        SchemaElement configTerm = terms.stream()
+                .filter(t -> TermConstants.DEFAULT_DIM_VALUE_CONFIG.equals(t.getName())).findFirst()
+                .orElse(null);
 
         if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
             return Collections.emptyMap();

@@ -1215,8 +1215,7 @@ public class BiAgentServiceImpl implements BiAgentService {
 
         List<DimValueMap> preview = new ArrayList<>();
         normalizedValues.stream().filter(value -> StringUtils.length(value) <= 20)
-                .filter(value -> !containsSurrogatePair(value)).limit(50)
-                .forEach(value -> {
+                .filter(value -> !containsSurrogatePair(value)).limit(50).forEach(value -> {
                     DimValueMap dimValueMap = new DimValueMap();
                     dimValueMap.setValue(value);
                     dimValueMap.setTechName(value);
@@ -1236,8 +1235,7 @@ public class BiAgentServiceImpl implements BiAgentService {
     }
 
     /**
-     * 判断字符串是否包含4字节UTF-8字符（如emoji），这类字符无法存入utf8mb3字段。
-     * Java中4字节Unicode以代理对（surrogate pair）表示。
+     * 判断字符串是否包含4字节UTF-8字符（如emoji），这类字符无法存入utf8mb3字段。 Java中4字节Unicode以代理对（surrogate pair）表示。
      */
     private static boolean containsSurrogatePair(String value) {
         if (value == null) {

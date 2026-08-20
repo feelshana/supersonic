@@ -56,8 +56,8 @@ public class SqlBuilder {
         for (DimSchemaResp dimSchemaResp : semanticSchema.getDimensions()) {
             if (StringUtils.isNotBlank(dimSchemaResp.getExpr()) && !StringUtils
                     .equalsIgnoreCase(dimSchemaResp.getExpr(), dimSchemaResp.getBizName())) {
-                selectList.add(createAlias(dimSchemaResp.getExpr(), dimSchemaResp.getBizName(),
-                        pos, engineType));
+                selectList.add(createAlias(dimSchemaResp.getExpr(), dimSchemaResp.getBizName(), pos,
+                        engineType));
             } else {
                 selectList.add(createColumn(dimSchemaResp.getBizName(), pos, engineType));
             }
@@ -78,7 +78,7 @@ public class SqlBuilder {
                 .getFirst().getModelDetail().getTableQuery().split("\\.")), pos);
         SqlSelect sqlSelect = new SqlSelect(pos, null, selectListNode, tableName, null, null, null,
                 null, null, null, null, null);
-        return sqlSelect.toString();
+        return SemanticNode.getSql(sqlSelect, engineType);
 
     }
 
@@ -636,8 +636,8 @@ public class SqlBuilder {
         try {
             // 对反引号本身做转义，避免注入问题
             String quoted = "`" + name.replace("`", "``") + "`";
-            SqlNode parsed = SqlParser.create(quoted,
-                    Configuration.getParserConfig(engineType)).parseExpression();
+            SqlNode parsed = SqlParser.create(quoted, Configuration.getParserConfig(engineType))
+                    .parseExpression();
             if (parsed instanceof SqlIdentifier) {
                 return (SqlIdentifier) parsed;
             }
@@ -659,18 +659,15 @@ public class SqlBuilder {
     }
 
     /**
-     * 对 SQL 表达式中的常见全角符号做半角转换。
-     * 只处理 SQL 语法符号（括号、逗号、算数符等），不处理中文文字。
-     * 防止 Calcite 解析 expr 时遇到全角符号报词法错误。
+     * 对 SQL 表达式中的常见全角符号做半角转换。 只处理 SQL 语法符号（括号、逗号、算数符等），不处理中文文字。 防止 Calcite 解析 expr 时遇到全角符号报词法错误。
      */
     private static String normalizeExprSymbols(String expr) {
         if (StringUtils.isBlank(expr)) {
             return expr;
         }
-        return expr.replace('（', '(').replace('）', ')').replace('，', ',')
-                .replace('；', ';').replace('＝', '=').replace('＞', '>')
-                .replace('＜', '<').replace('＋', '+').replace('－', '-')
-                .replace('＊', '*').replace('／', '/');
+        return expr.replace('（', '(').replace('）', ')').replace('，', ',').replace('；', ';')
+                .replace('＝', '=').replace('＞', '>').replace('＜', '<').replace('＋', '+')
+                .replace('－', '-').replace('＊', '*').replace('／', '/');
     }
 
     /**
@@ -686,8 +683,8 @@ public class SqlBuilder {
 
         expr = normalizeExprSymbols(expr);
         String exprPlusSql = "select " + expr + " from dual";
-        SqlNode parsedNode = SqlParser.create(exprPlusSql,
-                Configuration.getParserConfig(engineType)).parseQuery();
+        SqlNode parsedNode = SqlParser
+                .create(exprPlusSql, Configuration.getParserConfig(engineType)).parseQuery();
         // 提取表达式部分
         // 这里对内层sql的表达式做了别名，与外层的表达式保持一致，如果此处变动，外层表达式（getDimensionExpressions方法）也要变动
         if (parsedNode instanceof SqlSelect) {

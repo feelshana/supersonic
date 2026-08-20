@@ -3,6 +3,7 @@ package com.tencent.supersonic.headless.chat.mapper;
 import com.alibaba.fastjson.JSON;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.common.pojo.TermConstants;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticSchema;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
@@ -212,7 +213,7 @@ public abstract class BatchMatchStrategy<T extends MapResult> extends BaseMatchS
     public abstract List<T> detectByBatch(ChatQueryContext chatQueryContext,
             Set<Long> detectDataSetIds, Set<String> detectSegments);
 
-    private static final String TERM_DEFAULT_CONFIG_NAME = "默认值配置";
+    private static final String TERM_DEFAULT_CONFIG_NAME = TermConstants.DEFAULT_DIM_VALUE_CONFIG;
 
     private Set<String> getTermConfigDimNames(SemanticSchema semanticSchema) {
         List<SchemaElement> terms = semanticSchema.getTerms();

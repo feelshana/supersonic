@@ -1,6 +1,7 @@
 package com.tencent.supersonic.headless.chat.corrector;
 
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.pojo.TermConstants;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
@@ -27,7 +28,7 @@ import java.util.Set;
  * 术语驱动的 SELECT 字段强制补全校正器。
  *
  * <p>
- * 通过名为 {@value #TERM_NAME} 的术语（description 为 JSON 数组，元素为维度 name， 例如
+ * 通过名为 {@link TermConstants#MANDATORY_SELECT_FIELDS} 的术语（description 为 JSON 数组，元素为维度 name， 例如
  * {@code ["产品名称","省份","地市","日期"]}）来声明该数据集"必须查询的字段"。
  *
  * <p>
@@ -43,8 +44,6 @@ import java.util.Set;
  */
 @Slf4j
 public class MandatorySelectFieldCorrector extends BaseSemanticCorrector {
-
-    private static final String TERM_NAME = "必须查询的字段";
 
     /** 常见聚合函数名 */
     private static final Set<String> AGGREGATE_FUNCTIONS =
@@ -175,8 +174,9 @@ public class MandatorySelectFieldCorrector extends BaseSemanticCorrector {
         if (CollectionUtils.isEmpty(terms)) {
             return Collections.emptyList();
         }
-        SchemaElement configTerm =
-                terms.stream().filter(t -> TERM_NAME.equals(t.getName())).findFirst().orElse(null);
+        SchemaElement configTerm = terms.stream()
+                .filter(t -> TermConstants.MANDATORY_SELECT_FIELDS.equals(t.getName())).findFirst()
+                .orElse(null);
         if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
             return Collections.emptyList();
         }

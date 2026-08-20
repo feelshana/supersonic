@@ -3,6 +3,7 @@ package com.tencent.supersonic.headless.chat.corrector;
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.BiReportConfigDO;
+import com.tencent.supersonic.common.pojo.TermConstants;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
@@ -23,9 +24,9 @@ import java.util.stream.Collectors;
  *
  * <p>
  * When users forget to configure {@code defaultValues} on certain dimensions via BI training, this
- * corrector reads a Term named {@value #TERM_NAME} whose description is a JSON map
- * ({@code bizName → defaultValue}), and appends {@code dimName = 'defaultValue'} to the WHERE
- * clause for dimensions that the user's query does not mention.
+ * corrector reads a Term named {@link TermConstants#DEFAULT_DIM_VALUE_CONFIG} whose description is
+ * a JSON map ({@code bizName → defaultValue}), and appends {@code dimName = 'defaultValue'} to the
+ * WHERE clause for dimensions that the user's query does not mention.
  *
  * <p>
  * Dimensions that already have {@code defaultValues} configured in the dimension table are skipped,
@@ -33,8 +34,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class TermBasedDefaultDimValueCorrector extends BaseSemanticCorrector {
-
-    private static final String TERM_NAME = "默认值配置";
 
     @Override
     public void doCorrect(ChatQueryContext chatQueryContext, SemanticParseInfo semanticParseInfo) {
@@ -255,8 +254,9 @@ public class TermBasedDefaultDimValueCorrector extends BaseSemanticCorrector {
             return Collections.emptyMap();
         }
 
-        SchemaElement configTerm =
-                terms.stream().filter(t -> TERM_NAME.equals(t.getName())).findFirst().orElse(null);
+        SchemaElement configTerm = terms.stream()
+                .filter(t -> TermConstants.DEFAULT_DIM_VALUE_CONFIG.equals(t.getName())).findFirst()
+                .orElse(null);
 
         if (configTerm == null || StringUtils.isBlank(configTerm.getDescription())) {
             return Collections.emptyMap();

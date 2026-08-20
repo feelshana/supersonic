@@ -1,6 +1,7 @@
 ### chat-server SPIs
 
 com.tencent.supersonic.chat.server.parser.ChatQueryParser=\
+    com.tencent.supersonic.chat.server.parser.LlmNativeSqlParser, \
     com.tencent.supersonic.chat.server.parser.NL2PluginParser, \
     com.tencent.supersonic.chat.server.parser.NL2SQLParser,\
     com.tencent.supersonic.chat.server.parser.PlainTextParser

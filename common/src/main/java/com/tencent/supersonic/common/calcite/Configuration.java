@@ -77,9 +77,8 @@ public class Configuration {
         parserConfig.setLex(Lex.BIG_QUERY);
         parserConfig.setParserFactory(SqlParserImpl.FACTORY).setCaseSensitive(false)
                 .setIdentifierMaxLength(Integer.MAX_VALUE).setQuoting(Quoting.BACK_TICK)
-                .setQuotedCasing(Casing.TO_UPPER)
-                .setUnquotedCasing(Casing.TO_UPPER).setConformance(sqlDialect.getConformance())
-                .setLex(Lex.BIG_QUERY);
+                .setQuotedCasing(Casing.TO_UPPER).setUnquotedCasing(Casing.TO_UPPER)
+                .setConformance(sqlDialect.getConformance()).setLex(Lex.BIG_QUERY);
         if (EngineType.HANADB.equals(engineType)) {
             parserConfig = parserConfig.setQuoting(Quoting.DOUBLE_QUOTE);
         }
@@ -138,7 +137,7 @@ public class Configuration {
                 .withKeywordsLowerCase(false).withClauseEndsLine(true)
                 .withAlwaysUseParentheses(false).withSelectListItemsOnSeparateLines(false)
                 .withUpdateSetListNewline(false).withIndentation(0);
-        if (EngineType.MYSQL.equals(engineType)) {
+        if (EngineType.MYSQL.equals(engineType) || EngineType.DORIS.equals(engineType)) {
             // no backticks around function name
             config = config.withQuoteAllIdentifiers(false);
         }
