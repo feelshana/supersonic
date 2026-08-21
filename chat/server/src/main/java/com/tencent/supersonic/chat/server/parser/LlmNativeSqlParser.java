@@ -66,6 +66,13 @@ public class LlmNativeSqlParser implements ChatQueryParser {
     private static final String PLACEHOLDER_QUERY = "{{QUERY_TEXT}}";
     private static final String PLACEHOLDER_ENGINE = "{{ENGINE_TYPE}}";
     private static final String PLACEHOLDER_ERROR = "{{ERROR_FEEDBACK}}";
+    private static final String PLACEHOLDER_CUSTOM_RULES = "{{CUSTOM_RULES}}";
+
+    /**
+     * Agent 提示词中"报表定制规则"的起始标记。BI 训练时 {@code BiAgentServiceImpl.buildNewRulesContent()}
+     * 会以该标记开头追加报表规则，用户后续也可在前端继续补充。从该标记到提示词结尾即为定制规则部分。
+     */
+    private static final String CUSTOM_RULES_MARKER = "Sql生成的限制条件";
 
     /**
      * 是否接管本次解析。判定优先级：
@@ -127,7 +134,7 @@ public class LlmNativeSqlParser implements ChatQueryParser {
             LlmNativeSegmentService.segment(request.getQueryText(), context,
                     parseContext.getAgent());
 
-            String prompt = renderPrompt(context, request);
+            String prompt = renderPrompt(context, request, parseContext.getAgent());
             String rawSql = generateSql(parseContext, prompt);
             log.info("[LLM_NATIVE] LLM 原始输出: {}", rawSql);
 
@@ -166,15 +173,56 @@ public class LlmNativeSqlParser implements ChatQueryParser {
         return dataSetIds.iterator().next();
     }
 
-    private String renderPrompt(LlmNativeContext context, ChatParseReq request) throws Exception {
+    private String renderPrompt(LlmNativeContext context, ChatParseReq request, Agent agent)
+            throws Exception {
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String engineName =
                 context.getEngineType() != null ? context.getEngineType().getName() : "MySQL";
         return readPromptTemplate().replace(PLACEHOLDER_DATE, today)
                 .replace(PLACEHOLDER_ENGINE, engineName)
                 .replace(PLACEHOLDER_SCHEMA, context.getSchemaText())
+                .replace(PLACEHOLDER_CUSTOM_RULES, buildCustomRulesSection(agent))
                 .replace(PLACEHOLDER_ERROR, buildErrorFeedbackSection(request))
                 .replace(PLACEHOLDER_QUERY, StringUtils.defaultString(request.getQueryText()));
+    }
+
+    /**
+     * 构建"本报表定制规则"段落。从 Agent 的 S2SQL 提示词中截取定制规则部分； 无定制规则时返回空串（占位符被替换为空，不影响基础提示词）。
+     */
+    private String buildCustomRulesSection(Agent agent) {
+        String customRules = extractCustomRules(agent);
+        if (StringUtils.isBlank(customRules)) {
+            return "";
+        }
+        return "### 本报表定制规则（在上述通用规则之外，同样必须严格遵守）\n\n" + customRules + "\n";
+    }
+
+    /**
+     * 从 Agent 的 S2SQL_PARSER 提示词中提取报表定制规则。 规则部分以 {@link #CUSTOM_RULES_MARKER} 标记开头，取该标记到提示词结尾；
+     * 找不到标记（说明该 Agent 无定制规则）或解析异常时返回空串，不阻断主流程。
+     */
+    private String extractCustomRules(Agent agent) {
+        try {
+            ChatApp chatApp = agent != null && agent.getChatAppConfig() != null
+                    ? agent.getChatAppConfig().get(APP_KEY)
+                    : null;
+            if (chatApp == null || StringUtils.isBlank(chatApp.getPrompt())) {
+                return "";
+            }
+            String prompt = chatApp.getPrompt();
+            int markerIndex = prompt.indexOf(CUSTOM_RULES_MARKER);
+            if (markerIndex < 0) {
+                log.info("[LLM_NATIVE] Agent提示词中未找到定制规则标记 [{}]，跳过定制规则注入", CUSTOM_RULES_MARKER);
+                return "";
+            }
+            String customRules = prompt.substring(markerIndex).trim();
+            log.info("[LLM_NATIVE] 提取到本报表定制规则，长度: {} 字符", customRules.length());
+            log.debug("[LLM_NATIVE] 定制规则内容:\n{}", customRules);
+            return customRules;
+        } catch (Exception e) {
+            log.warn("[LLM_NATIVE] 提取定制规则失败，跳过", e);
+            return "";
+        }
     }
 
     /** 重试场景下把上次的失败 SQL 与错误原因回喂给 LLM。 */
