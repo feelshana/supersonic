@@ -67,12 +67,25 @@ public class LlmNativeSqlParser implements ChatQueryParser {
     private static final String PLACEHOLDER_ENGINE = "{{ENGINE_TYPE}}";
     private static final String PLACEHOLDER_ERROR = "{{ERROR_FEEDBACK}}";
     private static final String PLACEHOLDER_CUSTOM_RULES = "{{CUSTOM_RULES}}";
+    private static final String PLACEHOLDER_TABLE_TYPE_HINT = "{{TABLE_TYPE_HINT}}";
 
     /**
-     * Agent 提示词中"报表定制规则"的起始标记。BI 训练时 {@code BiAgentServiceImpl.buildNewRulesContent()}
+     * Agent 提示词中“报表定制规则”的起始标记。BI 训练时 {@code BiAgentServiceImpl.buildNewRulesContent()}
      * 会以该标记开头追加报表规则，用户后续也可在前端继续补充。从该标记到提示词结尾即为定制规则部分。
      */
     private static final String CUSTOM_RULES_MARKER = "Sql生成的限制条件";
+
+    /** 定制规则中出现该词时，判定为明细表，切换为明细表提示。 */
+    private static final String DETAIL_TABLE_MARKER = "当前报表是明细表";
+
+    /** 默认表类型提示：预聚合结果表。覆盖绝大多数报表，明细表通过定制规则显式声明。 */
+    private static final String RESULT_TABLE_HINT =
+            "【表类型】本数据集为预聚合结果表：" + "指标字段的表达式即最终口径，裸字段表示已预聚合的最终值，直接 SELECT，不要再套聚合函数，也不要为其 GROUP BY；"
+                    + "若表达式自带聚合函数，则按 GROUP BY 规则处理。";
+
+    /** 明细表提示：按需聚合。 */
+    private static final String DETAIL_TABLE_HINT = "【表类型】本数据集为明细表："
+            + "每行是一条业务记录，维度组合可能重复。请依据用户问题的统计口径，对指标字段按需使用聚合函数并配合 GROUP BY；" + "字段表达式自带聚合时按原样使用。";
 
     /**
      * 是否接管本次解析。判定优先级：
@@ -80,8 +93,8 @@ public class LlmNativeSqlParser implements ChatQueryParser {
      * <ol>
      * <li>请求显式传了 {@code queryType} → 严格按它判定。传本模式则接管，传其他模式（simple/super_simple）则让位，
      * 保证调用方能显式覆盖配置，便于灰度与联调。</li>
-     * <li>请求没传 → 看 Agent 是否在配置里被启用（{@link LlmNativeParserConfig}）。这是生产常态： 一个 BI 报表 Agent
-     * 用哪种模式是部署期决策，配一次即可，调用方无需改传参。</li>
+     * <li>请求没传 → 先看 Agent 是否在排除名单（{@link LlmNativeParserConfig#getExcludeAgentIds()}）， 命中则让位、回退原
+     * NL2SQLParser；否则看全量开关 {@code enable-all-bi-agents}。</li>
      * </ol>
      */
     @Override
@@ -96,7 +109,7 @@ public class LlmNativeSqlParser implements ChatQueryParser {
         return isEnabledForAgent(parseContext.getAgent());
     }
 
-    /** Agent 命中白名单，或开启了"对所有 BI 报表 Agent 生效"且当前是 BI Agent。 */
+    /** 排除名单优先（命中即回退原模式）；否则看"对所有 BI 报表 Agent 生效"开关。 */
     private boolean isEnabledForAgent(Agent agent) {
         if (agent == null || agent.getId() == null) {
             return false;
@@ -106,8 +119,9 @@ public class LlmNativeSqlParser implements ChatQueryParser {
             if (config == null) {
                 return false;
             }
-            if (config.getAgentIds().contains(agent.getId())) {
-                return true;
+            if (config.getExcludeAgentIds().contains(agent.getId())) {
+                log.info("[LLM_NATIVE] Agent[{}] 在排除名单中，回退原 NL2SQL 模式", agent.getId());
+                return false;
             }
             return config.isEnableAllBiAgents();
         } catch (Exception e) {
@@ -178,19 +192,33 @@ public class LlmNativeSqlParser implements ChatQueryParser {
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String engineName =
                 context.getEngineType() != null ? context.getEngineType().getName() : "MySQL";
+        // 定制规则只提取一次，同时供“表类型提示”与“定制规则段”使用
+        String customRules = extractCustomRules(agent);
         return readPromptTemplate().replace(PLACEHOLDER_DATE, today)
                 .replace(PLACEHOLDER_ENGINE, engineName)
                 .replace(PLACEHOLDER_SCHEMA, context.getSchemaText())
-                .replace(PLACEHOLDER_CUSTOM_RULES, buildCustomRulesSection(agent))
+                .replace(PLACEHOLDER_TABLE_TYPE_HINT, buildTableTypeHint(customRules))
+                .replace(PLACEHOLDER_CUSTOM_RULES, buildCustomRulesSection(customRules))
                 .replace(PLACEHOLDER_ERROR, buildErrorFeedbackSection(request))
                 .replace(PLACEHOLDER_QUERY, StringUtils.defaultString(request.getQueryText()));
     }
 
     /**
-     * 构建"本报表定制规则"段落。从 Agent 的 S2SQL 提示词中截取定制规则部分； 无定制规则时返回空串（占位符被替换为空，不影响基础提示词）。
+     * 构建表类型提示。默认按“预聚合结果表”处理（覆盖绝大多数报表）； 当 BI 在定制规则中显式写明“明细表”时，切换为明细表提示。 采用“默认结果表 +
+     * 显式声明明细表”的确定性策略，避免自动识别的静默误判。
      */
-    private String buildCustomRulesSection(Agent agent) {
-        String customRules = extractCustomRules(agent);
+    private String buildTableTypeHint(String customRules) {
+        if (StringUtils.isNotBlank(customRules) && customRules.contains(DETAIL_TABLE_MARKER)) {
+            log.info("[LLM_NATIVE] 定制规则中识别到 [{}] 标记，使用明细表提示", DETAIL_TABLE_MARKER);
+            return DETAIL_TABLE_HINT;
+        }
+        return RESULT_TABLE_HINT;
+    }
+
+    /**
+     * 构建“本报表定制规则”段落。无定制规则时返回空串（占位符被替换为空，不影响基础提示词）。
+     */
+    private String buildCustomRulesSection(String customRules) {
         if (StringUtils.isBlank(customRules)) {
             return "";
         }

@@ -18,6 +18,13 @@ s2:
     multi-turn:
       enable: false
 
+  #LLM_NATIVE模式：LLM直接生成物理SQL，跳过语义层翻译
+  llm-native:
+    #全量开关：true时所有Agent默认走该模式（请求显式传queryType时以传参为准）
+    enable-all-bi-agents: true
+    #排除名单：不走该模式、回退原NL2SQLParser的agentId，逗号分隔，如 43,58；没有则留空
+    exclude-agent-ids:
+
   corrector:
     additional:
       information: true
