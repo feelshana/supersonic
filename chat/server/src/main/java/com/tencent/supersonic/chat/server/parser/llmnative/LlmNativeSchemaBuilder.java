@@ -89,6 +89,7 @@ public class LlmNativeSchemaBuilder {
 
         appendDimensions(sb, context, modelDetail, dataSetSchema);
         appendMetrics(sb, context, modelDetail);
+        appendTerms(sb, dataSetSchema);
         resolveMandatorySelectFields(dataSetSchema, context);
         fillSegmentInputs(dataSetSchema, modelDetail, context);
 
@@ -115,6 +116,36 @@ public class LlmNativeSchemaBuilder {
                             measure.getBizName()))
                     .filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
             context.setMetricNames(metricNames);
+        }
+    }
+
+    /**
+     * 追加业务术语说明（口径解释/别名等价），帮助 LLM 把用户业务语言映射到正确字段与口径。
+     *
+     * <p>
+     * 过滤口径与 {@code AgentServiceImpl.getAgentDataSetInfo} 一致：排除 alias 含 "rule" 的术语。 规则术语走
+     * CUSTOM_RULES 注入；配置类术语（默认值配置/必须查询的字段/无需排除id的维度）的 alias 也配为 rule， 一并被排除，避免配置 JSON
+     * 进入提示词、与代码注入冲突。其余纯业务术语以 "name: description" 注入。
+     */
+    private static void appendTerms(StringBuilder sb, DataSetSchema dataSetSchema) {
+        if (CollectionUtils.isEmpty(dataSetSchema.getTerms())) {
+            return;
+        }
+        List<SchemaElement> businessTerms =
+                dataSetSchema.getTerms().stream().filter(t -> StringUtils.isNotBlank(t.getName()))
+                        .filter(t -> t.getAlias() == null || t.getAlias().stream()
+                                .noneMatch(a -> a != null && a.toLowerCase().contains("rule")))
+                        .collect(Collectors.toList());
+        if (businessTerms.isEmpty()) {
+            return;
+        }
+        sb.append("\n术语说明（业务口径/别名等价，供理解用户问题与字段的对应关系）:\n");
+        for (SchemaElement term : businessTerms) {
+            sb.append("   - ").append(term.getName());
+            if (StringUtils.isNotBlank(term.getDescription())) {
+                sb.append(": ").append(term.getDescription());
+            }
+            sb.append("\n");
         }
     }
 
